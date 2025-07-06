@@ -320,234 +320,43 @@ class NetworkXGraphStore:
     
     def visualize_subgraph(self, center_id: str, radius: int = 2) -> str:
         """部分グラフを可視化"""
-        pass
-```
 
-### 2.1 Transport Layer
+### 2.1 MCP Server Layer（SDKベース設計）
 
-#### 2.1.1 Transport Manager
-**責務**: 複数の通信方式を統合管理
+#### 2.1.0 FastMCPサーバ統合設計
 
-```python
-class TransportManager:
-    def __init__(self, config: TransportConfig):
-        self.config = config
-        self.handlers = {}
-        self.router = RequestRouter()
-        
-    async def start_transports(self):
-        """設定に応じて各トランスポートを起動"""
-        if self.config.stdio.enabled:
-            self.handlers['stdio'] = STDIOHandler(self.router)
-            await self.handlers['stdio'].start()
-            
-        if self.config.http.enabled:
-            self.handlers['http'] = HTTPHandler(self.router, self.config.http)
-            await self.handlers['http'].start()
-            
-        if self.config.sse.enabled:
-            self.handlers['sse'] = SSEHandler(self.router, self.config.sse)
-            await self.handlers['sse'].start()
+- すべてのトランスポート（STDIO/HTTP/SSE）は`FastMCP`インスタンスの`run()`または`xxx_app()`で一元管理
+- 独自のTransportManager/Handler/Routerは廃止
+- MCPツール・リソースは`@mcp.tool()`/`@mcp.resource()`で登録
+- main/エントリーポイントで`mcp.run(transport=...)`を呼び出すだけで切替可能
 
-class RequestRouter:
-    def __init__(self):
-        self.tool_handler = None
-        self.resource_handler = None
-        
-    async def route_request(self, request: dict, transport_context: dict) -> dict:
-        """リクエストを適切なハンドラーにルーティング"""
-        method = request.get('method')
-        params = request.get('params', {})
-        
-        # 認証・認可チェック
-        if not await self.check_authorization(method, params, transport_context):
-            raise UnauthorizedError("Access denied")
-            
-        # ツール呼び出し
-        if method.startswith('tools/'):
-            return await self.tool_handler.handle_request(method, params)
-        # リソース要求
-        elif method.startswith('resources/'):
-            return await self.resource_handler.handle_request(method, params)
-        else:
-            raise MethodNotFoundError(f"Unknown method: {method}")
-```
-
-#### 2.1.2 STDIO Handler
-**責務**: 標準入出力を通じたMCP通信
+#### 例: FastMCPベースのトランスポート統合
 
 ```python
-class STDIOHandler:
-    def __init__(self, router: RequestRouter):
-        self.router = router
-        
-    async def start(self):
-        """STDIO通信を開始"""
-        while True:
-            try:
-                line = await ainput()  # 非同期標準入力
-                request = json.loads(line)
-                response = await self.router.route_request(
-                    request, 
-                    {'transport': 'stdio', 'client_id': 'stdio_client'}
-                )
-                print(json.dumps(response))
-                sys.stdout.flush()
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                error_response = self.create_error_response(str(e))
-                print(json.dumps(error_response))
-```
+from mcp.server.fastmcp import FastMCP
 
-#### 2.1.3 HTTP Handler
-**責務**: HTTP RESTful APIでのMCP通信
-
-```python
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-
-class HTTPHandler:
-    def __init__(self, router: RequestRouter, config: HTTPConfig):
-        self.router = router
-        self.config = config
-        self.app = FastAPI(title="MCP Associative Memory Server")
-        self.setup_routes()
-        self.setup_middleware()
-        
-    def setup_routes(self):
-        @self.app.post("/mcp")
-        async def handle_mcp_request(request: dict, user_id: str = Depends(self.get_user_id)):
-            """JSON-RPC リクエストを処理"""
-            transport_context = {
-                'transport': 'http',
-                'user_id': user_id,
-                'client_ip': request.client.host
-            }
-            return await self.router.route_request(request, transport_context)
-        
-        @self.app.get("/health")
-        async def health_check():
-            """ヘルスチェック"""
-            return {"status": "healthy", "timestamp": datetime.now().isoformat()}
-        
-        @self.app.get("/metrics")
-        async def get_metrics():
-            """Prometheusメトリクス"""
-            return generate_prometheus_metrics()
-    
-    def setup_middleware(self):
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=self.config.cors.allowed_origins,
-            allow_methods=self.config.cors.allowed_methods,
-            allow_headers=["*"]
-        )
-    
-    async def get_user_id(self, authorization: str = Header(None)) -> str:
-        """認証からユーザーIDを取得"""
-        if not authorization:
-            raise HTTPException(401, "Authorization header required")
-        # JWT or API Key validation
-        return validate_auth_token(authorization)
-    
-    async def start(self):
-        """HTTPサーバーを起動"""
-        import uvicorn
-        await uvicorn.run(
-            self.app,
-            host=self.config.host,
-            port=self.config.port,
-            log_level=self.config.log_level
-        )
-```
-
-#### 2.1.4 SSE Handler
-**責務**: Server-Sent Eventsでのリアルタイム通信
-
-```python
-from fastapi import WebSocket, WebSocketDisconnect
-from typing import Dict, List
-
-class SSEHandler:
-    def __init__(self, router: RequestRouter, config: SSEConfig):
-        self.router = router
-        self.config = config
-        self.app = FastAPI()
-        self.active_connections: Dict[str, WebSocket] = {}
-        self.setup_routes()
-        
-    def setup_routes(self):
-        @self.app.websocket("/sse")
-        async def websocket_endpoint(websocket: WebSocket):
-            await websocket.accept()
-            client_id = f"sse_{uuid.uuid4().hex}"
-            self.active_connections[client_id] = websocket
-            
-            try:
-                # ハートビート送信
-                heartbeat_task = asyncio.create_task(
-                    self.send_heartbeat(client_id)
-                )
-                
-                # メッセージ処理
-                while True:
-                    data = await websocket.receive_json()
-                    transport_context = {
-                        'transport': 'sse',
-                        'client_id': client_id,
-                        'websocket': websocket
-                    }
-                    
-                    response = await self.router.route_request(data, transport_context)
-                    await websocket.send_json(response)
-                    
-            except WebSocketDisconnect:
-                self.active_connections.pop(client_id, None)
-                heartbeat_task.cancel()
-            except Exception as e:
-                await websocket.send_json({
-                    "error": {"code": -32000, "message": str(e)}
-                })
-    
-    async def send_heartbeat(self, client_id: str):
-        """定期的なハートビート送信"""
-        while client_id in self.active_connections:
-            try:
-                await self.active_connections[client_id].send_json({
-                    "type": "heartbeat", 
-                    "timestamp": datetime.now().isoformat()
-                })
-                await asyncio.sleep(self.config.heartbeat_interval)
-            except:
-                break
-    
-    async def broadcast_update(self, update: dict):
-        """すべての接続クライアントに更新を送信"""
-        disconnected = []
-        for client_id, websocket in self.active_connections.items():
-            try:
-                await websocket.send_json({
-                    "type": "update",
-                    "data": update
-                })
-            except:
-                disconnected.append(client_id)
-        
-        # 切断されたクライアントを削除
-        for client_id in disconnected:
-            self.active_connections.pop(client_id, None)
-    
-    async def start(self):
-        """SSE WebSocketサーバーを起動"""
-        import uvicorn
-        await uvicorn.run(
-            self.app,
-            host=self.config.host,
-            port=self.config.port,
-            ws_ping_interval=20,
             ws_ping_timeout=10
+
+@mcp.tool()
         )
+# ...他ツール/リソースも同様
+
+if __name__ == "__main__":
+    # transport="stdio"|"http"|"sse" で切替
+    mcp.run(transport="sse", host="0.0.0.0", port=8001)
+```
+
+#### SSE/WebSocket/HTTPの詳細
+
+- HTTP: `mcp.run(transport="http", ...)` または `mcp.http_app()` をASGI/Starlette/FastAPIにマウント
+- SSE: `mcp.run(transport="sse", ...)` または `mcp.sse_app()` をASGI/Starletteにマウント
+- STDIO: `mcp.run()`（デフォルト）
+
+#### 旧設計からの主な変更点
+
+- `TransportManager`, `STDIOHandler`, `HTTPHandler`, `SSEHandler`, `RequestRouter`は不要
+- ルーティング・認証・エラー処理はFastMCPが自動で実施
+- 設定値で`transport`/`host`/`port`を切替
 ```
 ## 3. データフロー
 

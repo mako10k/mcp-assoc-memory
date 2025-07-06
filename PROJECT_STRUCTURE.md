@@ -26,11 +26,7 @@ mcp-assoc-memory/
 │       │
 │       ├── transport/          # 通信層 🆕
 │       │   ├── __init__.py
-│       │   ├── manager.py      # TransportManager
-│       │   ├── stdio_handler.py # STDIO通信
-│       │   ├── http_handler.py  # HTTP API
-│       │   ├── sse_handler.py   # Server-Sent Events
-│       │   └── router.py        # リクエストルーター
+│       │   ├── sse_handler.py   # FastMCP SSEラッパー（SDKベース）
 │       │
 │       ├── handlers/           # MCP ハンドラー
 │       │   ├── __init__.py
@@ -154,7 +150,6 @@ import argparse
 import logging
 from mcp_assoc_memory.server import MCPAssocMemoryServer
 from mcp_assoc_memory.config import load_config
-from mcp_assoc_memory.transport.manager import TransportManager
 
 async def main():
     """メイン関数"""
@@ -193,16 +188,13 @@ async def main():
     
     # サーバー起動
     server = MCPAssocMemoryServer(config)
-    transport_manager = TransportManager(config.transports, server)
     
     try:
-        await transport_manager.start_all()
-        # Graceful shutdown
+        # FastMCPサーバ起動例
+        server.run(transport=args.transport, host="0.0.0.0", port=args.http_port)
         await asyncio.Event().wait()
     except KeyboardInterrupt:
         logging.info("Shutting down...")
-    finally:
-        await transport_manager.stop_all()
 
 if __name__ == "__main__":
     asyncio.run(main())

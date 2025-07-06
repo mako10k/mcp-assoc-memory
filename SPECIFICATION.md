@@ -650,40 +650,26 @@ mcp-assoc-memory --transport sse --port 8001
 ```
 
 **エンドポイント**:
-- `GET /sse` - SSE接続確立
-- `POST /sse` - JSON-RPCリクエスト送信
+- `GET /sse` - FastMCP SSE接続確立（推奨: FastMCP.sse_app()）
+- `POST /sse` - MCPリクエスト送信（推奨: FastMCP.sse_app()）
 
-### 4.2 マルチトランスポート対応
+### 4.2 マルチトランスポート対応（FastMCP方式）
 
-#### 4.2.1 同時起動
-複数の通信方式を同時に起動可能：
+#### 4.2.1 起動例
+FastMCPのrun()でトランスポートを切替：
 ```bash
-mcp-assoc-memory --transport stdio,http,sse --http-port 8000 --sse-port 8001
+python -m mcp_assoc_memory.server --transport sse --port 8001
+python -m mcp_assoc_memory.server --transport http --port 8000
+python -m mcp_assoc_memory.server --transport stdio
 ```
 
-#### 4.2.2 設定ファイルでの指定
+#### 4.2.2 設定ファイル例
 ```json
 {
-  "transports": {
-    "stdio": {
-      "enabled": true
-    },
-    "http": {
-      "enabled": true,
-      "port": 8000,
-      "host": "localhost",
-      "cors": {
-        "allowed_origins": ["http://localhost:3000"],
-        "allowed_methods": ["GET", "POST", "OPTIONS"]
-      }
-    },
-    "sse": {
-      "enabled": true,
-      "port": 8001,
-      "host": "localhost",
-      "max_connections": 100,
-      "heartbeat_interval": 30
-    }
+  "server": {
+    "transport": "sse",
+    "host": "0.0.0.0",
+    "port": 8001
   }
 }
 ```

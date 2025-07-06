@@ -32,6 +32,10 @@ graphviz>=0.20.0
 numpy>=1.24.0
 pandas>=2.0.0
 
+# SSE/WS
+sse-starlette>=1.6.1
+websockets>=11.0.3
+
 # Development dependencies (install with: pip install -e ".[dev]")
 # pytest>=7.0.0
 # pytest-asyncio>=0.21.0
@@ -43,4 +47,3 @@ pandas>=2.0.0
 # mypy>=1.5.0
 # pre-commit>=3.3.0
 # httpx>=0.24.0
-# websockets>=11.0.0

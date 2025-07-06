@@ -32,12 +32,12 @@ LLM用の連想記憶を形成するModel Context Protocol (MCP) サーバーで
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   LLM Client    │────│  MCP Server     │────│  Memory Store   │
-│                 │    │                 │    │                 │
-│ - Claude        │    │ - Tool Handler  │    │ - Vector DB     │
-│ - ChatGPT       │    │ - Memory Engine │    │ - Graph DB      │
-│ - Custom LLM    │    │ - API Layer     │    │ - Metadata DB   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+│   LLM Client    │────│  MCP Server (FastMCP) │────│  Memory Store   │
+│                 │    │                      │    │                 │
+│ - Claude        │    │ - @mcp.tool()        │    │ - Vector DB     │
+│ - ChatGPT       │    │ - @mcp.resource()    │    │ - Graph DB      │
+│ - Custom LLM    │    │ - FastMCP.run()      │    │ - Metadata DB   │
+└─────────────────┘    └──────────────────────┘    └─────────────────┘
 ```
 
 ## 技術スタック
@@ -70,7 +70,7 @@ LLM用の連想記憶を形成するModel Context Protocol (MCP) サーバーで
 - **[プロジェクト構造](PROJECT_STRUCTURE.md)** - ディレクトリ構成とファイル配置
 - **[開発計画](DEVELOPMENT_PLAN.md)** - 開発ロードマップ
 - **[技術検討](TECHNICAL_CONSIDERATIONS.md)** - 技術的な考慮事項
-- **[トランスポート設定](TRANSPORT_CONFIG.md)** - 各種起動方式の設定
+- **[トランスポート設定](TRANSPORT_CONFIG.md)** - FastMCP標準トランスポート（STDIO/HTTP/SSE）設定
 
 ### 貢献
 
