@@ -1,3 +1,6 @@
+from abc import ABC, abstractmethod
+from typing import Optional, List, Dict, Any, Tuple
+
 """
 ストレージ基底クラス定義
 """
@@ -29,6 +32,42 @@ class BaseStorage(ABC):
 
 
 class BaseVectorStore(BaseStorage):
+    @abstractmethod
+    async def store_embedding(
+        self,
+        memory_id: str,
+        embedding: Any,
+        metadata: Dict[str, Any]
+    ) -> bool:
+        """埋め込みを保存"""
+        pass
+
+    @abstractmethod
+    async def get_embedding(
+        self,
+        memory_id: str
+    ) -> Optional[Any]:
+        """埋め込みを取得"""
+        pass
+
+    @abstractmethod
+    async def delete_embedding(
+        self,
+        memory_id: str
+    ) -> bool:
+        """埋め込みを削除"""
+        pass
+
+    @abstractmethod
+    async def search(
+        self,
+        embedding: Any,
+        domain: str,
+        limit: int = 10,
+        min_score: float = 0.7
+    ) -> List["Tuple[str, float]"]:
+        """ベクトル検索（ID, score返却）"""
+        pass
     """ベクトルストレージの抽象基底クラス"""
 
     @abstractmethod
@@ -76,6 +115,98 @@ class BaseVectorStore(BaseStorage):
 
 
 class BaseMetadataStore(BaseStorage):
+    @abstractmethod
+    async def get_memories_by_domain(
+        self,
+        domain: Optional[MemoryDomain] = None,
+        limit: int = 1000,
+        order_by: Optional[str] = None
+    ) -> List[Memory]:
+        """ドメインごとの記憶一覧取得"""
+        pass
+
+    @abstractmethod
+    async def get_memory_stats(
+        self,
+        domain: Optional[MemoryDomain] = None
+    ) -> Dict[str, Any]:
+        """記憶統計取得"""
+        pass
+
+    @abstractmethod
+    async def search_by_tags(
+        self,
+        tags: List[str],
+        domain: MemoryDomain,
+        match_all: bool = False,
+        limit: int = 10
+    ) -> List[Memory]:
+        """タグ検索"""
+        pass
+
+    @abstractmethod
+    async def search_by_timerange(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        domain: MemoryDomain,
+        limit: int = 10
+    ) -> List[Memory]:
+        """時間範囲検索"""
+        pass
+
+    @abstractmethod
+    async def advanced_search(
+        self,
+        domain: MemoryDomain,
+        tags: Optional[List[str]] = None,
+        category: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        limit: int = 30
+    ) -> List[Memory]:
+        """高度検索（複合条件）"""
+        pass
+
+    @abstractmethod
+    async def update_access_stats(
+        self,
+        memory_id: str,
+        access_count: int
+    ) -> bool:
+        """アクセス統計を更新"""
+        pass
+
+    @abstractmethod
+    async def get_memory_associations(
+        self,
+        memory_id: str
+    ) -> List[Association]:
+        """記憶に紐づく関連性一覧取得"""
+        pass
+
+    @abstractmethod
+    async def batch_delete_memories(
+        self,
+        criteria: Dict[str, Any]
+    ) -> int:
+        """一括削除"""
+        pass
+
+    @abstractmethod
+    async def cleanup_orphans(self) -> int:
+        """孤立データのクリーンアップ"""
+        pass
+
+    @abstractmethod
+    async def reindex(self) -> None:
+        """インデックス再構築"""
+        pass
+
+    @abstractmethod
+    async def vacuum(self) -> None:
+        """VACUUM実行"""
+        pass
     """メタデータストレージの抽象基底クラス"""
 
     @abstractmethod
@@ -146,14 +277,28 @@ class BaseMetadataStore(BaseStorage):
 
 
 class BaseGraphStore(BaseStorage):
+    @abstractmethod
+    async def get_all_association_edges(
+        self,
+        domain: Optional[MemoryDomain] = None
+    ) -> List[Dict[str, Any]]:
+        """全関連エッジ取得（可視化用）"""
+        pass
+
+    @abstractmethod
+    async def export_graph(
+        self,
+        domain: Optional[MemoryDomain] = None
+    ) -> Dict[str, Any]:
+        """グラフ構造エクスポート（可視化用）"""
+        pass
     """グラフストレージの抽象基底クラス"""
 
     @abstractmethod
     async def add_memory_node(
         self,
-        memory_id: str,
-        metadata: Dict[str, Any]
-    ) -> None:
+        memory: 'Memory'
+    ) -> bool:
         """記憶ノードを追加"""
         pass
 
@@ -205,10 +350,7 @@ class BaseGraphStore(BaseStorage):
         """コミュニティを検出"""
         pass
 
-    @abstractmethod
-    async def export_graph(self, format: str = "graphml") -> str:
-        """グラフをエクスポート"""
-        pass
+    # 旧export_graphは廃止（新しいexport_graphに統合）
 
 
 class BaseEmbeddingService(ABC):

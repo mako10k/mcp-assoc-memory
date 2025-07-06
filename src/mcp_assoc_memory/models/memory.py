@@ -38,7 +38,7 @@ class Memory:
     # タイムスタンプ
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    accessed_at: datetime = field(default_factory=datetime.utcnow)
+    accessed_at: Optional[datetime] = field(default_factory=datetime.utcnow)
 
     # 統計情報
     access_count: int = 0
@@ -57,7 +57,7 @@ class Memory:
             "session_id": self.session_id,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
-            "accessed_at": self.accessed_at.isoformat(),
+            "accessed_at": self.accessed_at.isoformat() if self.accessed_at else None,
             "access_count": self.access_count,
         }
 
@@ -75,7 +75,7 @@ class Memory:
             session_id=data.get("session_id"),
             created_at=datetime.fromisoformat(data["created_at"]),
             updated_at=datetime.fromisoformat(data["updated_at"]),
-            accessed_at=datetime.fromisoformat(data["accessed_at"]),
+            accessed_at=datetime.fromisoformat(data["accessed_at"]) if data.get("accessed_at") else None,
             access_count=data.get("access_count", 0),
         )
 

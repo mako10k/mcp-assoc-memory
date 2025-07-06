@@ -25,6 +25,133 @@ logger = get_memory_logger(__name__)
 
 
 class MemoryManager:
+    # --- 可視化・統計・管理系メソッド ---
+    async def memory_map(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
+        """記憶マップ（可視化用データ）を取得"""
+        try:
+            memories = await self.metadata_store.get_memories_by_domain(domain)
+            nodes = [
+                {
+                    "id": m.id,
+                    "label": m.content[:32],
+                    "category": m.category,
+                    "domain": m.domain.value,
+                }
+                for m in memories
+            ]
+            edges = await self.graph_store.get_all_association_edges(domain)
+            return {"nodes": nodes, "edges": edges}
+        except Exception as e:
+            logger.error(f"memory_map生成エラー: {e}")
+            return {"error": str(e)}
+
+    async def domain_graph(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
+        """ドメイングラフ構造を取得"""
+        try:
+            graph = await self.graph_store.export_graph(domain)
+            return graph
+        except Exception as e:
+            logger.error(f"domain_graph生成エラー: {e}")
+            return {"error": str(e)}
+
+    async def timeline(self, domain: Optional[MemoryDomain] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """記憶のタイムラインデータを取得"""
+        try:
+            memories = await self.metadata_store.get_memories_by_domain(domain, limit=limit, order_by="created_at DESC")
+            return [
+                {
+                    "id": m.id,
+                    "content": m.content,
+                    "created_at": m.created_at.isoformat(),
+                    "category": m.category,
+                }
+                for m in memories
+            ]
+        except Exception as e:
+            logger.error(f"timeline生成エラー: {e}")
+            return []
+
+    async def category_chart(self, domain: Optional[MemoryDomain] = None) -> Dict[str, int]:
+        """カテゴリ別件数チャートデータ"""
+        try:
+            stats = await self.metadata_store.get_memory_stats(domain)
+            return stats.get("by_category", {})
+        except Exception as e:
+            logger.error(f"category_chart生成エラー: {e}")
+            return {}
+
+    async def stats_dashboard(self) -> Dict[str, Any]:
+        """統計ダッシュボードデータ"""
+        try:
+            stats = await self.get_memory_stats()
+            sys_stats = await self.get_statistics()
+            return {"memory_stats": stats, "system_stats": sys_stats}
+        except Exception as e:
+            logger.error(f"stats_dashboard生成エラー: {e}")
+            return {"error": str(e)}
+
+    # --- パフォーマンス・運用・拡張用メソッド ---
+    async def get_performance_metrics(self) -> Dict[str, Any]:
+        """パフォーマンスメトリクス取得（Phase 4用）"""
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            cpu = psutil.cpu_percent(interval=0.1)
+            return {
+                "memory_total": mem.total,
+                "memory_used": mem.used,
+                "memory_percent": mem.percent,
+                "cpu_percent": cpu,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"パフォーマンスメトリクス取得エラー: {e}")
+            return {"error": str(e)}
+
+    async def move_memories_to_domain(self, source_domain: MemoryDomain, target_domain: MemoryDomain) -> int:
+        """記憶を別ドメインへ一括移動（運用/管理用）"""
+        try:
+            memories = await self.metadata_store.get_memories_by_domain(source_domain)
+            moved = 0
+            for m in memories:
+                m.domain = target_domain
+                m.updated_at = datetime.utcnow()
+                success = await self.metadata_store.update_memory(m)
+                if success:
+                    self.memory_cache.set(m.id, m)
+                    moved += 1
+            logger.info(f"{moved}件を{source_domain.value}→{target_domain.value}へ移動")
+            return moved
+        except Exception as e:
+            logger.error(f"ドメイン一括移動エラー: {e}")
+            return 0
+
+    async def batch_update_memories(self, domain: MemoryDomain, update_fields: Dict[str, Any]) -> int:
+        """記憶を一括更新（管理・最適化用）"""
+        try:
+            memories = await self.metadata_store.get_memories_by_domain(domain)
+            updated = 0
+            for m in memories:
+                for k, v in update_fields.items():
+                    if hasattr(m, k):
+                        setattr(m, k, v)
+                m.updated_at = datetime.utcnow()
+                success = await self.metadata_store.update_memory(m)
+                if success:
+                    self.memory_cache.set(m.id, m)
+                    updated += 1
+            logger.info(f"{updated}件を一括更新({domain.value})")
+            return updated
+        except Exception as e:
+            logger.error(f"一括更新エラー: {e}")
+            return 0
+
+    # --- 今後の拡張・最適化用メソッドスタブ ---
+    # 例: async def reindex_all(self): ...
+    # 例: async def backup_database(self): ...
+    # 例: async def restore_database(self, backup_path: str): ...
+    # 例: async def detect_memory_leaks(self): ...
+    # 必要に応じて随時追加
     """記憶管理エンジン"""
 
     def __init__(
@@ -254,10 +381,18 @@ class MemoryManager:
                 filters["tags"] = tags
 
             # ベクトル検索実行
+            # 1次元リスト化
+            if hasattr(query_embedding, 'flatten'):
+                embedding_list = query_embedding.flatten().tolist()
+            elif hasattr(query_embedding, 'tolist'):
+                embedding_list = query_embedding.tolist()
+            else:
+                embedding_list = list(query_embedding) if not isinstance(query_embedding, list) else query_embedding
             vector_results = await self.vector_store.search_similar(
-                query_embedding,
-                limit=limit * 2,  # フィルタリング後に十分な結果を確保
-                metadata_filter=filters
+                embedding_list,
+                domain=filters.get("domain", [MemoryDomain.USER])[0] if filters.get("domain") else MemoryDomain.USER,
+                limit=limit * 2,
+                filters=filters
             )
 
             # 類似度フィルタリング
@@ -297,58 +432,7 @@ class MemoryManager:
             )
             return []
 
-    async def get_related_memories(
-        self,
-        memory_id: str,
-        max_depth: int = 2,
-        max_results: int = 10,
-        min_strength: float = 0.3
-    ) -> List[Dict[str, Any]]:
-        """関連記憶を取得"""
-        try:
-            # グラフから近隣記憶を取得
-            neighbors = await self.graph_store.get_neighbors(
-                memory_id,
-                max_depth=max_depth,
-                max_neighbors=max_results * 2
-            )
-
-            # 関連強度でフィルタリング
-            related_memories = []
-            for neighbor in neighbors:
-                if neighbor["association_strength"] >= min_strength:
-                    # 記憶詳細を取得
-                    memory = await self.get_memory(neighbor["memory_id"])
-                    if memory:
-                        related_memories.append({
-                            "memory": memory,
-                            "association_strength": neighbor["association_strength"],
-                            "association_type": neighbor["association_type"],
-                            "depth": neighbor["depth"]
-                        })
-
-            # 結果を制限
-            related_memories = related_memories[:max_results]
-
-            logger.debug(
-                "Related memories retrieved",
-                extra_data={
-                    "memory_id": memory_id,
-                    "total_neighbors": len(neighbors),
-                    "related_count": len(related_memories)
-                }
-            )
-
-            return related_memories
-
-        except Exception as e:
-            logger.error(
-                "Failed to get related memories",
-                error_code="RELATED_MEMORIES_ERROR",
-                memory_id=memory_id,
-                error=str(e)
-            )
-            return []
+    # --- グラフベースの get_related_memories は削除（find_similar_memories/semantic_searchで統一） ---
 
     async def update_memory(
         self,
@@ -470,12 +554,16 @@ class MemoryManager:
         """記憶の自動関連付け"""
         try:
             # 類似記憶を検索
+            if hasattr(embedding, 'flatten'):
+                emb_list = embedding.flatten().tolist()
+            elif hasattr(embedding, 'tolist'):
+                emb_list = embedding.tolist()
+            else:
+                emb_list = list(embedding) if not isinstance(embedding, list) else embedding
             similar_results = await self.vector_store.search_similar(
-                embedding,
-                limit=10,
-                metadata_filter={
-                    "domain": memory.domain.value
-                }
+                emb_list,
+                domain=memory.domain,
+                limit=10
             )
 
             # 関連性を作成
@@ -810,10 +898,10 @@ class MemoryManager:
         self,
         query: str = '',
         domain: MemoryDomain = MemoryDomain.USER,
-        tags: List[str] = None,
-        category: str = None,
-        start_date: datetime = None,
-        end_date: datetime = None,
+        tags: Optional[List[str]] = None,
+        category: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
         min_score: float = 0.5,
         limit: int = 10
     ) -> List[Tuple[Memory, float]]:
@@ -843,7 +931,7 @@ class MemoryManager:
                 # 記憶の埋め込みを取得
                 memory_embedding = await self.vector_store.get_embedding(memory.id)
                 if memory_embedding:
-                    score = self.similarity_calc.cosine_similarity(
+                    score = self.similarity_calculator.cosine_similarity(
                         query_embedding, memory_embedding
                     )
                     if score >= min_score:
@@ -914,49 +1002,8 @@ class MemoryManager:
             logger.error(f"関連記憶取得エラー: {e}")
             return []
 
-    async def update_memory(
-        self,
-        memory_id: str,
-        content: str = None,
-        metadata: Dict[str, Any] = None,
-        tags: List[str] = None,
-        category: str = None
-    ) -> Optional[Memory]:
-        """記憶を更新"""
-        try:
-            memory = await self.get_memory(memory_id)
-            if not memory:
-                return None
-            
-            # 更新フィールドを適用
-            if content is not None:
-                memory.content = content
-            if metadata is not None:
-                memory.metadata.update(metadata)
-            if tags is not None:
-                memory.tags = tags
-            if category is not None:
-                memory.category = category
-            
-            memory.updated_at = datetime.utcnow()
-            
-            # 埋め込みを再生成（コンテンツが変更された場合）
-            if content is not None:
-                embedding = await self.embedding_service.get_embedding(content)
-                if embedding:
-                    await self.vector_store.store_embedding(
-                        memory_id, embedding, memory.to_dict()
-                    )
-            
-            # メタデータストアを更新
-            success = await self.metadata_store.update_memory(memory)
-            if success:
-                # キャッシュを更新
-                self.memory_cache.set(memory_id, memory)
-                logger.info(f"記憶更新: {memory_id}")
-                return memory
-            
-            return None
-        except Exception as e:
-            logger.error(f"記憶更新エラー: {e}")
-            return None
+    # --- 既存の update_memory は上位で定義済みのため、ここでは省略 ---
+
+    # Phase 3: MCPツール用メソッド群の未実装部分（例: get_memory_stats, export_memories, import_memories など）は既に実装済み
+
+    # TODO: Phase 3/4で必要な追加メソッドや最適化ロジックがあればここに追記

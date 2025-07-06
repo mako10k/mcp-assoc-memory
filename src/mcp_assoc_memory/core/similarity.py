@@ -22,6 +22,9 @@ class SimilarityMetric(Enum):
 
 
 class SimilarityCalculator:
+    def cosine_similarity(self, vector1, vector2) -> float:
+        """コサイン類似度を直接計算 (memory_manager.py互換)"""
+        return self._cosine_similarity(np.array(vector1), np.array(vector2))
     """類似度計算クラス"""
 
     def __init__(

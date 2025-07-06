@@ -37,7 +37,12 @@ class NetworkXGraphStore(BaseGraphStore):
             # 既存グラフファイルの読み込み
             if Path(self.graph_path).exists():
                 with open(self.graph_path, 'rb') as f:
-                    self.graph = pickle.load(f)
+                    loaded_graph = pickle.load(f)
+                    if isinstance(loaded_graph, nx.MultiDiGraph):
+                        self.graph = loaded_graph
+                    else:
+                        logger.error("Loaded graph is not a MultiDiGraph. Reinitializing.")
+                        self.graph = nx.MultiDiGraph()
                 logger.info(
                     "Graph loaded from file",
                     extra_data={
@@ -154,11 +159,13 @@ class NetworkXGraphStore(BaseGraphStore):
                     "content": memory.content,
                     "metadata": memory.metadata,
                     "tags": memory.tags,
+                    "category": memory.category,
                     "user_id": memory.user_id,
                     "project_id": memory.project_id,
                     "session_id": memory.session_id,
-                    "created_at": memory.created_at.isoformat(),
-                    "updated_at": memory.updated_at.isoformat(),
+                    "created_at": memory.created_at.isoformat() if memory.created_at else None,
+                    "updated_at": memory.updated_at.isoformat() if memory.updated_at else None,
+                    "accessed_at": memory.accessed_at.isoformat() if memory.accessed_at else None,
                     "access_count": memory.access_count
                 }
 
@@ -426,29 +433,33 @@ class NetworkXGraphStore(BaseGraphStore):
             )
             return None
 
-    async def get_graph_stats(self) -> Dict[str, Any]:
+    async def get_graph_stats(self) -> dict:
         """グラフ統計を取得"""
         try:
-            stats = {
+            stats: dict = {
                 "nodes": self.graph.number_of_nodes(),
                 "edges": self.graph.number_of_edges(),
             }
 
             if self.graph.number_of_nodes() > 0:
                 # 次数統計
-                degrees = dict(self.graph.degree())
-                stats.update({
-                    "avg_degree": sum(degrees.values()) / len(degrees),
-                    "max_degree": max(degrees.values()),
-                    "min_degree": min(degrees.values())
-                })
+                node_degrees = {node: int(deg) for node, deg in getattr(self.graph, "degree")()}
+                if node_degrees:
+                    stats["avg_degree"] = sum(node_degrees.values()) / len(node_degrees)
+                    stats["max_degree"] = max(node_degrees.values())
+                    stats["min_degree"] = min(node_degrees.values())
+                else:
+                    stats["avg_degree"] = 0
+                    stats["max_degree"] = 0
+                    stats["min_degree"] = 0
 
                 # 連結成分
                 components = list(nx.weakly_connected_components(self.graph))
-                stats.update({
-                    "num_components": len(components),
-                    "largest_component_size": len(max(components, key=len))
-                })
+                stats["num_components"] = len(components)
+                if components:
+                    stats["largest_component_size"] = len(max(components, key=len))
+                else:
+                    stats["largest_component_size"] = 0
 
                 # 関連タイプ別統計
                 type_stats = {}
@@ -472,10 +483,11 @@ class NetworkXGraphStore(BaseGraphStore):
         """孤立ノードをクリーンアップ"""
         try:
             async with self.graph_lock:
-                orphaned_nodes = [
-                    node for node in self.graph.nodes()
-                    if self.graph.degree(node) == 0
-                ]
+                orphaned_nodes = []
+                for node in self.graph.nodes():
+                    deg = self.graph.degree(node)  # type: ignore
+                    if deg == 0:
+                        orphaned_nodes.append(node)
 
                 for node in orphaned_nodes:
                     self.graph.remove_node(node)

@@ -53,6 +53,12 @@ class MemoryToolHandler(BaseHandler):
                 category=category
             )
 
+            if memory is None:
+                return ToolResponse(
+                    success=False,
+                    error="MEMORY_STORE_ERROR",
+                    message="記憶の保存に失敗しました"
+                )
             return ToolResponse(
                 success=True,
                 data={
@@ -84,19 +90,21 @@ class MemoryToolHandler(BaseHandler):
 
             results = await self.memory_manager.search_memories(
                 query=query,
-                domain=domain,
+                domains=[domain] if domain else None,
                 limit=limit,
-                tags=tags,
-                category=category
+                tags=tags
             )
 
             formatted_results = []
-            for memory, score in results:
+            for item in results:
+                memory = item.get('memory')
+                if memory is None:
+                    continue
                 formatted_results.append({
                     'memory_id': memory.id,
                     'content': memory.content[:200] + '...' if len(memory.content) > 200 else memory.content,
                     'domain': memory.domain.value,
-                    'score': score,
+                    'score': item.get('score'),
                     'tags': memory.tags,
                     'category': memory.category,
                     'created_at': memory.created_at.isoformat()
@@ -171,6 +179,8 @@ class MemoryToolHandler(BaseHandler):
 
             formatted_results = []
             for memory, score in related_memories:
+                if memory is None:
+                    continue
                 formatted_results.append({
                     'memory_id': memory.id,
                     'content': memory.content[:200] + '...' if len(memory.content) > 200 else memory.content,
@@ -208,26 +218,28 @@ class MemoryToolHandler(BaseHandler):
             tags = args.get('tags')
             category = args.get('category')
 
-            memory = await self.memory_manager.update_memory(
+            update_result = await self.memory_manager.update_memory(
                 memory_id=memory_id,
                 content=content,
                 metadata=metadata,
-                tags=tags,
-                category=category
+                tags=tags
             )
 
-            if not memory:
+            if not update_result:
                 return ToolResponse(
                     success=False,
                     error="MEMORY_NOT_FOUND",
                     message=f"記憶 {memory_id} が見つかりません"
                 )
 
+            # 更新日時取得のため再取得
+            memory = await self.memory_manager.get_memory(memory_id)
+            updated_at = memory.updated_at.isoformat() if memory and memory.updated_at else None
             return ToolResponse(
                 success=True,
                 data={
-                    'memory_id': memory.id,
-                    'updated_at': memory.updated_at.isoformat()
+                    'memory_id': memory_id,
+                    'updated_at': updated_at
                 },
                 message="記憶を更新しました"
             )
@@ -527,6 +539,8 @@ class SearchToolHandler(BaseHandler):
 
             formatted_results = []
             for memory in results:
+                if memory is None:
+                    continue
                 formatted_results.append({
                     'memory_id': memory.id,
                     'content': memory.content[:200] + '...' if len(memory.content) > 200 else memory.content,
@@ -629,6 +643,8 @@ class SearchToolHandler(BaseHandler):
 
             formatted_results = []
             for memory, score in results:
+                if memory is None:
+                    continue
                 formatted_results.append({
                     'memory_id': memory.id,
                     'content': memory.content,
@@ -682,6 +698,8 @@ class SearchToolHandler(BaseHandler):
 
             formatted_results = []
             for memory, score in results:
+                if memory is None:
+                    continue
                 formatted_results.append({
                     'memory_id': memory.id,
                     'content': memory.content,

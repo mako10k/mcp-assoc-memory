@@ -73,8 +73,8 @@ class MCPResponse:
         return cls(id=request_id, result=result)
     
     @classmethod
-    def error(cls, request_id: Optional[str], error: "MCPError") -> "MCPResponse":
-        """エラーレスポンスを作成"""
+    def error_response(cls, request_id: Optional[str], error: "MCPError") -> "MCPResponse":
+        """エラーレスポンスを作成（クラスメソッド名を変更し衝突回避）"""
         return cls(id=request_id, error=error)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -302,13 +302,13 @@ class MCPHandler:
                 return await self._handle_resources_list(request)
             
             else:
-                return MCPResponse.error(
+                return MCPResponse.error_response(
                     request.id,
                     MCPError.method_not_found(request.method)
                 )
         
         except Exception as e:
-            return MCPResponse.error(
+            return MCPResponse.error_response(
                 request.id,
                 MCPError.internal_error(str(e))
             )
@@ -320,13 +320,13 @@ class MCPHandler:
         arguments = params.get("arguments", {})
         
         if not tool_name:
-            return MCPResponse.error(
+            return MCPResponse.error_response(
                 request.id,
                 MCPError.invalid_params("Tool name is required")
             )
         
         if tool_name not in self.tools:
-            return MCPResponse.error(
+            return MCPResponse.error_response(
                 request.id,
                 MCPError.method_not_found(tool_name)
             )
@@ -341,13 +341,13 @@ class MCPHandler:
         uri = params.get("uri")
         
         if not uri:
-            return MCPResponse.error(
+            return MCPResponse.error_response(
                 request.id,
                 MCPError.invalid_params("URI is required")
             )
         
         if uri not in self.resources:
-            return MCPResponse.error(
+            return MCPResponse.error_response(
                 request.id,
                 MCPError.method_not_found(f"Resource not found: {uri}")
             )

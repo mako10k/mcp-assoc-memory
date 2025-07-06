@@ -1,6 +1,5 @@
-"""
-SQLiteメタデータストア実装
-"""
+
+
 
 import aiosqlite
 import asyncio
@@ -19,6 +18,82 @@ logger = get_memory_logger(__name__)
 
 
 class SQLiteMetadataStore(BaseMetadataStore):
+
+    def _row_to_memory(self, row) -> Optional[Memory]:
+        if not row:
+            return None
+        try:
+            # 明示的に各引数を渡す（embedding, categoryはNoneでOK）
+            return Memory(
+                id=str(row[0]),
+                domain=MemoryDomain(row[1]),
+                content=str(row[2]),
+                metadata=json.loads(row[3]) if row[3] else {},
+                tags=json.loads(row[4]) if row[4] else [],
+                embedding=None,
+                user_id=str(row[5]) if row[5] is not None else None,
+                project_id=str(row[6]) if row[6] is not None else None,
+                session_id=str(row[7]) if row[7] is not None else None,
+                category=None,
+                created_at=datetime.fromisoformat(row[8]),
+                updated_at=datetime.fromisoformat(row[9]),
+                accessed_at=datetime.fromisoformat(row[10]) if row[10] else None,
+                access_count=int(row[11]) if row[11] is not None else 0
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to convert row to Memory",
+                error_code="ROW_CONVERT_ERROR",
+                row=row,
+                error=str(e)
+            )
+            return None
+
+    async def get_memories_by_domain(self, domain: Optional[MemoryDomain], limit: int = 1000, order_by: Optional[str] = None) -> List[Memory]:
+        """指定ドメインの記憶一覧を取得"""
+        async with aiosqlite.connect(self.database_path) as db:
+            query = "SELECT * FROM memories WHERE 1=1"
+            params = []
+            if domain:
+                query += " AND domain = ?"
+                params.append(domain.value if hasattr(domain, 'value') else str(domain))
+            if order_by:
+                query += f" ORDER BY {order_by}"
+            else:
+                query += " ORDER BY created_at DESC"
+            query += " LIMIT ?"
+            params.append(limit)
+            async with db.execute(query, params) as cursor:
+                rows = await cursor.fetchall()
+            memories = []
+            for row in rows:
+                memory = self._row_to_memory(row)
+                if memory:
+                    memories.append(memory)
+            return memories
+
+    async def get_memory_stats(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
+        """ドメイン別・カテゴリ別件数など統計情報を返す"""
+        stats: Dict[str, Any] = {"total": 0, "by_category": {}}
+        async with aiosqlite.connect(self.database_path) as db:
+            query = "SELECT metadata, COUNT(*) as cnt FROM memories WHERE 1=1"
+            params: List[Any] = []
+            if domain:
+                query += " AND domain = ?"
+                params.append(domain.value if hasattr(domain, 'value') else str(domain))
+            query += " GROUP BY metadata"
+            async with db.execute(query, params) as cursor:
+                rows = await cursor.fetchall()
+            for row in rows:
+                # カテゴリはmetadataの中に含まれる場合があるため、ここではmetadataからcategoryを抽出
+                try:
+                    meta = json.loads(row[0]) if row[0] else {}
+                    category = meta.get("category", "unknown")
+                except Exception:
+                    category = "unknown"
+                stats["by_category"][category] = row[1]
+                stats["total"] += row[1]
+        return stats
     """SQLite実装のメタデータストア"""
 
     def __init__(self, database_path: str = "./data/memory.db"):
@@ -120,13 +195,15 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 async with db.execute(
                     "SELECT COUNT(*) FROM memories"
                 ) as cursor:
-                    memory_count = (await cursor.fetchone())[0]
+                    row = await cursor.fetchone()
+                    memory_count = row[0] if row and row[0] is not None else 0
 
                 # 関連性数を取得
                 async with db.execute(
                     "SELECT COUNT(*) FROM associations"
                 ) as cursor:
-                    association_count = (await cursor.fetchone())[0]
+                    row = await cursor.fetchone()
+                    association_count = row[0] if row and row[0] is not None else 0
 
                 # ドメイン別統計
                 domain_stats = {}
@@ -135,7 +212,8 @@ class SQLiteMetadataStore(BaseMetadataStore):
                         "SELECT COUNT(*) FROM memories WHERE domain = ?",
                         (domain.value,)
                     ) as cursor:
-                        count = (await cursor.fetchone())[0]
+                        row = await cursor.fetchone()
+                        count = row[0] if row and row[0] is not None else 0
                         domain_stats[domain.value] = count
 
                 return {
@@ -211,26 +289,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     (memory_id,)
                 ) as cursor:
                     row = await cursor.fetchone()
-
-                    if not row:
-                        return None
-
-                    return Memory(
-                        id=row[0],
-                        domain=MemoryDomain(row[1]),
-                        content=row[2],
-                        metadata=json.loads(row[3]) if row[3] else {},
-                        tags=json.loads(row[4]) if row[4] else [],
-                        user_id=row[5],
-                        project_id=row[6],
-                        session_id=row[7],
-                        created_at=datetime.fromisoformat(row[8]),
-                        updated_at=datetime.fromisoformat(row[9]),
-                        accessed_at=(datetime.fromisoformat(row[10])
-                                     if row[10] else None),
-                        access_count=row[11] or 0
-                    )
-
+                    return self._row_to_memory(row)
         except Exception as e:
             logger.error(
                 "Failed to get memory",
@@ -311,7 +370,6 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 error=str(e)
             )
             return False
-
     async def search_memories(
         self,
         domain: MemoryDomain,
@@ -360,7 +418,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 tag_conditions = []
                 for tag in tags:
                     tag_conditions.append("tags LIKE ?")
-                    params.append(f"%\"{tag}\"%")
+                    params.append(f'%"{tag}"%')
                 where_conditions.append(f"({' OR '.join(tag_conditions)})")
 
             sql = f'''
@@ -369,7 +427,8 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
             '''
-            params.extend([limit, offset])
+            params.append(str(limit))
+            params.append(str(offset))
 
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(sql, params) as cursor:
@@ -377,26 +436,9 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
                     memories = []
                     for row in rows:
-                        memory = Memory(
-                            id=row[0],
-                            domain=MemoryDomain(
-                                row[1]),
-                            content=row[2],
-                            metadata=json.loads(
-                                row[3]) if row[3] else {},
-                            tags=json.loads(
-                                row[4]) if row[4] else [],
-                            user_id=row[5],
-                            project_id=row[6],
-                            session_id=row[7],
-                            created_at=datetime.fromisoformat(
-                                row[8]),
-                            updated_at=datetime.fromisoformat(
-                                row[9]),
-                            accessed_at=datetime.fromisoformat(
-                                row[10]) if row[10] else None,
-                            access_count=row[11] or 0)
-                        memories.append(memory)
+                        memory = self._row_to_memory(row)
+                        if memory:
+                            memories.append(memory)
 
                     logger.info(
                         "Memory search completed",
@@ -426,8 +468,8 @@ class SQLiteMetadataStore(BaseMetadataStore):
     ) -> int:
         """記憶数を取得"""
         try:
-            where_conditions = ["domain = ?"]
-            params = [domain.value]
+            where_conditions: List[str] = ["domain = ?"]
+            params: List[Any] = [domain.value]
 
             if user_id:
                 where_conditions.append("user_id = ?")
@@ -444,7 +486,11 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(sql, params) as cursor:
-                    return (await cursor.fetchone())[0]
+                    row = await cursor.fetchone()
+                    if row and row[0] is not None:
+                        return int(row[0])
+                    else:
+                        return 0
 
         except Exception as e:
             logger.error(

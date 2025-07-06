@@ -3,7 +3,7 @@ ChromaDBベクトルストア実装
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 
 try:
@@ -22,6 +22,41 @@ logger = get_memory_logger(__name__)
 
 
 class ChromaVectorStore(BaseVectorStore):
+    async def store_embedding(self, memory_id: str, embedding: Any, metadata: Dict[str, Any]) -> bool:
+        """埋め込みを保存 (memory_manager.py互換)"""
+        try:
+            await self.store_vector(memory_id, embedding, metadata)
+            return True
+        except Exception as e:
+            logger.error(f"store_embedding error: {e}")
+            return False
+
+    async def get_embedding(self, memory_id: str) -> Optional[Any]:
+        """埋め込みを取得 (memory_manager.py互換)"""
+        # ChromaDBはembedding単体取得APIがないため、ID検索で取得
+        for domain, collection in self.collections.items():
+            try:
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: collection.get(ids=[memory_id])
+                )
+                if result["embeddings"] and result["embeddings"][0]:
+                    return result["embeddings"][0]
+            except Exception:
+                continue
+        return None
+
+    async def delete_embedding(self, memory_id: str) -> bool:
+        """埋め込みを削除 (memory_manager.py互換)"""
+        return await self.delete_vector(memory_id)
+
+    async def search(self, embedding: Any, domain: str, limit: int = 10, min_score: float = 0.7) -> List[Tuple[str, float]]:
+        """ベクトル検索 (memory_manager.py互換)"""
+        domain_enum = MemoryDomain(domain) if not isinstance(domain, MemoryDomain) else domain
+        results = await self.search_similar(embedding, domain_enum, limit, min_score)
+        return [(r["memory_id"], r["similarity"]) for r in results]
+
+    # 既存のsearch_similar（互換ラッパー）は削除。実装は下部のsearch_similarのみ。
     """ChromaDB実装のベクトルストア"""
 
     def __init__(
