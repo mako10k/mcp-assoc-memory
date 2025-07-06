@@ -133,6 +133,12 @@ class LRUCache:
 
         return removed_count
 
+    def get_hit_ratio(self) -> float:
+        """ヒット率を取得"""
+        with self.lock:
+            total_requests = self.hits + self.misses
+            return self.hits / total_requests if total_requests > 0 else 0.0
+
     def get_stats(self) -> Dict[str, Any]:
         """キャッシュ統計を取得"""
         with self.lock:

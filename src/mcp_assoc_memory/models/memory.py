@@ -31,6 +31,9 @@ class Memory:
     user_id: Optional[str] = None
     project_id: Optional[str] = None
     session_id: Optional[str] = None
+    
+    # カテゴリ
+    category: Optional[str] = None
 
     # タイムスタンプ
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -48,6 +51,7 @@ class Memory:
             "content": self.content,
             "metadata": self.metadata,
             "tags": self.tags,
+            "category": self.category,
             "user_id": self.user_id,
             "project_id": self.project_id,
             "session_id": self.session_id,

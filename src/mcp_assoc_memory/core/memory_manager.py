@@ -4,7 +4,7 @@
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import numpy as np
 
@@ -93,6 +93,7 @@ class MemoryManager:
         content: str,
         metadata: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None,
+        category: Optional[str] = None,
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -106,6 +107,7 @@ class MemoryManager:
                 content=content,
                 metadata=metadata or {},
                 tags=tags or [],
+                category=category,
                 user_id=user_id,
                 project_id=project_id,
                 session_id=session_id
@@ -577,3 +579,384 @@ class MemoryManager:
                 error=str(e)
             )
             return {}
+
+    async def get_memory_stats(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
+        """記憶統計を取得"""
+        try:
+            stats = await self.metadata_store.get_memory_stats(domain)
+            cache_stats = self.memory_cache.get_stats()
+            embedding_stats = self.embedding_service.get_cache_stats()
+            
+            return {
+                'total_memories': stats.get('total_count', 0),
+                'memories_by_domain': stats.get('by_domain', {}),
+                'memories_by_category': stats.get('by_category', {}),
+                'total_size_bytes': stats.get('total_size', 0),
+                'cache_stats': cache_stats,
+                'embedding_cache_stats': embedding_stats,
+                'last_updated': datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"統計取得エラー: {e}")
+            return {'error': str(e)}
+
+    async def export_memories(
+        self, 
+        domain: Optional[MemoryDomain] = None,
+        format_type: str = 'json'
+    ) -> Dict[str, Any]:
+        """記憶をエクスポート"""
+        try:
+            memories = await self.metadata_store.get_memories_by_domain(domain)
+            
+            if format_type == 'json':
+                exported_data = [memory.to_dict() for memory in memories]
+            else:
+                raise ValueError(f"Unsupported format: {format_type}")
+            
+            return {
+                'format': format_type,
+                'count': len(exported_data),
+                'data': exported_data,
+                'exported_at': datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"エクスポートエラー: {e}")
+            return {'error': str(e)}
+
+    async def import_memories(
+        self,
+        data: List[Dict[str, Any]],
+        domain: MemoryDomain,
+        overwrite: bool = False
+    ) -> Dict[str, Any]:
+        """記憶をインポート"""
+        imported_count = 0
+        skipped_count = 0
+        error_count = 0
+        
+        try:
+            for item in data:
+                try:
+                    # 既存チェック
+                    if 'id' in item and not overwrite:
+                        existing = await self.get_memory(item['id'])
+                        if existing:
+                            skipped_count += 1
+                            continue
+                    
+                    # 記憶を作成・保存
+                    memory = await self.store_memory(
+                        domain=domain,
+                        content=item.get('content', ''),
+                        metadata=item.get('metadata', {}),
+                        tags=item.get('tags', []),
+                        category=item.get('category')
+                    )
+                    
+                    if memory:
+                        imported_count += 1
+                    else:
+                        error_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"インポートアイテムエラー: {e}")
+                    error_count += 1
+            
+            return {
+                'imported_count': imported_count,
+                'skipped_count': skipped_count,
+                'error_count': error_count
+            }
+        except Exception as e:
+            logger.error(f"インポートエラー: {e}")
+            return {'error': str(e)}
+
+    async def change_memory_domain(
+        self,
+        memory_id: str,
+        new_domain: MemoryDomain
+    ) -> bool:
+        """記憶のドメインを変更"""
+        try:
+            memory = await self.get_memory(memory_id)
+            if not memory:
+                return False
+            
+            memory.domain = new_domain
+            memory.updated_at = datetime.utcnow()
+            
+            success = await self.metadata_store.update_memory(memory)
+            if success:
+                # キャッシュを更新
+                self.memory_cache.set(memory_id, memory)
+                logger.info(f"記憶ドメイン変更: {memory_id} -> {new_domain.value}")
+            
+            return success
+        except Exception as e:
+            logger.error(f"ドメイン変更エラー: {e}")
+            return False
+
+    async def batch_delete_memories(self, criteria: Dict[str, Any]) -> int:
+        """記憶を一括削除"""
+        try:
+            deleted_count = await self.metadata_store.batch_delete_memories(criteria)
+            
+            # キャッシュからも削除（簡易実装）
+            self.memory_cache.clear()
+            
+            logger.info(f"一括削除完了: {deleted_count}件")
+            return deleted_count
+        except Exception as e:
+            logger.error(f"一括削除エラー: {e}")
+            return 0
+
+    async def cleanup_database(
+        self,
+        cleanup_orphans: bool = True,
+        reindex: bool = False,
+        vacuum: bool = False
+    ) -> Dict[str, Any]:
+        """データベースクリーンアップ"""
+        try:
+            result = {
+                'cleanup_orphans': 0,
+                'reindex_completed': False,
+                'vacuum_completed': False
+            }
+            
+            if cleanup_orphans:
+                result['cleanup_orphans'] = await self.metadata_store.cleanup_orphans()
+            
+            if reindex:
+                await self.metadata_store.reindex()
+                result['reindex_completed'] = True
+            
+            if vacuum:
+                await self.metadata_store.vacuum()
+                result['vacuum_completed'] = True
+            
+            return result
+        except Exception as e:
+            logger.error(f"クリーンアップエラー: {e}")
+            return {'error': str(e)}
+
+    async def semantic_search(
+        self,
+        query: str,
+        domain: MemoryDomain,
+        limit: int = 10,
+        min_score: float = 0.7
+    ) -> List[Tuple[Memory, float]]:
+        """意味的検索"""
+        try:
+            embedding = await self.embedding_service.get_embedding(query)
+            if not embedding:
+                return []
+            
+            # ベクトル検索
+            results = await self.vector_store.search(
+                embedding,
+                domain.value,
+                limit,
+                min_score
+            )
+            
+            # 記憶オブジェクトに変換
+            memories_with_scores = []
+            for memory_id, score in results:
+                memory = await self.get_memory(memory_id)
+                if memory:
+                    memories_with_scores.append((memory, score))
+            
+            return memories_with_scores
+        except Exception as e:
+            logger.error(f"意味的検索エラー: {e}")
+            return []
+
+    async def search_by_tags(
+        self,
+        tags: List[str],
+        domain: MemoryDomain,
+        match_all: bool = False,
+        limit: int = 10
+    ) -> List[Memory]:
+        """タグ検索"""
+        try:
+            return await self.metadata_store.search_by_tags(
+                tags, domain, match_all, limit
+            )
+        except Exception as e:
+            logger.error(f"タグ検索エラー: {e}")
+            return []
+
+    async def search_by_timerange(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        domain: MemoryDomain,
+        limit: int = 10
+    ) -> List[Memory]:
+        """時間範囲検索"""
+        try:
+            return await self.metadata_store.search_by_timerange(
+                start_date, end_date, domain, limit
+            )
+        except Exception as e:
+            logger.error(f"時間範囲検索エラー: {e}")
+            return []
+
+    async def advanced_search(
+        self,
+        query: str = '',
+        domain: MemoryDomain = MemoryDomain.USER,
+        tags: List[str] = None,
+        category: str = None,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        min_score: float = 0.5,
+        limit: int = 10
+    ) -> List[Tuple[Memory, float]]:
+        """高度検索"""
+        try:
+            # 複合検索条件でメタデータ検索
+            memories = await self.metadata_store.advanced_search(
+                domain=domain,
+                tags=tags or [],
+                category=category,
+                start_date=start_date,
+                end_date=end_date,
+                limit=limit * 3  # より多く取得してスコアフィルタリング
+            )
+            
+            if not query:
+                # クエリなしの場合は時系列順
+                return [(memory, 1.0) for memory in memories[:limit]]
+            
+            # 意味的類似度でフィルタリング
+            query_embedding = await self.embedding_service.get_embedding(query)
+            if not query_embedding:
+                return [(memory, 1.0) for memory in memories[:limit]]
+            
+            scored_memories = []
+            for memory in memories:
+                # 記憶の埋め込みを取得
+                memory_embedding = await self.vector_store.get_embedding(memory.id)
+                if memory_embedding:
+                    score = self.similarity_calc.cosine_similarity(
+                        query_embedding, memory_embedding
+                    )
+                    if score >= min_score:
+                        scored_memories.append((memory, score))
+            
+            # スコア順にソート
+            scored_memories.sort(key=lambda x: x[1], reverse=True)
+            return scored_memories[:limit]
+            
+        except Exception as e:
+            logger.error(f"高度検索エラー: {e}")
+            return []
+
+    async def find_similar_memories(
+        self,
+        reference_id: str,
+        domain: MemoryDomain,
+        limit: int = 10,
+        min_score: float = 0.7
+    ) -> List[Tuple[Memory, float]]:
+        """類似記憶検索"""
+        try:
+            # 参照記憶の埋め込みを取得
+            reference_embedding = await self.vector_store.get_embedding(reference_id)
+            if not reference_embedding:
+                return []
+            
+            # 類似検索
+            results = await self.vector_store.search(
+                reference_embedding,
+                domain.value,
+                limit + 1,  # 自分自身を除外するため+1
+                min_score
+            )
+            
+            # 記憶オブジェクトに変換（参照記憶を除外）
+            memories_with_scores = []
+            for memory_id, score in results:
+                if memory_id != reference_id:
+                    memory = await self.get_memory(memory_id)
+                    if memory:
+                        memories_with_scores.append((memory, score))
+            
+            return memories_with_scores[:limit]
+        except Exception as e:
+            logger.error(f"類似記憶検索エラー: {e}")
+            return []
+
+    async def get_related_memories(
+        self,
+        memory_id: str,
+        limit: int = 5,
+        min_score: float = 0.7
+    ) -> List[Tuple[Memory, float]]:
+        """関連記憶を取得"""
+        try:
+            memory = await self.get_memory(memory_id)
+            if not memory:
+                return []
+            
+            return await self.find_similar_memories(
+                reference_id=memory_id,
+                domain=memory.domain,
+                limit=limit,
+                min_score=min_score
+            )
+        except Exception as e:
+            logger.error(f"関連記憶取得エラー: {e}")
+            return []
+
+    async def update_memory(
+        self,
+        memory_id: str,
+        content: str = None,
+        metadata: Dict[str, Any] = None,
+        tags: List[str] = None,
+        category: str = None
+    ) -> Optional[Memory]:
+        """記憶を更新"""
+        try:
+            memory = await self.get_memory(memory_id)
+            if not memory:
+                return None
+            
+            # 更新フィールドを適用
+            if content is not None:
+                memory.content = content
+            if metadata is not None:
+                memory.metadata.update(metadata)
+            if tags is not None:
+                memory.tags = tags
+            if category is not None:
+                memory.category = category
+            
+            memory.updated_at = datetime.utcnow()
+            
+            # 埋め込みを再生成（コンテンツが変更された場合）
+            if content is not None:
+                embedding = await self.embedding_service.get_embedding(content)
+                if embedding:
+                    await self.vector_store.store_embedding(
+                        memory_id, embedding, memory.to_dict()
+                    )
+            
+            # メタデータストアを更新
+            success = await self.metadata_store.update_memory(memory)
+            if success:
+                # キャッシュを更新
+                self.memory_cache.set(memory_id, memory)
+                logger.info(f"記憶更新: {memory_id}")
+                return memory
+            
+            return None
+        except Exception as e:
+            logger.error(f"記憶更新エラー: {e}")
+            return None
