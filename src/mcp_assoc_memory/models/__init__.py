@@ -8,7 +8,7 @@ from .project import Project, ProjectMember, ProjectRole, UserSession
 
 __all__ = [
     "Memory",
-    "MemoryDomain", 
+    "MemoryDomain",
     "MemorySearchResult",
     "MemoryStats",
     "Association",

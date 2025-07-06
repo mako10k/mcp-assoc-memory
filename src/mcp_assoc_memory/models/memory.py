@@ -26,20 +26,20 @@ class Memory:
     metadata: Dict[str, Any] = field(default_factory=dict)
     tags: List[str] = field(default_factory=list)
     embedding: Optional[List[float]] = None
-    
+
     # アクセス制御
     user_id: Optional[str] = None
     project_id: Optional[str] = None
     session_id: Optional[str] = None
-    
+
     # タイムスタンプ
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     accessed_at: datetime = field(default_factory=datetime.utcnow)
-    
+
     # 統計情報
     access_count: int = 0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """辞書形式に変換"""
         return {
@@ -56,7 +56,7 @@ class Memory:
             "accessed_at": self.accessed_at.isoformat(),
             "access_count": self.access_count,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Memory":
         """辞書から復元"""
@@ -74,7 +74,7 @@ class Memory:
             accessed_at=datetime.fromisoformat(data["accessed_at"]),
             access_count=data.get("access_count", 0),
         )
-    
+
     def update_access(self):
         """アクセス情報を更新"""
         self.accessed_at = datetime.utcnow()

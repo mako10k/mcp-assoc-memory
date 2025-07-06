@@ -23,13 +23,13 @@ class SimilarityMetric(Enum):
 
 class SimilarityCalculator:
     """類似度計算クラス"""
-    
+
     def __init__(
         self,
         default_metric: SimilarityMetric = SimilarityMetric.COSINE
     ):
         self.default_metric = default_metric
-    
+
     def calculate_similarity(
         self,
         vector1: np.ndarray,
@@ -39,7 +39,7 @@ class SimilarityCalculator:
         """2つのベクトル間の類似度を計算"""
         if metric is None:
             metric = self.default_metric
-        
+
         try:
             # ベクトルの正規化チェック
             if len(vector1) != len(vector2):
@@ -51,7 +51,7 @@ class SimilarityCalculator:
                     }
                 )
                 return 0.0
-            
+
             if metric == SimilarityMetric.COSINE:
                 return self._cosine_similarity(vector1, vector2)
             elif metric == SimilarityMetric.EUCLIDEAN:
@@ -65,7 +65,7 @@ class SimilarityCalculator:
                     f"Unknown similarity metric: {metric}, using cosine"
                 )
                 return self._cosine_similarity(vector1, vector2)
-                
+
         except Exception as e:
             logger.error(
                 "Failed to calculate similarity",
@@ -74,7 +74,7 @@ class SimilarityCalculator:
                 error=str(e)
             )
             return 0.0
-    
+
     def _cosine_similarity(
         self,
         vector1: np.ndarray,
@@ -84,17 +84,17 @@ class SimilarityCalculator:
         # ゼロベクトルのチェック
         norm1 = np.linalg.norm(vector1)
         norm2 = np.linalg.norm(vector2)
-        
+
         if norm1 == 0 or norm2 == 0:
             return 0.0
-        
+
         # コサイン類似度計算
         dot_product = np.dot(vector1, vector2)
         similarity = dot_product / (norm1 * norm2)
-        
+
         # 数値安定性のためのクリッピング
         return float(np.clip(similarity, -1.0, 1.0))
-    
+
     def _euclidean_similarity(
         self,
         vector1: np.ndarray,
@@ -107,7 +107,7 @@ class SimilarityCalculator:
         max_distance = np.sqrt(2)
         similarity = 1.0 - min(distance / max_distance, 1.0)
         return float(similarity)
-    
+
     def _dot_product_similarity(
         self,
         vector1: np.ndarray,
@@ -119,7 +119,7 @@ class SimilarityCalculator:
         # 0-1の範囲に変換
         similarity = (dot_product + 1.0) / 2.0
         return float(np.clip(similarity, 0.0, 1.0))
-    
+
     def _manhattan_similarity(
         self,
         vector1: np.ndarray,
@@ -131,7 +131,7 @@ class SimilarityCalculator:
         max_distance = 2.0
         similarity = 1.0 - min(distance / max_distance, 1.0)
         return float(similarity)
-    
+
     def rank_by_similarity(
         self,
         query_vector: np.ndarray,
@@ -142,7 +142,7 @@ class SimilarityCalculator:
         """クエリベクトルに対する候補ベクトルの類似度ランキング"""
         try:
             results = []
-            
+
             for vector_id, vector in candidate_vectors:
                 similarity = self.calculate_similarity(
                     query_vector, vector, metric
@@ -151,14 +151,14 @@ class SimilarityCalculator:
                     "id": vector_id,
                     "similarity": similarity
                 })
-            
+
             # 類似度でソート（降順）
             results.sort(key=lambda x: x["similarity"], reverse=True)
-            
+
             # top_k による制限
             if top_k is not None:
                 results = results[:top_k]
-            
+
             logger.debug(
                 "Similarity ranking completed",
                 extra_data={
@@ -168,9 +168,9 @@ class SimilarityCalculator:
                     "metric": (metric or self.default_metric).value
                 }
             )
-            
+
             return results
-            
+
         except Exception as e:
             logger.error(
                 "Failed to rank by similarity",
@@ -179,7 +179,7 @@ class SimilarityCalculator:
                 error=str(e)
             )
             return []
-    
+
     def batch_similarity(
         self,
         query_vector: np.ndarray,
@@ -189,7 +189,7 @@ class SimilarityCalculator:
         """バッチで類似度を計算（効率的な実装）"""
         if metric is None:
             metric = self.default_metric
-        
+
         try:
             if metric == SimilarityMetric.COSINE:
                 return self._batch_cosine_similarity(
@@ -208,7 +208,7 @@ class SimilarityCalculator:
                     )
                     similarities.append(similarity)
                 return np.array(similarities)
-                
+
         except Exception as e:
             logger.error(
                 "Failed to calculate batch similarity",
@@ -217,7 +217,7 @@ class SimilarityCalculator:
                 error=str(e)
             )
             return np.zeros(len(target_vectors))
-    
+
     def _batch_cosine_similarity(
         self,
         query_vector: np.ndarray,
@@ -228,21 +228,21 @@ class SimilarityCalculator:
         query_norm = np.linalg.norm(query_vector)
         if query_norm == 0:
             return np.zeros(len(target_vectors))
-        
+
         query_normalized = query_vector / query_norm
-        
+
         # ターゲットベクトルの正規化
         target_norms = np.linalg.norm(target_vectors, axis=1)
         # ゼロベクトルを避けるため、小さい値で置き換え
         target_norms = np.where(target_norms == 0, 1e-8, target_norms)
         target_normalized = target_vectors / target_norms.reshape(-1, 1)
-        
+
         # バッチ内積計算
         similarities = np.dot(target_normalized, query_normalized)
-        
+
         # 数値安定性のためのクリッピング
         return np.clip(similarities, -1.0, 1.0)
-    
+
     def _batch_dot_product_similarity(
         self,
         query_vector: np.ndarray,
@@ -253,7 +253,7 @@ class SimilarityCalculator:
         # 0-1の範囲に変換
         similarities = (dot_products + 1.0) / 2.0
         return np.clip(similarities, 0.0, 1.0)
-    
+
     def find_most_similar(
         self,
         query_vector: np.ndarray,
@@ -265,12 +265,12 @@ class SimilarityCalculator:
         rankings = self.rank_by_similarity(
             query_vector, candidate_vectors, metric, top_k=1
         )
-        
+
         if rankings and rankings[0]["similarity"] >= threshold:
             return rankings[0]
-        
+
         return None
-    
+
     def find_similar_above_threshold(
         self,
         query_vector: np.ndarray,
@@ -282,12 +282,12 @@ class SimilarityCalculator:
         rankings = self.rank_by_similarity(
             query_vector, candidate_vectors, metric
         )
-        
+
         return [
             result for result in rankings
             if result["similarity"] >= threshold
         ]
-    
+
     def calculate_diversity_score(
         self,
         vectors: List[np.ndarray],
@@ -296,11 +296,11 @@ class SimilarityCalculator:
         """ベクトル群の多様性スコアを計算"""
         if len(vectors) < 2:
             return 1.0  # 単一または空の場合は最大多様性
-        
+
         try:
             total_similarity = 0.0
             pair_count = 0
-            
+
             # 全ペアの類似度を計算
             for i in range(len(vectors)):
                 for j in range(i + 1, len(vectors)):
@@ -309,15 +309,15 @@ class SimilarityCalculator:
                     )
                     total_similarity += similarity
                     pair_count += 1
-            
+
             # 平均類似度を計算
             avg_similarity = total_similarity / pair_count
-            
+
             # 多様性スコア = 1 - 平均類似度
             diversity_score = 1.0 - avg_similarity
-            
+
             return float(np.clip(diversity_score, 0.0, 1.0))
-            
+
         except Exception as e:
             logger.error(
                 "Failed to calculate diversity score",

@@ -48,7 +48,7 @@ async def main():
 
     # 設定読み込み
     config = Config.load(args.config)
-    
+
     # ログ設定
     setup_logging(args.log_level)
 
@@ -59,7 +59,7 @@ async def main():
 
         # トランスポート管理システム初期化
         transport_manager = TransportManager(memory_manager, config)
-        
+
         # サーバ起動
         await transport_manager.start(
             transport_type=args.transport,

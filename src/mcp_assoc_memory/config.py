@@ -77,27 +77,27 @@ class Config:
     storage: StorageConfig = field(default_factory=StorageConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     transport: TransportConfig = field(default_factory=TransportConfig)
-    
+
     log_level: str = "INFO"
     debug_mode: bool = False
-    
+
     @classmethod
     def load(cls, config_path: Optional[str] = None) -> "Config":
         """設定を読み込み"""
         config = cls()
-        
+
         # 環境変数から設定を読み込み
         config._load_from_env()
-        
+
         # 設定ファイルがあれば読み込み
         if config_path and Path(config_path).exists():
             config._load_from_file(config_path)
-        
+
         # バリデーション
         config._validate()
-        
+
         return config
-    
+
     def _load_from_env(self):
         """環境変数から設定を読み込み"""
         # データベース設定
@@ -107,43 +107,58 @@ class Config:
         self.database.port = int(os.getenv("DB_PORT", str(self.database.port)))
         self.database.database = os.getenv("DB_NAME", self.database.database)
         self.database.username = os.getenv("DB_USER", self.database.username)
-        self.database.password = os.getenv("DB_PASSWORD", self.database.password)
-        
+        self.database.password = os.getenv(
+            "DB_PASSWORD", self.database.password)
+
         # 埋め込み設定
-        self.embedding.provider = os.getenv("EMBEDDING_PROVIDER", self.embedding.provider)
-        self.embedding.model = os.getenv("EMBEDDING_MODEL", self.embedding.model)
-        self.embedding.api_key = os.getenv("OPENAI_API_KEY", self.embedding.api_key)
-        
+        self.embedding.provider = os.getenv(
+            "EMBEDDING_PROVIDER", self.embedding.provider)
+        self.embedding.model = os.getenv(
+            "EMBEDDING_MODEL", self.embedding.model)
+        self.embedding.api_key = os.getenv(
+            "OPENAI_API_KEY", self.embedding.api_key)
+
         # ストレージ設定
         self.storage.data_dir = os.getenv("DATA_DIR", self.storage.data_dir)
-        
+
         # セキュリティ設定
-        self.security.auth_enabled = os.getenv("AUTH_ENABLED", "false").lower() == "true"
-        self.security.api_key_required = os.getenv("API_KEY_REQUIRED", "false").lower() == "true"
-        self.security.jwt_secret = os.getenv("JWT_SECRET", self.security.jwt_secret)
-        
+        self.security.auth_enabled = os.getenv(
+            "AUTH_ENABLED", "false").lower() == "true"
+        self.security.api_key_required = os.getenv(
+            "API_KEY_REQUIRED", "false").lower() == "true"
+        self.security.jwt_secret = os.getenv(
+            "JWT_SECRET", self.security.jwt_secret)
+
         # トランスポート設定
-        self.transport.http_host = os.getenv("HTTP_HOST", self.transport.http_host)
-        self.transport.http_port = int(os.getenv("HTTP_PORT", str(self.transport.http_port)))
-        self.transport.sse_host = os.getenv("SSE_HOST", self.transport.sse_host)
-        self.transport.sse_port = int(os.getenv("SSE_PORT", str(self.transport.sse_port)))
-        
+        self.transport.http_host = os.getenv(
+            "HTTP_HOST", self.transport.http_host)
+        self.transport.http_port = int(
+            os.getenv(
+                "HTTP_PORT", str(
+                    self.transport.http_port)))
+        self.transport.sse_host = os.getenv(
+            "SSE_HOST", self.transport.sse_host)
+        self.transport.sse_port = int(
+            os.getenv(
+                "SSE_PORT", str(
+                    self.transport.sse_port)))
+
         # その他
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
         self.debug_mode = os.getenv("DEBUG", "false").lower() == "true"
-    
+
     def _load_from_file(self, config_path: str):
         """設定ファイルから読み込み"""
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
-            
+
             # 設定をマージ（ファイルが優先）
             self._merge_config(config_data)
-            
+
         except Exception as e:
             logger.warning(f"設定ファイルの読み込みに失敗: {e}")
-    
+
     def _merge_config(self, config_data: Dict[str, Any]):
         """設定データをマージ"""
         for section, values in config_data.items():
@@ -152,19 +167,19 @@ class Config:
                 for key, value in values.items():
                     if hasattr(section_obj, key):
                         setattr(section_obj, key, value)
-    
+
     def _validate(self):
         """設定値のバリデーション"""
         # データディレクトリの作成
         Path(self.storage.data_dir).mkdir(parents=True, exist_ok=True)
-        
+
         # 必須設定のチェック
         if self.embedding.provider == "openai" and not self.embedding.api_key:
             logger.warning("OpenAI API keyが設定されていません")
-        
+
         if self.security.auth_enabled and not self.security.jwt_secret:
             raise ValueError("認証が有効ですがJWT secretが設定されていません")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """設定を辞書形式で取得"""
         return {

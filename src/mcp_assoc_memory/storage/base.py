@@ -11,17 +11,17 @@ from ..models.association import Association
 
 class BaseStorage(ABC):
     """ストレージの抽象基底クラス"""
-    
+
     @abstractmethod
     async def initialize(self) -> None:
         """ストレージを初期化"""
         pass
-    
+
     @abstractmethod
     async def close(self) -> None:
         """ストレージを閉じる"""
         pass
-    
+
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
         """ヘルスチェック"""
@@ -30,7 +30,7 @@ class BaseStorage(ABC):
 
 class BaseVectorStore(BaseStorage):
     """ベクトルストレージの抽象基底クラス"""
-    
+
     @abstractmethod
     async def store_vector(
         self,
@@ -40,7 +40,7 @@ class BaseVectorStore(BaseStorage):
     ) -> None:
         """ベクトルを保存"""
         pass
-    
+
     @abstractmethod
     async def search_similar(
         self,
@@ -52,12 +52,12 @@ class BaseVectorStore(BaseStorage):
     ) -> List[Dict[str, Any]]:
         """類似ベクトルを検索"""
         pass
-    
+
     @abstractmethod
     async def delete_vector(self, memory_id: str) -> bool:
         """ベクトルを削除"""
         pass
-    
+
     @abstractmethod
     async def update_metadata(
         self,
@@ -66,7 +66,7 @@ class BaseVectorStore(BaseStorage):
     ) -> bool:
         """メタデータを更新"""
         pass
-    
+
     @abstractmethod
     async def get_collection_stats(
         self, domain: MemoryDomain
@@ -77,27 +77,27 @@ class BaseVectorStore(BaseStorage):
 
 class BaseMetadataStore(BaseStorage):
     """メタデータストレージの抽象基底クラス"""
-    
+
     @abstractmethod
     async def store_memory(self, memory: Memory) -> str:
         """記憶を保存"""
         pass
-    
+
     @abstractmethod
     async def get_memory(self, memory_id: str) -> Optional[Memory]:
         """記憶を取得"""
         pass
-    
+
     @abstractmethod
     async def update_memory(self, memory: Memory) -> bool:
         """記憶を更新"""
         pass
-    
+
     @abstractmethod
     async def delete_memory(self, memory_id: str) -> bool:
         """記憶を削除"""
         pass
-    
+
     @abstractmethod
     async def search_memories(
         self,
@@ -114,7 +114,7 @@ class BaseMetadataStore(BaseStorage):
     ) -> List[Memory]:
         """記憶を検索"""
         pass
-    
+
     @abstractmethod
     async def get_memory_count(
         self,
@@ -124,12 +124,12 @@ class BaseMetadataStore(BaseStorage):
     ) -> int:
         """記憶数を取得"""
         pass
-    
+
     @abstractmethod
     async def store_association(self, association: Association) -> str:
         """関連性を保存"""
         pass
-    
+
     @abstractmethod
     async def get_associations(
         self,
@@ -138,7 +138,7 @@ class BaseMetadataStore(BaseStorage):
     ) -> List[Association]:
         """関連性を取得"""
         pass
-    
+
     @abstractmethod
     async def delete_association(self, association_id: str) -> bool:
         """関連性を削除"""
@@ -147,7 +147,7 @@ class BaseMetadataStore(BaseStorage):
 
 class BaseGraphStore(BaseStorage):
     """グラフストレージの抽象基底クラス"""
-    
+
     @abstractmethod
     async def add_memory_node(
         self,
@@ -156,22 +156,22 @@ class BaseGraphStore(BaseStorage):
     ) -> None:
         """記憶ノードを追加"""
         pass
-    
+
     @abstractmethod
     async def add_association_edge(self, association: Association) -> None:
         """関連性エッジを追加"""
         pass
-    
+
     @abstractmethod
     async def remove_memory_node(self, memory_id: str) -> bool:
         """記憶ノードを削除"""
         pass
-    
+
     @abstractmethod
     async def remove_association_edge(self, association_id: str) -> bool:
         """関連性エッジを削除"""
         pass
-    
+
     @abstractmethod
     async def find_shortest_path(
         self,
@@ -181,7 +181,7 @@ class BaseGraphStore(BaseStorage):
     ) -> Optional[List[str]]:
         """最短パスを検索"""
         pass
-    
+
     @abstractmethod
     async def get_neighbors(
         self,
@@ -191,7 +191,7 @@ class BaseGraphStore(BaseStorage):
     ) -> List[Dict[str, Any]]:
         """近傍ノードを取得"""
         pass
-    
+
     @abstractmethod
     async def calculate_centrality(
         self,
@@ -199,12 +199,12 @@ class BaseGraphStore(BaseStorage):
     ) -> Dict[str, float]:
         """中心性を計算"""
         pass
-    
+
     @abstractmethod
     async def detect_communities(self) -> Dict[str, List[str]]:
         """コミュニティを検出"""
         pass
-    
+
     @abstractmethod
     async def export_graph(self, format: str = "graphml") -> str:
         """グラフをエクスポート"""
@@ -213,7 +213,7 @@ class BaseGraphStore(BaseStorage):
 
 class BaseEmbeddingService(ABC):
     """埋め込みサービスの抽象基底クラス"""
-    
+
     @abstractmethod
     async def generate_embedding(
         self,
@@ -222,7 +222,7 @@ class BaseEmbeddingService(ABC):
     ) -> List[float]:
         """テキストの埋め込みを生成"""
         pass
-    
+
     @abstractmethod
     async def generate_batch_embeddings(
         self,
@@ -231,7 +231,7 @@ class BaseEmbeddingService(ABC):
     ) -> List[List[float]]:
         """バッチ埋め込みを生成"""
         pass
-    
+
     @abstractmethod
     def calculate_similarity(
         self,
@@ -241,7 +241,7 @@ class BaseEmbeddingService(ABC):
     ) -> float:
         """類似度を計算"""
         pass
-    
+
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
         """ヘルスチェック"""
@@ -250,7 +250,7 @@ class BaseEmbeddingService(ABC):
 
 class StorageManager:
     """ストレージマネージャー - 各ストレージを統合管理"""
-    
+
     def __init__(
         self,
         vector_store: BaseVectorStore,
@@ -262,19 +262,19 @@ class StorageManager:
         self.metadata_store = metadata_store
         self.graph_store = graph_store
         self.embedding_service = embedding_service
-    
+
     async def initialize(self) -> None:
         """全ストレージを初期化"""
         await self.vector_store.initialize()
         await self.metadata_store.initialize()
         await self.graph_store.initialize()
-    
+
     async def close(self) -> None:
         """全ストレージを閉じる"""
         await self.vector_store.close()
         await self.metadata_store.close()
         await self.graph_store.close()
-    
+
     async def health_check(self) -> Dict[str, Any]:
         """全ストレージのヘルスチェック"""
         return {

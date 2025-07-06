@@ -26,7 +26,7 @@ logger = get_memory_logger(__name__)
 
 class MemoryManager:
     """記憶管理エンジン"""
-    
+
     def __init__(
         self,
         vector_store: BaseVectorStore,
@@ -42,14 +42,14 @@ class MemoryManager:
         self.similarity_calculator = (
             similarity_calculator or SimilarityCalculator()
         )
-        
+
         # キャッシュ
         self.memory_cache = LRUCache(max_size=1000)
         self.association_cache = LRUCache(max_size=500)
-        
+
         # 管理用ロック
         self.operation_lock = asyncio.Lock()
-    
+
     async def initialize(self) -> None:
         """システム初期化"""
         try:
@@ -58,9 +58,9 @@ class MemoryManager:
                 self.metadata_store.initialize(),
                 self.graph_store.initialize()
             )
-            
+
             logger.info("Memory manager initialized successfully")
-            
+
         except Exception as e:
             logger.error(
                 "Failed to initialize memory manager",
@@ -68,7 +68,7 @@ class MemoryManager:
                 error=str(e)
             )
             raise
-    
+
     async def close(self) -> None:
         """システムクリーンアップ"""
         try:
@@ -77,16 +77,16 @@ class MemoryManager:
                 self.metadata_store.close(),
                 self.graph_store.close()
             )
-            
+
             logger.info("Memory manager closed successfully")
-            
+
         except Exception as e:
             logger.error(
                 "Failed to close memory manager",
                 error_code="MEMORY_MANAGER_CLOSE_ERROR",
                 error=str(e)
             )
-    
+
     async def store_memory(
         self,
         domain: MemoryDomain,
@@ -110,7 +110,7 @@ class MemoryManager:
                 project_id=project_id,
                 session_id=session_id
             )
-            
+
             # 埋め込みベクトル生成
             embedding = await self.embedding_service.get_embedding(content)
             if embedding is None:
@@ -118,7 +118,7 @@ class MemoryManager:
                     "Failed to generate embedding, storing without vector",
                     extra_data={"memory_id": memory.id}
                 )
-            
+
             async with self.operation_lock:
                 # ベクトルストアに保存
                 if embedding is not None:
@@ -132,7 +132,7 @@ class MemoryManager:
                             "Failed to store in vector store",
                             extra_data={"memory_id": memory.id}
                         )
-                
+
                 # メタデータストアに保存
                 metadata_id = await self.metadata_store.store_memory(memory)
                 if not metadata_id:
@@ -142,7 +142,7 @@ class MemoryManager:
                         memory_id=memory.id
                     )
                     return None
-                
+
                 # グラフストアに記憶ノード追加
                 graph_success = await self.graph_store.add_memory_node(memory)
                 if not graph_success:
@@ -150,14 +150,14 @@ class MemoryManager:
                         "Failed to add to graph store",
                         extra_data={"memory_id": memory.id}
                     )
-                
+
                 # キャッシュに保存
                 self.memory_cache.set(memory.id, memory)
-                
+
                 # 自動関連付け
                 if auto_associate and embedding is not None:
                     await self._auto_associate_memory(memory, embedding)
-                
+
                 logger.info(
                     "Memory stored successfully",
                     extra_data={
@@ -167,9 +167,9 @@ class MemoryManager:
                         "has_embedding": embedding is not None
                     }
                 )
-                
+
                 return memory
-            
+
         except Exception as e:
             logger.error(
                 "Failed to store memory",
@@ -179,7 +179,7 @@ class MemoryManager:
                 error=str(e)
             )
             return None
-    
+
     async def get_memory(self, memory_id: str) -> Optional[Memory]:
         """記憶を取得"""
         try:
@@ -190,26 +190,26 @@ class MemoryManager:
                 cached_memory.access_count += 1
                 cached_memory.accessed_at = datetime.utcnow()
                 return cached_memory
-            
+
             # メタデータストアから取得
             memory = await self.metadata_store.get_memory(memory_id)
             if memory:
                 # キャッシュに保存
                 self.memory_cache.set(memory_id, memory)
-                
+
                 # アクセス統計を更新
                 await self.metadata_store.update_access_stats(
                     memory_id,
                     memory.access_count + 1
                 )
-                
+
                 logger.debug(
                     "Memory retrieved",
                     extra_data={"memory_id": memory_id}
                 )
-            
+
             return memory
-            
+
         except Exception as e:
             logger.error(
                 "Failed to get memory",
@@ -218,7 +218,7 @@ class MemoryManager:
                 error=str(e)
             )
             return None
-    
+
     async def search_memories(
         self,
         query: str,
@@ -237,7 +237,7 @@ class MemoryManager:
             if query_embedding is None:
                 logger.warning("Failed to generate query embedding")
                 return []
-            
+
             # フィルタ条件構築
             filters = {}
             if domains:
@@ -250,14 +250,14 @@ class MemoryManager:
                 filters["session_id"] = session_id
             if tags:
                 filters["tags"] = tags
-            
+
             # ベクトル検索実行
             vector_results = await self.vector_store.search_similar(
                 query_embedding,
                 limit=limit * 2,  # フィルタリング後に十分な結果を確保
                 metadata_filter=filters
             )
-            
+
             # 類似度フィルタリング
             filtered_results = []
             for result in vector_results:
@@ -270,10 +270,10 @@ class MemoryManager:
                             "similarity": result["similarity"],
                             "score": result.get("score", result["similarity"])
                         })
-            
+
             # 結果を制限
             filtered_results = filtered_results[:limit]
-            
+
             logger.info(
                 "Memory search completed",
                 extra_data={
@@ -283,9 +283,9 @@ class MemoryManager:
                     "filters": filters
                 }
             )
-            
+
             return filtered_results
-            
+
         except Exception as e:
             logger.error(
                 "Failed to search memories",
@@ -294,7 +294,7 @@ class MemoryManager:
                 error=str(e)
             )
             return []
-    
+
     async def get_related_memories(
         self,
         memory_id: str,
@@ -310,7 +310,7 @@ class MemoryManager:
                 max_depth=max_depth,
                 max_neighbors=max_results * 2
             )
-            
+
             # 関連強度でフィルタリング
             related_memories = []
             for neighbor in neighbors:
@@ -324,10 +324,10 @@ class MemoryManager:
                             "association_type": neighbor["association_type"],
                             "depth": neighbor["depth"]
                         })
-            
+
             # 結果を制限
             related_memories = related_memories[:max_results]
-            
+
             logger.debug(
                 "Related memories retrieved",
                 extra_data={
@@ -336,9 +336,9 @@ class MemoryManager:
                     "related_count": len(related_memories)
                 }
             )
-            
+
             return related_memories
-            
+
         except Exception as e:
             logger.error(
                 "Failed to get related memories",
@@ -347,7 +347,7 @@ class MemoryManager:
                 error=str(e)
             )
             return []
-    
+
     async def update_memory(
         self,
         memory_id: str,
@@ -365,13 +365,13 @@ class MemoryManager:
                     extra_data={"memory_id": memory_id}
                 )
                 return False
-            
+
             # 更新内容を適用
             updated = False
             if content is not None and content != memory.content:
                 memory.content = content
                 updated = True
-                
+
                 # 新しい埋め込みベクトル生成
                 embedding = await self.embedding_service.get_embedding(content)
                 if embedding is not None:
@@ -380,18 +380,18 @@ class MemoryManager:
                         embedding,
                         memory.to_dict()
                     )
-            
+
             if metadata is not None:
                 memory.metadata.update(metadata)
                 updated = True
-            
+
             if tags is not None:
                 memory.tags = tags
                 updated = True
-            
+
             if updated:
                 memory.updated_at = datetime.utcnow()
-                
+
                 async with self.operation_lock:
                     # メタデータストア更新
                     success = await self.metadata_store.update_memory(memory)
@@ -402,17 +402,17 @@ class MemoryManager:
                             memory_id=memory_id
                         )
                         return False
-                    
+
                     # キャッシュ更新
                     self.memory_cache.set(memory_id, memory)
-                    
+
                     logger.info(
                         "Memory updated successfully",
                         extra_data={"memory_id": memory_id}
                     )
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(
                 "Failed to update memory",
@@ -421,7 +421,7 @@ class MemoryManager:
                 error=str(e)
             )
             return False
-    
+
     async def delete_memory(self, memory_id: str) -> bool:
         """記憶を削除"""
         try:
@@ -433,24 +433,24 @@ class MemoryManager:
                 for assoc in associations:
                     await self.graph_store.remove_association_edge(assoc.id)
                     await self.metadata_store.delete_association(assoc.id)
-                
+
                 # ストレージから削除
                 await asyncio.gather(
                     self.vector_store.delete_embedding(memory_id),
                     self.metadata_store.delete_memory(memory_id),
                     self.graph_store.remove_memory_node(memory_id)
                 )
-                
+
                 # キャッシュから削除
                 self.memory_cache.delete(memory_id)
-                
+
                 logger.info(
                     "Memory deleted successfully",
                     extra_data={"memory_id": memory_id}
                 )
-                
+
                 return True
-            
+
         except Exception as e:
             logger.error(
                 "Failed to delete memory",
@@ -459,7 +459,7 @@ class MemoryManager:
                 error=str(e)
             )
             return False
-    
+
     async def _auto_associate_memory(
         self,
         memory: Memory,
@@ -475,12 +475,12 @@ class MemoryManager:
                     "domain": memory.domain.value
                 }
             )
-            
+
             # 関連性を作成
             for result in similar_results:
                 if result["id"] == memory.id:
                     continue  # 自己関連を除外
-                
+
                 similarity_score = result["similarity"]
                 if similarity_score >= 0.7:  # 高い類似度のみ
                     association = Association(
@@ -490,10 +490,10 @@ class MemoryManager:
                         strength=similarity_score,
                         auto_generated=True
                     )
-                    
+
                     # 関連性を保存
                     await self._store_association(association)
-            
+
             logger.debug(
                 "Auto-association completed",
                 extra_data={
@@ -501,7 +501,7 @@ class MemoryManager:
                     "similar_count": len(similar_results)
                 }
             )
-            
+
         except Exception as e:
             logger.error(
                 "Failed to auto-associate memory",
@@ -509,7 +509,7 @@ class MemoryManager:
                 memory_id=memory.id,
                 error=str(e)
             )
-    
+
     async def _store_association(self, association: Association) -> bool:
         """関連性を保存"""
         try:
@@ -517,19 +517,19 @@ class MemoryManager:
             assoc_id = await self.metadata_store.store_association(association)
             if not assoc_id:
                 return False
-            
+
             # グラフストアに保存
             success = await self.graph_store.add_association_edge(association)
             if not success:
                 # ロールバック
                 await self.metadata_store.delete_association(association.id)
                 return False
-            
+
             # キャッシュに保存
             self.association_cache.set(association.id, association)
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(
                 "Failed to store association",
@@ -538,7 +538,7 @@ class MemoryManager:
                 error=str(e)
             )
             return False
-    
+
     async def get_statistics(self) -> Dict[str, Any]:
         """システム統計を取得"""
         try:
@@ -548,7 +548,7 @@ class MemoryManager:
                 self.metadata_store.health_check(),
                 self.graph_store.health_check()
             )
-            
+
             # キャッシュ統計
             cache_stats = {
                 "memory_cache": {
@@ -561,7 +561,7 @@ class MemoryManager:
                 },
                 "embedding_cache": self.embedding_service.get_cache_stats()
             }
-            
+
             return {
                 "vector_store": vector_health,
                 "metadata_store": metadata_health,
@@ -569,7 +569,7 @@ class MemoryManager:
                 "cache_stats": cache_stats,
                 "timestamp": datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(
                 "Failed to get statistics",

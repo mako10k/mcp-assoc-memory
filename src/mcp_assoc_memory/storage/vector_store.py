@@ -23,7 +23,7 @@ logger = get_memory_logger(__name__)
 
 class ChromaVectorStore(BaseVectorStore):
     """ChromaDB実装のベクトルストア"""
-    
+
     def __init__(
         self,
         persist_directory: str = "./data/chroma_db",
@@ -35,13 +35,13 @@ class ChromaVectorStore(BaseVectorStore):
                 "ChromaDB is not installed. "
                 "Install it with: pip install chromadb"
             )
-        
+
         self.persist_directory = persist_directory
         self.host = host
         self.port = port
         self.client = None
         self.collections = {}
-        
+
     async def initialize(self) -> None:
         """ChromaDBクライアントを初期化"""
         try:
@@ -60,7 +60,7 @@ class ChromaVectorStore(BaseVectorStore):
                         allow_reset=True
                     )
                 )
-            
+
             # 各ドメイン用のコレクションを初期化
             for domain in MemoryDomain:
                 collection_name = f"memories_{domain.value}"
@@ -73,7 +73,7 @@ class ChromaVectorStore(BaseVectorStore):
                         metadata={"domain": domain.value}
                     )
                 self.collections[domain] = collection
-            
+
             logger.info(
                 "ChromaDB initialized",
                 extra_data={
@@ -81,7 +81,7 @@ class ChromaVectorStore(BaseVectorStore):
                     "collections": list(self.collections.keys())
                 }
             )
-            
+
         except Exception as e:
             logger.error(
                 "Failed to initialize ChromaDB",
@@ -89,20 +89,20 @@ class ChromaVectorStore(BaseVectorStore):
                 error=str(e)
             )
             raise
-    
+
     async def close(self) -> None:
         """クライアントを閉じる"""
         # ChromaDBクライアントは明示的なclose不要
         self.client = None
         self.collections = {}
         logger.info("ChromaDB client closed")
-    
+
     async def health_check(self) -> Dict[str, Any]:
         """ヘルスチェック"""
         try:
             if not self.client:
                 return {"status": "error", "message": "Client not initialized"}
-            
+
             # 各コレクションの統計を取得
             collection_stats = {}
             for domain, collection in self.collections.items():
@@ -117,21 +117,21 @@ class ChromaVectorStore(BaseVectorStore):
                         "status": "error",
                         "error": str(e)
                     }
-            
+
             return {
                 "status": "healthy",
                 "client_type": type(self.client).__name__,
                 "collections": collection_stats,
                 "timestamp": datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
             return {
                 "status": "error",
                 "error": str(e),
                 "timestamp": datetime.utcnow().isoformat()
             }
-    
+
     async def store_vector(
         self,
         memory_id: str,
@@ -142,7 +142,7 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             domain = MemoryDomain(metadata.get("domain", "user"))
             collection = self.collections[domain]
-            
+
             # ChromaDBに保存
             await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -152,7 +152,7 @@ class ChromaVectorStore(BaseVectorStore):
                     metadatas=[metadata]
                 )
             )
-            
+
             logger.info(
                 "Vector stored",
                 extra_data={
@@ -161,7 +161,7 @@ class ChromaVectorStore(BaseVectorStore):
                     "embedding_dim": len(embedding)
                 }
             )
-            
+
         except Exception as e:
             logger.error(
                 "Failed to store vector",
@@ -170,7 +170,7 @@ class ChromaVectorStore(BaseVectorStore):
                 error=str(e)
             )
             raise
-    
+
     async def search_similar(
         self,
         query_embedding: List[float],
@@ -182,39 +182,40 @@ class ChromaVectorStore(BaseVectorStore):
         """類似ベクトルを検索"""
         try:
             collection = self.collections[domain]
-            
+
             # ChromaDBで検索
             query_kwargs = {
                 "query_embeddings": [query_embedding],
                 "n_results": limit
             }
-            
+
             # フィルターがある場合は追加
             if filters:
                 query_kwargs["where"] = filters
-            
+
             results = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: collection.query(**query_kwargs)
             )
-            
+
             # 結果を整形
             similar_memories = []
             if results["ids"] and results["ids"][0]:
                 for i, memory_id in enumerate(results["ids"][0]):
                     distance = results["distances"][0][i]
                     similarity = 1.0 - distance  # 距離を類似度に変換
-                    
+
                     if similarity >= min_similarity:
-                        metadata = results["metadatas"][0][i] if results["metadatas"] else {}
-                        
+                        metadata = results["metadatas"][0][i] if results["metadatas"] else {
+                        }
+
                         similar_memories.append({
                             "memory_id": memory_id,
                             "similarity": similarity,
                             "distance": distance,
                             "metadata": metadata
                         })
-            
+
             logger.info(
                 "Vector search completed",
                 extra_data={
@@ -224,9 +225,9 @@ class ChromaVectorStore(BaseVectorStore):
                     "min_similarity": min_similarity
                 }
             )
-            
+
             return similar_memories
-            
+
         except Exception as e:
             logger.error(
                 "Failed to search similar vectors",
@@ -235,7 +236,7 @@ class ChromaVectorStore(BaseVectorStore):
                 error=str(e)
             )
             raise
-    
+
     async def delete_vector(self, memory_id: str) -> bool:
         """ベクトルを削除"""
         try:
@@ -258,9 +259,9 @@ class ChromaVectorStore(BaseVectorStore):
                 except Exception:
                     # このドメインにはベクトルが存在しない
                     continue
-            
+
             return deleted
-            
+
         except Exception as e:
             logger.error(
                 "Failed to delete vector",
@@ -269,7 +270,7 @@ class ChromaVectorStore(BaseVectorStore):
                 error=str(e)
             )
             return False
-    
+
     async def update_metadata(
         self,
         memory_id: str,
@@ -279,7 +280,7 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             domain = MemoryDomain(metadata.get("domain", "user"))
             collection = self.collections[domain]
-            
+
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: collection.update(
@@ -287,7 +288,7 @@ class ChromaVectorStore(BaseVectorStore):
                     metadatas=[metadata]
                 )
             )
-            
+
             logger.info(
                 "Vector metadata updated",
                 extra_data={
@@ -295,9 +296,9 @@ class ChromaVectorStore(BaseVectorStore):
                     "domain": domain.value
                 }
             )
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(
                 "Failed to update vector metadata",
@@ -306,26 +307,26 @@ class ChromaVectorStore(BaseVectorStore):
                 error=str(e)
             )
             return False
-    
+
     async def get_collection_stats(
         self, domain: MemoryDomain
     ) -> Dict[str, Any]:
         """コレクション統計を取得"""
         try:
             collection = self.collections[domain]
-            
+
             count = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: collection.count()
             )
-            
+
             return {
                 "domain": domain.value,
                 "total_vectors": count,
                 "collection_name": f"memories_{domain.value}",
                 "timestamp": datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(
                 "Failed to get collection stats",

@@ -19,20 +19,20 @@ logger = get_memory_logger(__name__)
 
 class EmbeddingService:
     """埋め込みサービス基底クラス"""
-    
+
     def __init__(self, cache_size: int = 1000, cache_ttl_hours: int = 24):
         self.cache = LRUCache(max_size=cache_size)
         self.cache_ttl = timedelta(hours=cache_ttl_hours)
         self.embedding_lock = asyncio.Lock()
-    
+
     async def get_embedding(self, text: str) -> Optional[np.ndarray]:
         """テキストの埋め込みベクトルを取得"""
         if not text or not text.strip():
             return None
-        
+
         # キャッシュキーを生成
         cache_key = self._get_cache_key(text)
-        
+
         # キャッシュから取得を試行
         cached_result = self.cache.get(cache_key)
         if cached_result:
@@ -47,11 +47,11 @@ class EmbeddingService:
             else:
                 # 期限切れエントリを削除
                 self.cache.delete(cache_key)
-        
+
         # 新しい埋め込みを生成
         async with self.embedding_lock:
             embedding = await self._generate_embedding(text)
-            
+
             if embedding is not None:
                 # キャッシュに保存
                 self.cache.set(cache_key, (embedding, datetime.utcnow()))
@@ -62,7 +62,7 @@ class EmbeddingService:
                         "embedding_dim": len(embedding)
                     }
                 )
-            
+
             return embedding
 
     async def get_embeddings_batch(
@@ -72,7 +72,7 @@ class EmbeddingService:
     ) -> List[Optional[np.ndarray]]:
         """複数テキストの埋め込みを一括取得"""
         results = []
-        
+
         # バッチ処理
         for i in range(0, len(texts), batch_size):
             batch_texts = texts[i:i + batch_size]
@@ -80,19 +80,19 @@ class EmbeddingService:
                 self.get_embedding(text) for text in batch_texts
             ])
             results.extend(batch_results)
-        
+
         return results
-    
+
     def _get_cache_key(self, text: str) -> str:
         """キャッシュキーを生成"""
         # テキストのハッシュを使用
         text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()
         return f"embedding:{text_hash}"
-    
+
     async def _generate_embedding(self, text: str) -> Optional[np.ndarray]:
         """埋め込みベクトルを生成（サブクラスで実装）"""
         raise NotImplementedError
-    
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """キャッシュ統計を取得"""
         return {
@@ -104,7 +104,7 @@ class EmbeddingService:
 
 class OpenAIEmbeddingService(EmbeddingService):
     """OpenAI Embeddings API を使用した埋め込みサービス"""
-    
+
     def __init__(
         self,
         api_key: str,
@@ -115,7 +115,7 @@ class OpenAIEmbeddingService(EmbeddingService):
         self.api_key = api_key
         self.model = model
         self._client = None
-    
+
     async def _get_client(self):
         """OpenAI クライアントを遅延初期化"""
         if self._client is None:
@@ -129,19 +129,19 @@ class OpenAIEmbeddingService(EmbeddingService):
                 )
                 raise
         return self._client
-    
+
     async def _generate_embedding(self, text: str) -> Optional[np.ndarray]:
         """OpenAI APIで埋め込みを生成"""
         try:
             client = await self._get_client()
-            
+
             response = await client.embeddings.create(
                 model=self.model,
                 input=text
             )
-            
+
             embedding = np.array(response.data[0].embedding, dtype=np.float32)
-            
+
             logger.debug(
                 "OpenAI embedding generated",
                 extra_data={
@@ -150,9 +150,9 @@ class OpenAIEmbeddingService(EmbeddingService):
                     "embedding_dim": len(embedding)
                 }
             )
-            
+
             return embedding
-            
+
         except Exception as e:
             logger.error(
                 "Failed to generate OpenAI embedding",
@@ -166,7 +166,7 @@ class OpenAIEmbeddingService(EmbeddingService):
 
 class SentenceTransformerEmbeddingService(EmbeddingService):
     """Sentence Transformers を使用した埋め込みサービス"""
-    
+
     def __init__(
         self,
         model_name: str = "all-MiniLM-L6-v2",
@@ -177,7 +177,7 @@ class SentenceTransformerEmbeddingService(EmbeddingService):
         self.model_name = model_name
         self.device = device
         self._model = None
-    
+
     async def _get_model(self):
         """モデルを遅延初期化"""
         if self._model is None:
@@ -201,21 +201,21 @@ class SentenceTransformerEmbeddingService(EmbeddingService):
                 )
                 raise
         return self._model
-    
+
     async def _generate_embedding(self, text: str) -> Optional[np.ndarray]:
         """Sentence Transformersで埋め込みを生成"""
         try:
             model = await self._get_model()
-            
+
             # 非同期実行のため、ループで実行
             loop = asyncio.get_event_loop()
             embedding = await loop.run_in_executor(
                 None,
                 lambda: model.encode([text])[0]
             )
-            
+
             embedding = np.array(embedding, dtype=np.float32)
-            
+
             logger.debug(
                 "SentenceTransformer embedding generated",
                 extra_data={
@@ -224,9 +224,9 @@ class SentenceTransformerEmbeddingService(EmbeddingService):
                     "embedding_dim": len(embedding)
                 }
             )
-            
+
             return embedding
-            
+
         except Exception as e:
             logger.error(
                 "Failed to generate SentenceTransformer embedding",
@@ -240,28 +240,28 @@ class SentenceTransformerEmbeddingService(EmbeddingService):
 
 class MockEmbeddingService(EmbeddingService):
     """テスト用モック埋め込みサービス"""
-    
+
     def __init__(self, embedding_dim: int = 384, **kwargs):
         super().__init__(**kwargs)
         self.embedding_dim = embedding_dim
-    
+
     async def _generate_embedding(self, text: str) -> Optional[np.ndarray]:
         """固定次元のランダム埋め込みを生成"""
         try:
             # テキストのハッシュをシードに使用して再現可能に
             text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()
             seed = int(text_hash[:8], 16)
-            
+
             np.random.seed(seed)
             embedding = np.random.normal(
                 0, 1, self.embedding_dim
             ).astype(np.float32)
-            
+
             # 正規化
             norm = np.linalg.norm(embedding)
             if norm > 0:
                 embedding = embedding / norm
-            
+
             logger.debug(
                 "Mock embedding generated",
                 extra_data={
@@ -269,9 +269,9 @@ class MockEmbeddingService(EmbeddingService):
                     "embedding_dim": len(embedding)
                 }
             )
-            
+
             return embedding
-            
+
         except Exception as e:
             logger.error(
                 "Failed to generate mock embedding",
@@ -288,10 +288,10 @@ def create_embedding_service(
     """設定に基づいて埋め込みサービスを作成"""
     if config is None:
         config = get_config()
-    
+
     embedding_config = config.get("embedding", {})
     service_type = embedding_config.get("service", "mock")
-    
+
     if service_type == "openai":
         api_key = embedding_config.get("api_key")
         if not api_key:
@@ -299,14 +299,14 @@ def create_embedding_service(
                 "OpenAI API key not configured, falling back to mock service"
             )
             return MockEmbeddingService()
-        
+
         return OpenAIEmbeddingService(
             api_key=api_key,
             model=embedding_config.get("model", "text-embedding-3-small"),
             cache_size=embedding_config.get("cache_size", 1000),
             cache_ttl_hours=embedding_config.get("cache_ttl_hours", 24)
         )
-    
+
     elif service_type == "sentence_transformer":
         return SentenceTransformerEmbeddingService(
             model_name=embedding_config.get("model_name", "all-MiniLM-L6-v2"),
@@ -314,14 +314,14 @@ def create_embedding_service(
             cache_size=embedding_config.get("cache_size", 1000),
             cache_ttl_hours=embedding_config.get("cache_ttl_hours", 24)
         )
-    
+
     elif service_type == "mock":
         return MockEmbeddingService(
             embedding_dim=embedding_config.get("embedding_dim", 384),
             cache_size=embedding_config.get("cache_size", 1000),
             cache_ttl_hours=embedding_config.get("cache_ttl_hours", 24)
         )
-    
+
     else:
         logger.warning(
             f"Unknown embedding service type: {service_type}, "
