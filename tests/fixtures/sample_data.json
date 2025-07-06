@@ -1,0 +1,90 @@
+{
+  "memories": [
+    {
+      "id": "mem-001",
+      "content": "機械学習の基本概念について学習しました。教師あり学習、教師なし学習、強化学習の3つの主要なカテゴリがあります。",
+      "domain": "user",
+      "tags": ["machine-learning", "ai", "basics"],
+      "metadata": {
+        "category": "learning",
+        "difficulty": "beginner",
+        "language": "ja"
+      },
+      "user_id": "user-123",
+      "created_at": "2024-01-01T10:00:00Z",
+      "updated_at": "2024-01-01T10:00:00Z",
+      "accessed_at": "2024-01-01T10:00:00Z",
+      "access_count": 1
+    },
+    {
+      "id": "mem-002", 
+      "content": "Pythonでの非同期プログラミングにはasyncioライブラリを使用します。async/await構文でコルーチンを定義できます。",
+      "domain": "project",
+      "tags": ["python", "asyncio", "programming"],
+      "metadata": {
+        "category": "programming",
+        "difficulty": "intermediate",
+        "language": "ja"
+      },
+      "project_id": "proj-456",
+      "created_at": "2024-01-02T14:30:00Z",
+      "updated_at": "2024-01-02T14:30:00Z",
+      "accessed_at": "2024-01-02T14:30:00Z",
+      "access_count": 3
+    },
+    {
+      "id": "mem-003",
+      "content": "REST APIの設計原則：リソース指向、ステートレス、統一インターフェース、階層化システム、キャッシュ可能、オンデマンドコード（オプション）",
+      "domain": "global",
+      "tags": ["rest-api", "web-development", "architecture"],
+      "metadata": {
+        "category": "architecture",
+        "difficulty": "intermediate",
+        "language": "ja",
+        "source": "design-patterns"
+      },
+      "created_at": "2024-01-03T09:15:00Z",
+      "updated_at": "2024-01-03T09:15:00Z",
+      "accessed_at": "2024-01-03T09:15:00Z",
+      "access_count": 5
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-456",
+      "name": "MCPサーバプロジェクト",
+      "description": "LLM向け連想記憶MCPサーバの開発プロジェクト",
+      "owner_id": "user-123",
+      "is_public": false,
+      "tags": ["mcp", "llm", "memory"],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-03T15:00:00Z",
+      "memory_count": 25,
+      "member_count": 3
+    }
+  ],
+  "associations": [
+    {
+      "id": "assoc-001",
+      "source_memory_id": "mem-001",
+      "target_memory_id": "mem-002",
+      "association_type": "semantic",
+      "strength": 0.7,
+      "description": "機械学習とPythonプログラミングの関連性",
+      "auto_generated": true,
+      "created_at": "2024-01-02T15:00:00Z",
+      "updated_at": "2024-01-02T15:00:00Z"
+    },
+    {
+      "id": "assoc-002", 
+      "source_memory_id": "mem-002",
+      "target_memory_id": "mem-003",
+      "association_type": "temporal",
+      "strength": 0.4,
+      "description": "同時期に学習した内容",
+      "auto_generated": true,
+      "created_at": "2024-01-03T10:00:00Z",
+      "updated_at": "2024-01-03T10:00:00Z"
+    }
+  ]
+}

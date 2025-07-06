@@ -1,0 +1,46 @@
+# Core MCP and AI dependencies
+mcp>=1.0.0
+pydantic>=2.0.0
+openai>=1.0.0
+sentence-transformers>=2.2.0
+
+# Vector and Graph databases
+chromadb>=0.4.0
+networkx>=3.0
+
+# Web framework for HTTP transport
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Database
+SQLAlchemy>=2.0.0
+aiosqlite>=0.19.0
+
+# Authentication
+pyjwt>=2.8.0
+bcrypt>=4.0.0
+
+# Configuration and environment
+python-dotenv>=1.0.0
+
+# Visualization
+jinja2>=3.1.0
+graphviz>=0.20.0
+
+# Data processing
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Development dependencies (install with: pip install -e ".[dev]")
+# pytest>=7.0.0
+# pytest-asyncio>=0.21.0
+# pytest-cov>=4.0.0
+# pytest-mock>=3.10.0
+# black>=23.0.0
+# isort>=5.12.0
+# flake8>=6.0.0
+# mypy>=1.5.0
+# pre-commit>=3.3.0
+# httpx>=0.24.0
+# websockets>=11.0.0

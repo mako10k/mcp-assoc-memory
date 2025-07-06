@@ -362,6 +362,42 @@ jobs:
 
 各フェーズの詳細なチェックリストは[実装計画書](../IMPLEMENTATION_PLAN.md)を参照してください。
 
+## ターミナル実行ガイドライン
+
+### 実行ツールの優先順位
+1. **`mcp_mcpbridge_shell_execute`** - メインのシェル実行ツール（優先使用）
+2. **`mcp_mcpbridge_terminal_*`** - セキュリティ制限時の代替手段
+   - `mcp_mcpbridge_terminal_create` - ターミナルセッション作成
+   - `mcp_mcpbridge_terminal_input` - コマンド入力
+   - `mcp_mcpbridge_terminal_output` - 出力取得
+
+### セキュリティ対応
+- `mcp_mcpbridge_shell_execute`でセキュリティエラーが発生した場合
+- インタラクティブターミナルセッションを作成して実行
+- 長時間実行コマンドや権限が必要な操作で使用
+
+### 使用例
+```typescript
+// 優先: 直接実行
+await mcp_mcpbridge_shell_execute({
+  command: "npm install",
+  working_directory: "/project/path"
+});
+
+// 代替: ターミナルセッション経由
+const terminal = await mcp_mcpbridge_terminal_create({
+  working_directory: "/project/path"
+});
+await mcp_mcpbridge_terminal_input({
+  terminal_id: terminal.id,
+  input: "npm install",
+  execute: true
+});
+const output = await mcp_mcpbridge_terminal_output({
+  terminal_id: terminal.id
+});
+```
+
 ## 参考資料
 - [MCP仕様書](https://spec.modelcontextprotocol.io/)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
