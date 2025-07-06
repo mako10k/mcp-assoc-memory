@@ -1,0 +1,498 @@
+"""
+NetworkXベースのグラフストア実装
+記憶間の関連性をグラフ構造で管理
+"""
+
+import asyncio
+import pickle
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+from pathlib import Path
+
+import networkx as nx
+
+from .base import BaseGraphStore
+from ..models.memory import Memory, MemoryDomain
+from ..models.association import Association
+from ..utils.logging import get_memory_logger
+
+
+logger = get_memory_logger(__name__)
+
+
+class NetworkXGraphStore(BaseGraphStore):
+    """NetworkX実装のグラフストア"""
+    
+    def __init__(self, graph_path: str = "./data/memory_graph.pkl"):
+        self.graph_path = graph_path
+        self.graph = nx.MultiDiGraph()
+        self.graph_lock = asyncio.Lock()
+        
+        # グラフファイルディレクトリを作成
+        Path(self.graph_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    async def initialize(self) -> None:
+        """グラフを初期化"""
+        try:
+            # 既存グラフファイルの読み込み
+            if Path(self.graph_path).exists():
+                with open(self.graph_path, 'rb') as f:
+                    self.graph = pickle.load(f)
+                logger.info(
+                    "Graph loaded from file",
+                    extra_data={
+                        "graph_path": self.graph_path,
+                        "nodes": self.graph.number_of_nodes(),
+                        "edges": self.graph.number_of_edges()
+                    }
+                )
+            else:
+                # 新規グラフ作成
+                self.graph = nx.MultiDiGraph()
+                logger.info("New graph created")
+            
+        except Exception as e:
+            logger.error(
+                "Failed to initialize graph store",
+                error_code="GRAPH_INIT_ERROR",
+                error=str(e)
+            )
+            # フォールバック: 新規グラフ作成
+            self.graph = nx.MultiDiGraph()
+            logger.info("Fallback: created new graph")
+    
+    async def close(self) -> None:
+        """グラフを保存"""
+        try:
+            await self._save_graph()
+            logger.info("Graph store closed")
+        except Exception as e:
+            logger.error(
+                "Failed to save graph on close",
+                error_code="GRAPH_SAVE_ERROR",
+                error=str(e)
+            )
+    
+    async def _save_graph(self) -> None:
+        """グラフをファイルに保存"""
+        async with self.graph_lock:
+            try:
+                with open(self.graph_path, 'wb') as f:
+                    pickle.dump(self.graph, f)
+                logger.info(
+                    "Graph saved",
+                    extra_data={
+                        "graph_path": self.graph_path,
+                        "nodes": self.graph.number_of_nodes(),
+                        "edges": self.graph.number_of_edges()
+                    }
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to save graph",
+                    error_code="GRAPH_SAVE_ERROR",
+                    error=str(e)
+                )
+                raise
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """ヘルスチェック"""
+        try:
+            # 基本統計
+            stats = {
+                "status": "healthy",
+                "graph_path": self.graph_path,
+                "nodes": self.graph.number_of_nodes(),
+                "edges": self.graph.number_of_edges(),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            # ドメイン別統計
+            domain_stats = {}
+            for domain in MemoryDomain:
+                nodes = [
+                    n for n, d in self.graph.nodes(data=True)
+                    if d.get('domain') == domain.value
+                ]
+                domain_stats[domain.value] = len(nodes)
+            
+            stats["domain_stats"] = domain_stats
+            
+            # グラフの連結性チェック
+            if self.graph.number_of_nodes() > 0:
+                # 最大弱連結成分のサイズ
+                largest_component = max(
+                    nx.weakly_connected_components(self.graph),
+                    key=len,
+                    default=set()
+                )
+                stats["largest_component_size"] = len(largest_component)
+                stats["connectivity_ratio"] = (
+                    len(largest_component) / self.graph.number_of_nodes()
+                    if self.graph.number_of_nodes() > 0 else 0
+                )
+            else:
+                stats["largest_component_size"] = 0
+                stats["connectivity_ratio"] = 0
+            
+            return stats
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "graph_path": self.graph_path,
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+    
+    async def add_memory_node(self, memory: Memory) -> bool:
+        """記憶ノードを追加"""
+        try:
+            async with self.graph_lock:
+                node_attributes = {
+                    "domain": memory.domain.value,
+                    "content": memory.content,
+                    "metadata": memory.metadata,
+                    "tags": memory.tags,
+                    "user_id": memory.user_id,
+                    "project_id": memory.project_id,
+                    "session_id": memory.session_id,
+                    "created_at": memory.created_at.isoformat(),
+                    "updated_at": memory.updated_at.isoformat(),
+                    "access_count": memory.access_count
+                }
+                
+                self.graph.add_node(memory.id, **node_attributes)
+            
+            logger.info(
+                "Memory node added",
+                extra_data={
+                    "memory_id": memory.id,
+                    "domain": memory.domain.value
+                }
+            )
+            
+            # 定期的にグラフを保存
+            if self.graph.number_of_nodes() % 100 == 0:
+                await self._save_graph()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(
+                "Failed to add memory node",
+                error_code="GRAPH_ADD_NODE_ERROR",
+                memory_id=memory.id,
+                error=str(e)
+            )
+            return False
+    
+    async def remove_memory_node(self, memory_id: str) -> bool:
+        """記憶ノードを削除"""
+        try:
+            async with self.graph_lock:
+                if memory_id in self.graph:
+                    self.graph.remove_node(memory_id)
+                    
+                    logger.info(
+                        "Memory node removed",
+                        extra_data={"memory_id": memory_id}
+                    )
+                    return True
+                else:
+                    logger.warning(
+                        "Memory node not found for removal",
+                        extra_data={"memory_id": memory_id}
+                    )
+                    return False
+            
+        except Exception as e:
+            logger.error(
+                "Failed to remove memory node",
+                error_code="GRAPH_REMOVE_NODE_ERROR",
+                memory_id=memory_id,
+                error=str(e)
+            )
+            return False
+    
+    async def add_association_edge(self, association: Association) -> bool:
+        """関連性エッジを追加"""
+        try:
+            async with self.graph_lock:
+                edge_attributes = {
+                    "association_id": association.id,
+                    "association_type": association.association_type,
+                    "strength": association.strength,
+                    "metadata": association.metadata,
+                    "description": association.description,
+                    "auto_generated": association.auto_generated,
+                    "created_at": association.created_at.isoformat(),
+                    "updated_at": association.updated_at.isoformat()
+                }
+                
+                self.graph.add_edge(
+                    association.source_memory_id,
+                    association.target_memory_id,
+                    key=association.id,
+                    **edge_attributes
+                )
+            
+            logger.info(
+                "Association edge added",
+                extra_data={
+                    "association_id": association.id,
+                    "source": association.source_memory_id,
+                    "target": association.target_memory_id,
+                    "association_type": association.association_type,
+                }
+            )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(
+                "Failed to add association edge",
+                error_code="GRAPH_ADD_EDGE_ERROR",
+                association_id=association.id,
+                error=str(e)
+            )
+            return False
+    
+    async def remove_association_edge(self, association_id: str) -> bool:
+        """関連性エッジを削除"""
+        try:
+            async with self.graph_lock:
+                # エッジを検索
+                edge_to_remove = None
+                for u, v, key, data in self.graph.edges(keys=True, data=True):
+                    if data.get("association_id") == association_id:
+                        edge_to_remove = (u, v, key)
+                        break
+                
+                if edge_to_remove:
+                    u, v, key = edge_to_remove
+                    self.graph.remove_edge(u, v, key)
+                    
+                    logger.info(
+                        "Association edge removed",
+                        extra_data={"association_id": association_id}
+                    )
+                    return True
+                else:
+                    logger.warning(
+                        "Association edge not found for removal",
+                        extra_data={"association_id": association_id}
+                    )
+                    return False
+            
+        except Exception as e:
+            logger.error(
+                "Failed to remove association edge",
+                error_code="GRAPH_REMOVE_EDGE_ERROR",
+                association_id=association_id,
+                error=str(e)
+            )
+            return False
+    
+    async def get_neighbors(
+        self,
+        memory_id: str,
+        max_depth: int = 2,
+        max_neighbors: int = 20
+    ) -> List[Dict[str, Any]]:
+        """近隣記憶を取得"""
+        try:
+            if memory_id not in self.graph:
+                return []
+            
+            neighbors = []
+            visited = set()
+            
+            # BFS で近隣ノードを探索
+            queue = [(memory_id, 0)]
+            visited.add(memory_id)
+            
+            while queue and len(neighbors) < max_neighbors:
+                current_id, depth = queue.pop(0)
+                
+                if depth >= max_depth:
+                    continue
+                
+                # 隣接ノードを取得
+                for neighbor_id in self.graph.neighbors(current_id):
+                    if neighbor_id not in visited:
+                        visited.add(neighbor_id)
+                        
+                        # エッジ情報を取得
+                        edge_data = self.graph.get_edge_data(
+                            current_id, neighbor_id
+                        )
+                        
+                        # 最も強い関連を取得
+                        best_edge = max(
+                            edge_data.values(),
+                            key=lambda x: x.get('strength', 0)
+                        )
+                        
+                        # ノード情報を取得
+                        node_data = self.graph.nodes[neighbor_id]
+                        
+                        neighbor_info = {
+                            "memory_id": neighbor_id,
+                            "depth": depth + 1,
+                            "association_strength": best_edge.get('strength', 0),
+                            "association_type": best_edge.get('association_type'),
+                            "node_data": node_data
+                        }
+                        
+                        neighbors.append(neighbor_info)
+                        queue.append((neighbor_id, depth + 1))
+            
+            # 関連強度でソート
+            neighbors.sort(
+                key=lambda x: x["association_strength"],
+                reverse=True
+            )
+            
+            return neighbors[:max_neighbors]
+            
+        except Exception as e:
+            logger.error(
+                "Failed to get neighbors",
+                error_code="GRAPH_GET_NEIGHBORS_ERROR",
+                memory_id=memory_id,
+                error=str(e)
+            )
+            return []
+    
+    async def find_path(
+        self,
+        source_id: str,
+        target_id: str,
+        max_path_length: int = 5
+    ) -> Optional[List[Dict[str, Any]]]:
+        """記憶間のパスを検索"""
+        try:
+            if source_id not in self.graph or target_id not in self.graph:
+                return None
+            
+            try:
+                # 最短パスを検索
+                path = nx.shortest_path(
+                    self.graph,
+                    source_id,
+                    target_id,
+                    weight=lambda u, v, d: 1.0 / (d.get('strength', 0.1) + 0.1)
+                )
+                
+                if len(path) > max_path_length + 1:
+                    return None
+                
+                # パス情報を構築
+                path_info = []
+                for i in range(len(path) - 1):
+                    u, v = path[i], path[i + 1]
+                    edge_data = self.graph.get_edge_data(u, v)
+                    
+                    # 最も強い関連を取得
+                    best_edge = max(
+                        edge_data.values(),
+                        key=lambda x: x.get('strength', 0)
+                    )
+                    
+                    step = {
+                        "from": u,
+                        "to": v,
+                        "association_strength": best_edge.get('strength', 0),
+                        "association_type": best_edge.get('association_type'),
+                        "association_id": best_edge.get('association_id')
+                    }
+                    
+                    path_info.append(step)
+                
+                return path_info
+                
+            except nx.NetworkXNoPath:
+                return None
+            
+        except Exception as e:
+            logger.error(
+                "Failed to find path",
+                error_code="GRAPH_FIND_PATH_ERROR",
+                source_id=source_id,
+                target_id=target_id,
+                error=str(e)
+            )
+            return None
+    
+    async def get_graph_stats(self) -> Dict[str, Any]:
+        """グラフ統計を取得"""
+        try:
+            stats = {
+                "nodes": self.graph.number_of_nodes(),
+                "edges": self.graph.number_of_edges(),
+            }
+            
+            if self.graph.number_of_nodes() > 0:
+                # 次数統計
+                degrees = dict(self.graph.degree())
+                stats.update({
+                    "avg_degree": sum(degrees.values()) / len(degrees),
+                    "max_degree": max(degrees.values()),
+                    "min_degree": min(degrees.values())
+                })
+                
+                # 連結成分
+                components = list(nx.weakly_connected_components(self.graph))
+                stats.update({
+                    "num_components": len(components),
+                    "largest_component_size": len(max(components, key=len))
+                })
+                
+                # 関連タイプ別統計
+                type_stats = {}
+                for u, v, data in self.graph.edges(data=True):
+                    assoc_type = data.get('association_type', 'unknown')
+                    type_stats[assoc_type] = type_stats.get(assoc_type, 0) + 1
+                
+                stats["association_type_stats"] = type_stats
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(
+                "Failed to get graph stats",
+                error_code="GRAPH_STATS_ERROR",
+                error=str(e)
+            )
+            return {}
+    
+    async def cleanup_orphaned_nodes(self) -> int:
+        """孤立ノードをクリーンアップ"""
+        try:
+            async with self.graph_lock:
+                orphaned_nodes = [
+                    node for node in self.graph.nodes()
+                    if self.graph.degree(node) == 0
+                ]
+                
+                for node in orphaned_nodes:
+                    self.graph.remove_node(node)
+                
+                if orphaned_nodes:
+                    await self._save_graph()
+                
+                logger.info(
+                    "Orphaned nodes cleaned up",
+                    extra_data={"removed_count": len(orphaned_nodes)}
+                )
+                
+                return len(orphaned_nodes)
+            
+        except Exception as e:
+            logger.error(
+                "Failed to cleanup orphaned nodes",
+                error_code="GRAPH_CLEANUP_ERROR",
+                error=str(e)
+            )
+            return 0

@@ -101,6 +101,47 @@ class MemoryLogger:
                 }
             }
         )
+    
+    def info(self, message: str, extra_data: Dict[str, Any] = None, **kwargs):
+        """情報ログ"""
+        data = {"action": "info"}
+        if extra_data:
+            data.update(extra_data)
+        data.update(kwargs)
+        
+        self.logger.info(
+            message,
+            extra={"extra_data": data}
+        )
+    
+    def debug(self, message: str, extra_data: Dict[str, Any] = None, **kwargs):
+        """デバッグログ"""
+        data = {"action": "debug"}
+        if extra_data:
+            data.update(extra_data)
+        data.update(kwargs)
+        
+        self.logger.debug(
+            message,
+            extra={"extra_data": data}
+        )
+    
+    def warning(
+        self,
+        message: str,
+        extra_data: Dict[str, Any] = None,
+        **kwargs
+    ):
+        """警告ログ"""
+        data = {"action": "warning"}
+        if extra_data:
+            data.update(extra_data)
+        data.update(kwargs)
+        
+        self.logger.warning(
+            message,
+            extra={"extra_data": data}
+        )
 
 
 class PerformanceTimer:
@@ -119,7 +160,9 @@ class PerformanceTimer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """コンテキスト終了"""
         if self.start_time:
-            duration = (datetime.utcnow() - self.start_time).total_seconds() * 1000
+            duration = (
+                datetime.utcnow() - self.start_time
+            ).total_seconds() * 1000
             self.logger.info(
                 f"Operation completed: {self.operation}",
                 extra={

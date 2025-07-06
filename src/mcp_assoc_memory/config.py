@@ -176,3 +176,21 @@ class Config:
             "log_level": self.log_level,
             "debug_mode": self.debug_mode,
         }
+
+
+# グローバル設定インスタンス
+_global_config = None
+
+
+def get_config() -> Dict[str, Any]:
+    """グローバル設定を取得"""
+    global _global_config
+    if _global_config is None:
+        _global_config = Config.load()
+    return _global_config.to_dict()
+
+
+def set_config(config: Config) -> None:
+    """グローバル設定を設定"""
+    global _global_config
+    _global_config = config
