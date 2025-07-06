@@ -1,0 +1,7 @@
+{
+    "servers": {
+        "MCPBridge": {
+            "url": "http://localhost:3002/mcp"
+        }
+    }
+}
