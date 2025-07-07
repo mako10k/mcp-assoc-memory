@@ -29,7 +29,8 @@ class TransportManager:
         if sse_enabled_flag and mcp_server is not None:
             try:
                 from .sse_handler import SseTransport
-                self.sse = SseTransport(mcp_server)
+                # mount_pathを"/mcp"に変更し、/mcpでSSEストリームを受け付ける
+                self.sse = SseTransport(mcp_server, mount_path="/mcp")
             except Exception as e:
                 import logging
                 logging.warning(f"SSEトランスポート初期化失敗: {e}")

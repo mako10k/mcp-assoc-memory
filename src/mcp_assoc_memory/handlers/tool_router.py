@@ -264,3 +264,27 @@ class MCPToolRouter(BaseHandler):
         """グループ別ツール一覧を取得"""
         tools = self.get_available_tools()
         return tools.get(group, {})
+    
+    async def handle_request(self, mcp_req) -> dict:
+        """
+        JSON-RPC形式のmethod: initialize なら即時応答（toolsは7グループのみ）、それ以外はroute()へ委譲
+        """
+        if hasattr(mcp_req, "method") and mcp_req.method == "initialize":
+            tools_info = self.get_available_tools()
+            return {
+                "jsonrpc": "2.0",
+                "id": getattr(mcp_req, "id", None),
+                "result": {
+                    "capabilities": {
+                        "streaming": True,
+                        "tools": list(tools_info.keys()),  # 7グループのみ
+                        "tool_details": tools_info
+                    }
+                }
+            }
+        # MCPツール形式はroute()で処理
+        if hasattr(mcp_req, "to_dict"):
+            req_json = mcp_req.to_dict()
+        else:
+            req_json = dict(mcp_req)
+        return await self.route(req_json)
