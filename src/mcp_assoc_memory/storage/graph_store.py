@@ -21,6 +21,109 @@ logger = get_memory_logger(__name__)
 
 
 class NetworkXGraphStore(BaseGraphStore):
+    async def get_all_association_edges(self, domain: Optional[MemoryDomain] = None) -> List[Dict[str, Any]]:
+        """全関連エッジ取得（可視化用）"""
+        try:
+            edges = []
+            for u, v, key, data in self.graph.edges(keys=True, data=True):
+                if domain is None or self.graph.nodes[u].get('domain') == domain.value or self.graph.nodes[v].get('domain') == domain.value:
+                    edge_info = {
+                        "source": u,
+                        "target": v,
+                        "association_id": data.get("association_id"),
+                        "association_type": data.get("association_type"),
+                        "strength": data.get("strength"),
+                        "metadata": data.get("metadata"),
+                        "description": data.get("description"),
+                        "auto_generated": data.get("auto_generated"),
+                        "created_at": data.get("created_at"),
+                        "updated_at": data.get("updated_at")
+                    }
+                    edges.append(edge_info)
+            return edges
+        except Exception as e:
+            logger.error("Failed to get all association edges", error=str(e))
+            return []
+
+    async def export_graph(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
+        """グラフ構造エクスポート（可視化用）"""
+        try:
+            nodes = []
+            for node_id, data in self.graph.nodes(data=True):
+                if domain is None or data.get('domain') == domain.value:
+                    nodes.append({"id": node_id, **data})
+            edges = await self.get_all_association_edges(domain)
+            return {"nodes": nodes, "edges": edges}
+        except Exception as e:
+            logger.error("Failed to export graph", error=str(e))
+            return {"nodes": [], "edges": []}
+
+    async def find_shortest_path(self, source_memory_id: str, target_memory_id: str, max_depth: int = 6) -> Optional[List[str]]:
+        """最短パスを検索"""
+        try:
+            if source_memory_id not in self.graph or target_memory_id not in self.graph:
+                return None
+            try:
+                path = nx.shortest_path(self.graph, source_memory_id, target_memory_id)
+                if isinstance(path, list) and len(path) > max_depth + 1:
+                    return None
+                if isinstance(path, list):
+                    return [str(n) for n in path]
+                return None
+            except nx.NetworkXNoPath:
+                return None
+        except Exception as e:
+            logger.error("Failed to find shortest path", error=str(e))
+            return None
+
+    async def calculate_centrality(self, centrality_type: str = "betweenness") -> Dict[str, float]:
+        """中心性を計算"""
+        try:
+            if centrality_type == "betweenness":
+                centrality = nx.betweenness_centrality(self.graph)
+            elif centrality_type == "closeness":
+                centrality = nx.closeness_centrality(self.graph)
+            elif centrality_type == "degree":
+                # Fallback: try both callable and non-callable degree
+                try:
+                    degree_view = getattr(self.graph, "degree", None)
+                    if degree_view is not None and hasattr(degree_view, "__iter__"):
+                        centrality = {str(n): float(d) for n, d in degree_view}
+                    else:
+                        centrality = {}
+                except Exception:
+                    centrality = {}
+            else:
+                centrality = {}
+            return {str(k): float(v) for k, v in centrality.items()}
+        except Exception as e:
+            logger.error("Failed to calculate centrality", error=str(e))
+            return {}
+
+    async def detect_communities(self) -> Dict[str, List[str]]:
+        """コミュニティを検出"""
+        try:
+            import networkx.algorithms.community as nx_comm
+            import collections.abc
+            try:
+                communities = []
+                if hasattr(nx_comm, "greedy_modularity_communities"):
+                    comms = nx_comm.greedy_modularity_communities(self.graph)
+                    # 型安全: set/generator/iterableのみリスト化、そうでなければ空リスト
+                    if hasattr(comms, "__iter__") and not isinstance(comms, (str, bytes, int, float, complex, bool)):
+                        try:
+                            communities = [list(c) for c in comms]  # type: ignore
+                        except Exception:
+                            communities = []
+                    else:
+                        communities = []
+            except Exception:
+                communities = []
+            result = {f"community_{i}": [str(n) for n in comm] for i, comm in enumerate(communities)}
+            return result
+        except Exception as e:
+            logger.error("Failed to detect communities", error=str(e))
+            return {}
     """NetworkX実装のグラフストア"""
 
     def __init__(self, graph_path: str = "./data/memory_graph.pkl"):

@@ -18,6 +18,207 @@ logger = get_memory_logger(__name__)
 
 
 class SQLiteMetadataStore(BaseMetadataStore):
+    async def search_by_tags(
+        self,
+        tags: List[str],
+        domain: MemoryDomain,
+        match_all: bool = False,
+        limit: int = 10
+    ) -> List[Memory]:
+        """タグ検索"""
+        try:
+            where_conditions = ["domain = ?"]
+            params = [domain.value]
+            if tags:
+                tag_conditions = []
+                for tag in tags:
+                    tag_conditions.append("tags LIKE ?")
+                    params.append(f'%"{tag}"%')
+                if match_all:
+                    where_conditions.extend(tag_conditions)
+                else:
+                    where_conditions.append(f"({' OR '.join(tag_conditions)})")
+            sql = f'''
+                SELECT * FROM memories
+                WHERE {' AND '.join(where_conditions)}
+                ORDER BY created_at DESC
+                LIMIT ?
+            '''
+            params.append(str(limit))
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(sql, params) as cursor:
+                    rows = await cursor.fetchall()
+                    memories = [self._row_to_memory(row) for row in rows if row]
+                    return [m for m in memories if m is not None]
+        except Exception as e:
+            logger.error("Failed to search by tags", error=str(e))
+            return []
+
+    async def search_by_timerange(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        domain: MemoryDomain,
+        limit: int = 10
+    ) -> List[Memory]:
+        """時間範囲検索"""
+        try:
+            sql = '''
+                SELECT * FROM memories
+                WHERE domain = ? AND created_at >= ? AND created_at <= ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            '''
+            params = [domain.value, start_date.isoformat(), end_date.isoformat(), str(limit)]
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(sql, params) as cursor:
+                    rows = await cursor.fetchall()
+                    memories = [self._row_to_memory(row) for row in rows if row]
+                    return [m for m in memories if m is not None]
+        except Exception as e:
+            logger.error("Failed to search by timerange", error=str(e))
+            return []
+
+    async def advanced_search(
+        self,
+        domain: MemoryDomain,
+        tags: Optional[List[str]] = None,
+        category: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        limit: int = 30
+    ) -> List[Memory]:
+        """高度検索（複合条件）"""
+        try:
+            where_conditions = ["domain = ?"]
+            params = [domain.value]
+            if tags:
+                tag_conditions = []
+                for tag in tags:
+                    tag_conditions.append("tags LIKE ?")
+                    params.append(f'%"{tag}"%')
+                where_conditions.append(f"({' OR '.join(tag_conditions)})")
+            if category:
+                where_conditions.append("metadata LIKE ?")
+                params.append(f'%"category": "{category}"%')
+            if start_date:
+                where_conditions.append("created_at >= ?")
+                params.append(start_date.isoformat())
+            if end_date:
+                where_conditions.append("created_at <= ?")
+                params.append(end_date.isoformat())
+            sql = f'''
+                SELECT * FROM memories
+                WHERE {' AND '.join(where_conditions)}
+                ORDER BY created_at DESC
+                LIMIT ?
+            '''
+            params.append(str(limit))
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(sql, params) as cursor:
+                    rows = await cursor.fetchall()
+                    memories = [self._row_to_memory(row) for row in rows if row]
+                    return [m for m in memories if m is not None]
+        except Exception as e:
+            logger.error("Failed to advanced search", error=str(e))
+            return []
+
+    async def update_access_stats(self, memory_id: str, access_count: int) -> bool:
+        try:
+            async with self.db_lock:
+                async with aiosqlite.connect(self.database_path) as db:
+                    await db.execute(
+                        "UPDATE memories SET access_count = ? WHERE id = ?",
+                        (access_count, memory_id)
+                    )
+                    await db.commit()
+            return True
+        except Exception as e:
+            logger.error("Failed to update access stats", error=str(e))
+            return False
+
+    async def get_memory_associations(self, memory_id: str) -> List[Association]:
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(
+                    "SELECT * FROM associations WHERE source_memory_id = ? OR target_memory_id = ?",
+                    (memory_id, memory_id)
+                ) as cursor:
+                    rows = await cursor.fetchall()
+                    associations = []
+                    for row in rows:
+                        association = Association(
+                            id=row[0],
+                            source_memory_id=row[1],
+                            target_memory_id=row[2],
+                            association_type=row[3],
+                            strength=row[4],
+                            metadata=json.loads(row[5]) if row[5] else {},
+                            description=row[6],
+                            auto_generated=bool(row[7]),
+                            created_at=datetime.fromisoformat(row[8]),
+                            updated_at=datetime.fromisoformat(row[9])
+                        )
+                        associations.append(association)
+                    return associations
+        except Exception as e:
+            logger.error("Failed to get memory associations", error=str(e))
+            return []
+
+    async def batch_delete_memories(self, criteria: Dict[str, Any]) -> int:
+        try:
+            where_conditions = []
+            params = []
+            for key, value in criteria.items():
+                where_conditions.append(f"{key} = ?")
+                params.append(value)
+            sql = f"DELETE FROM memories WHERE {' AND '.join(where_conditions)}"
+            async with self.db_lock:
+                async with aiosqlite.connect(self.database_path) as db:
+                    cursor = await db.execute(sql, params)
+                    count = cursor.rowcount
+                    await db.commit()
+            return count or 0
+        except Exception as e:
+            logger.error("Failed to batch delete memories", error=str(e))
+            return 0
+
+    async def cleanup_orphans(self) -> int:
+        try:
+            # 孤立した記憶（関連性がないもの）を削除
+            sql = '''
+                DELETE FROM memories
+                WHERE id NOT IN (
+                    SELECT source_memory_id FROM associations
+                    UNION
+                    SELECT target_memory_id FROM associations
+                )
+            '''
+            async with self.db_lock:
+                async with aiosqlite.connect(self.database_path) as db:
+                    cursor = await db.execute(sql)
+                    count = cursor.rowcount
+                    await db.commit()
+            return count or 0
+        except Exception as e:
+            logger.error("Failed to cleanup orphans", error=str(e))
+            return 0
+
+    async def reindex(self) -> None:
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                await db.execute("REINDEX")
+                await db.commit()
+        except Exception as e:
+            logger.error("Failed to reindex", error=str(e))
+
+    async def vacuum(self) -> None:
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                await db.execute("VACUUM")
+                await db.commit()
+        except Exception as e:
+            logger.error("Failed to vacuum", error=str(e))
 
     def _row_to_memory(self, row) -> Optional[Memory]:
         if not row:
