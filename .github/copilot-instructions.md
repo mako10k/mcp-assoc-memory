@@ -1,3 +1,22 @@
+`````instructions
+# Copilot Instructions for This Project
+
+## 現場仕様・AI運用ルール
+- 設定ファイルの形式・優先順位は必ず現物コードで確認すること。
+  - 例: `config.yaml`/`config.json`/環境変数/CLI引数のどれが有効かは、`Config`クラスや起動スクリプトの実装を直接確認。
+- 推測や一般論で断定せず、根拠となるコード断片・ログ・公式仕様を必ず引用すること。
+- 変更提案時は「仮説→検証手順→根拠」を明示すること。
+- 変更前後の状態・理由・根拠を記録し、現場の仕様を最優先すること。
+- .github/copilot-instructions.md, README, コメント等の現場ドキュメントを最優先で参照すること。
+- 推測や仮説は「根拠・検証手順・現物確認」とセットで提示すること。
+- ユーザーからのフィードバックは即時反映し、説明責任を果たすこと。
+
+## 参考: 責任あるAI利用
+- [Copilotの責任ある利用](https://docs.github.com/ja/copilot/responsible-use-of-github-copilot-features)
+- [プロンプトエンジニアリング](https://docs.github.com/ja/copilot/concepts/prompt-engineering-for-copilot-chat)
+
+---
+
 # GitHub Copilot Development Instructions
 
 ## プロジェクト概要
@@ -360,45 +379,15 @@ jobs:
 3. **Phase 3: 高度機能** (2週間) - MCPツール・トランスポート・可視化
 4. **Phase 4: 統合・最適化** (1週間) - パフォーマンス・監視・ドキュメント
 
-各フェーズの詳細なチェックリストは[実装計画書](../IMPLEMENTATION_PLAN.md)を参照してください。
+---
 
-## ターミナル実行ガイドライン
+## 設計・実装・設定ファイル同期ルール（2025-07-07制定）
 
-### 実行ツールの優先順位
-1. **`mcp_mcpbridge_shell_execute`** - メインのシェル実行ツール（優先使用）
-2. **`mcp_mcpbridge_terminal_*`** - セキュリティ制限時の代替手段
-   - `mcp_mcpbridge_terminal_create` - ターミナルセッション作成
-   - `mcp_mcpbridge_terminal_input` - コマンド入力
-   - `mcp_mcpbridge_terminal_output` - 出力取得
+- 設計書（CONFIG_SPEC.md, README, docs/fastmcp.md等）・実装・設定ファイル（config.json等）は必ず内容を同期させること。
+- 設計・仕様と実装がズレている場合は、**必ず設計書を現状実装に合わせて修正し、その理由・差分・今後の方針を明記した上で、実装・設定ファイルの修正に進むこと**。
+- 設計書修正後は、必ずチーム・ユーザーにレビュー・合意を取り、合意後に実装・設定ファイルを修正すること。
+- 設計書・実装・設定ファイルの同期が徹底されていない場合、PRレビューで必ず指摘・差し戻しとする。
+- このルールは今後の全ての開発・運用フェーズで厳守すること。
 
-### セキュリティ対応
-- `mcp_mcpbridge_shell_execute`でセキュリティエラーが発生した場合
-- インタラクティブターミナルセッションを作成して実行
-- 長時間実行コマンドや権限が必要な操作で使用
-
-### 使用例
-```typescript
-// 優先: 直接実行
-await mcp_mcpbridge_shell_execute({
-  command: "npm install",
-  working_directory: "/project/path"
-});
-
-// 代替: ターミナルセッション経由
-const terminal = await mcp_mcpbridge_terminal_create({
-  working_directory: "/project/path"
-});
-await mcp_mcpbridge_terminal_input({
-  terminal_id: terminal.id,
-  input: "npm install",
-  execute: true
-});
-const output = await mcp_mcpbridge_terminal_output({
-  terminal_id: terminal.id
-});
-```
-
-## 参考資料
-- [MCP仕様書](https://spec.modelcontextprotocol.io/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [Node.js Best Practices](https://github.com/goldbergyoni/nodebestpractices)
+---
+``````

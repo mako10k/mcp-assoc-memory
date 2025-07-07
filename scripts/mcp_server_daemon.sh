@@ -2,9 +2,9 @@
 # MCP Associative Memory Server Daemon Control Script
 # Usage: ./scripts/mcp_server_daemon.sh {start|stop|restart|status}
 
+
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON=python3
-SERVER_MODULE="mcp_assoc_memory.server"
 PID_FILE="$APP_DIR/logs/mcp_server.pid"
 LOG_FILE="$APP_DIR/logs/mcp_server.log"
 
@@ -15,12 +15,10 @@ start() {
     fi
     echo "MCPサーバを起動します..."
     cd "$APP_DIR"
-    # 環境変数でトランスポート/ポートを指定してください（--transport/--port引数は未対応）
-    export HTTP_ENABLED=true
-    export HTTP_PORT=3006
-    export STDIO_ENABLED=false
+    # MCPサーバ起動（推奨: python -m mcp_assoc_memory ...）
+    CONFIG_ARG="--config $APP_DIR/config.json"
 
-    nohup $PYTHON -m $SERVER_MODULE >> "$LOG_FILE" 2>&1 &
+    nohup $PYTHON -m mcp_assoc_memory $CONFIG_ARG >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     echo "起動しました (PID: $(cat $PID_FILE))"
 }

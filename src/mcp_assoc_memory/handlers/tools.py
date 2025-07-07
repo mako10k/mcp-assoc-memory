@@ -30,6 +30,31 @@ logger = logging.getLogger(__name__)
 
 
 class MemoryToolHandler(BaseHandler):
+
+    # --- MCPToolRouter向け: 個別ハンドラ公開 ---
+    async def handle_store(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory.store 用: 記憶保存"""
+        return await self._store(args)
+
+    async def handle_search(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory.search 用: 記憶検索"""
+        return await self._search(args)
+
+    async def handle_get(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory.get 用: 記憶取得"""
+        return await self._get(args)
+
+    async def handle_get_related(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory.get_related 用: 関連記憶取得"""
+        return await self._get_related(args)
+
+    async def handle_update(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory.update 用: 記憶更新"""
+        return await self._update(args)
+
+    async def handle_delete(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory.delete 用: 記憶削除"""
+        return await self._delete(args)
     """記憶操作ツールハンドラー"""
 
     def __init__(self, memory_manager: MemoryManager):
@@ -246,6 +271,31 @@ class MemoryToolHandler(BaseHandler):
 
 
 class MemoryManageToolHandler(BaseHandler):
+
+    # --- MCPToolRouter向け: 個別ハンドラ公開 ---
+    async def handle_stats(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory_manage.stats 用: 統計取得"""
+        return await self._stats(args)
+
+    async def handle_export(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory_manage.export 用: エクスポート"""
+        return await self._export(args)
+
+    async def handle_import(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory_manage.import 用: インポート"""
+        return await self._import(args)
+
+    async def handle_change_domain(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory_manage.change_domain 用: ドメイン変更"""
+        return await self._change_domain(args)
+
+    async def handle_batch_delete(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory_manage.batch_delete 用: バッチ削除"""
+        return await self._batch_delete(args)
+
+    async def handle_cleanup(self, args: Dict[str, Any]) -> ToolResponse:
+        """memory_manage.cleanup 用: クリーンアップ"""
+        return await self._cleanup(args)
     """記憶管理ツールハンドラー"""
 
     def __init__(self, memory_manager: MemoryManager):
@@ -401,6 +451,27 @@ class MemoryManageToolHandler(BaseHandler):
 
 
 class SearchToolHandler(BaseHandler):
+
+    # --- MCPToolRouter向け: 個別ハンドラ公開 ---
+    async def handle_semantic(self, args: Dict[str, Any]) -> ToolResponse:
+        """search.semantic 用: 意味検索"""
+        return await self._semantic(args)
+
+    async def handle_tags(self, args: Dict[str, Any]) -> ToolResponse:
+        """search.tags 用: タグ検索"""
+        return await self._tags(args)
+
+    async def handle_timerange(self, args: Dict[str, Any]) -> ToolResponse:
+        """search.timerange 用: 時間範囲検索"""
+        return await self._timerange(args)
+
+    async def handle_advanced(self, args: Dict[str, Any]) -> ToolResponse:
+        """search.advanced 用: 高度検索"""
+        return await self._advanced(args)
+
+    async def handle_similar(self, args: Dict[str, Any]) -> ToolResponse:
+        """search.similar 用: 類似検索"""
+        return await self._similar(args)
     """高度検索ツールハンドラー"""
 
     def __init__(self, memory_manager: MemoryManager, similarity_calc: SimilarityCalculator):

@@ -34,6 +34,16 @@ logger = logging.getLogger(__name__)
 
 
 class MCPToolRouter(BaseHandler):
+    async def route(self, req_json: dict) -> dict:
+        """MCPリクエスト(JSON)を解釈し、対応ツールを呼び出す"""
+        # MCPRequest形式: {"tool": ..., "action": ..., "params": ...}
+        tool = req_json.get("tool")
+        action = req_json.get("action")
+        params = req_json.get("params", {})
+        if not tool or not action:
+            return {"success": False, "error": "INVALID_REQUEST", "message": "'tool'と'action'は必須です"}
+        tool_name = f"{tool}.{action}"
+        return await self.call_tool(tool_name, params)
     """MCPツール統合ルーター"""
     
     def __init__(

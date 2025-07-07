@@ -1,0 +1,14 @@
+{
+  "embedding": {
+    "provider": "openai",
+    "api_key": "Your API Key",
+    "model": "text-embedding-3-small",
+    "cache_size": 1000
+  },
+  "transport": {
+    "http_port": 3006,
+    "http_enabled": true,
+    "stdio_enabled": false,
+    "sse_enabled": false
+  }
+}

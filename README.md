@@ -55,33 +55,35 @@ LLM用の連想記憶を形成するModel Context Protocol (MCP) サーバーで
 
 ## サーバの起動方法・トランスポート設定
 
-### デフォルト起動モード
 
-`scripts/mcp_server_daemon.sh` で起動した場合、MCPサーバは **デフォルトでSTDIOモード** で起動します（`server.py`のFastMCPデフォルト設定に従います）。
+### 推奨: 統一エントリーポイントによる起動
 
+MCPサーバは **`python -m mcp_assoc_memory`** で起動してください。トランスポートやポート等はCLI引数で明示的に指定できます。
 
-### HTTPモード・ポート指定での起動
-
-HTTPモードやポート番号を指定したい場合は、**環境変数**で設定してください（CLI引数 `--transport` や `--port` は未対応です）。
-
-例：HTTP/8080で起動したい場合
+例: HTTP/3006で起動したい場合
 
 ```bash
-export HTTP_ENABLED=true
-export HTTP_PORT=8080
-export STDIO_ENABLED=false
-nohup python3 -m mcp_assoc_memory.server >> logs/mcp_server.log 2>&1 &
+python3 -m mcp_assoc_memory --transport http --port 3006 --host 0.0.0.0 --log-level INFO
 ```
 
-利用可能な主な環境変数：
+または、スクリプトから:
 
-- `STDIO_ENABLED` (true/false)
-- `HTTP_ENABLED` (true/false)
-- `HTTP_HOST` (デフォルト: localhost)
-- `HTTP_PORT` (デフォルト: 8000)
-- `SSE_ENABLED` (true/false)
-- `SSE_HOST` (デフォルト: localhost)
-- `SSE_PORT` (デフォルト: 8001)
+```bash
+./scripts/mcp_server_daemon.sh start
+```
+
+利用可能な主なCLI引数:
+
+- `--transport` (`stdio`|`http`|`sse`)
+- `--port` (デフォルト: 8000)
+- `--host` (デフォルト: localhost)
+- `--log-level` (`DEBUG`|`INFO`|`WARNING`|`ERROR`)
+- `--config` (設定ファイルパス)
+
+CLI引数 > 環境変数 > config.json > デフォルト の優先順位で設定が適用されます。
+
+**注意:** 旧来の `server.py` 直接起動や環境変数によるトランスポート切替は非推奨です。
+今後は `python -m mcp_assoc_memory` のみを公式サポートとします。
 
 詳細は `src/mcp_assoc_memory/config.py` を参照してください。
 
@@ -131,3 +133,37 @@ nohup python3 -m mcp_assoc_memory.server >> logs/mcp_server.log 2>&1 &
 ## ライセンス
 
 MIT License
+
+---
+
+## 【現場運用ルール・指摘事項の記録】
+
+- 重要な運用ルール・API設計・現場知・過去の指摘事項は、会話や宣言だけで済ませず、必ずこのREADMEや`.github/copilot-instructions.md`等のドキュメントに明記・記録すること。
+- APIエンドポイント設計・curl例・注意点・現場での運用指針は、現物コード・設計・運用実態に基づき、必ず根拠とともに記載すること。
+- 「徹底する」「気をつける」など抽象的な宣言や反省ではなく、現物の証拠・手順・現状分析のみを記載・共有すること。
+- 設計・実装・設定ファイル・運用ルールがズレている場合は、必ず設計書・README等を現状実装に合わせて修正し、その理由・差分・今後の方針を明記すること。
+- このルールは`.github/copilot-instructions.md`にも明記されており、全開発・運用フェーズで厳守すること。
+
+### 例: APIエンドポイント設計・curl例
+
+- HTTPモードの標準エンドポイントは `/mcp` (POST)。
+- リクエストはMCPツールリクエスト形式のJSONで送信する。
+
+```bash
+curl -X POST http://localhost:3006/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "tool": "memory",
+    "action": "store",
+    "params": {
+      "domain": "user",
+      "content": "テストメモリ",
+      "metadata": {"tag": "test"}
+    }
+  }'
+```
+
+- `/memory` などREST風エンドポイントは現状未実装。
+- 実装・設計・運用ルールの差分や指摘事項は、必ずこのセクションに追記・記録すること。
+
+---

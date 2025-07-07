@@ -300,12 +300,22 @@ class MemoryManager:
                 return memory
 
         except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            try:
+                with open('/tmp/mcp_memory_error.log', 'a') as f:
+                    f.write('=== MEMORY_STORE_ERROR TRACEBACK ===\n')
+                    f.write(tb)
+                    f.write('\n')
+            except Exception as file_e:
+                print('Failed to write traceback to /tmp/mcp_memory_error.log:', file_e)
             logger.error(
                 "Failed to store memory",
                 error_code="MEMORY_STORE_ERROR",
                 domain=domain.value,
                 content_length=len(content),
-                error=str(e)
+                error=str(e),
+                traceback=tb
             )
             return None
 

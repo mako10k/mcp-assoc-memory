@@ -5,6 +5,7 @@
 
 import os
 from dataclasses import dataclass, field
+from typing import List
 from pathlib import Path
 from typing import Dict, Any, Optional
 import json
@@ -55,7 +56,6 @@ class SecurityConfig:
     session_timeout_minutes: int = 60
     rate_limit_requests_per_minute: int = 100
 
-
 @dataclass
 class TransportConfig:
     """トランスポート設定"""
@@ -66,7 +66,7 @@ class TransportConfig:
     http_port: int = 8000
     sse_host: str = "localhost"
     sse_port: int = 8001
-    cors_origins: list = field(default_factory=lambda: ["*"])
+    cors_origins: List[str] = field(default_factory=lambda: ["*"])
 
 
 @dataclass
@@ -81,17 +81,59 @@ class Config:
     log_level: str = "INFO"
     debug_mode: bool = False
 
+
     @classmethod
-    def load(cls, config_path: Optional[str] = None) -> "Config":
-        """設定を読み込み"""
+    def load(
+        cls,
+        config_path: Optional[str] = None,
+        cli_args: Optional[dict] = None
+    ) -> "Config":
+        """
+        設定を読み込み（CLI > 環境変数 > config.json > デフォルト）
+        仕様:
+          1. CLI引数で--config指定があればそのパスを優先
+          2. 指定がなければ ./config.json を自動探索
+          3. なければ環境変数/デフォルト
+        """
         config = cls()
 
         # 環境変数から設定を読み込み
         config._load_from_env()
 
-        # 設定ファイルがあれば読み込み
-        if config_path and Path(config_path).exists():
-            config._load_from_file(config_path)
+        # 設定ファイルパス決定
+        config_file = None
+        if config_path:
+            # CLIで明示指定
+            if Path(config_path).exists():
+                config_file = config_path
+        else:
+            # カレントディレクトリと親ディレクトリのconfig.jsonを自動探索
+            default_path = Path.cwd() / "config.json"
+            parent_path = Path.cwd().parent / "config.json"
+            if default_path.exists():
+                config_file = str(default_path)
+            elif parent_path.exists():
+                config_file = str(parent_path)
+
+        print(f"[DEBUG] config_file resolved: {config_file}")
+        if config_file:
+            config._load_from_file(config_file)
+
+        # CLI引数で上書き
+        if cli_args:
+            # transport, port, host, log_level などを反映
+            if "log_level" in cli_args and cli_args["log_level"]:
+                config.log_level = cli_args["log_level"]
+            if "host" in cli_args and cli_args["host"]:
+                config.transport.http_host = cli_args["host"]
+            if "port" in cli_args and cli_args["port"]:
+                config.transport.http_port = cli_args["port"]
+            if "transport" in cli_args and cli_args["transport"]:
+                # 有効なトランスポートのみTrueに
+                t = cli_args["transport"]
+                config.transport.stdio_enabled = t == "stdio"
+                config.transport.http_enabled = t == "http"
+                config.transport.sse_enabled = t == "sse"
 
         # バリデーション
         config._validate()
@@ -153,16 +195,23 @@ class Config:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
 
+            print(f"[DEBUG] config.json loaded: {config_data}")
             # 設定をマージ（ファイルが優先）
             self._merge_config(config_data)
+            print(f"[DEBUG] after merge: http_host={self.transport.http_host}, http_port={self.transport.http_port}, http_enabled={getattr(self.transport, 'http_enabled', None)}")
 
         except Exception as e:
             logger.warning(f"設定ファイルの読み込みに失敗: {e}")
 
     def _merge_config(self, config_data: Dict[str, Any]):
-        """設定データをマージ"""
+        """設定データをマージ（transportはdataclass再生成で厳密に反映）"""
+        print(f"[DEBUG] _merge_config input: {config_data}")
         for section, values in config_data.items():
-            if hasattr(self, section) and isinstance(values, dict):
+            if section == "transport" and isinstance(values, dict):
+                # TransportConfigのみdict→dataclass再生成
+                self.transport = TransportConfig(**values)
+                print(f"[DEBUG] after TransportConfig dataclass: {self.transport}")
+            elif hasattr(self, section) and isinstance(values, dict):
                 section_obj = getattr(self, section)
                 for key, value in values.items():
                     if hasattr(section_obj, key):

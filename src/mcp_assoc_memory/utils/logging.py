@@ -34,7 +34,14 @@ class StructuredFormatter(logging.Formatter):
         if record.exc_info:
             log_entry["exception"] = self.formatException(record.exc_info)
 
-        return json.dumps(log_entry, ensure_ascii=False)
+        def enum_serializer(obj):
+            import enum
+            if isinstance(obj, enum.Enum):
+                return str(obj)
+            if isinstance(obj, set):
+                return list(obj)
+            return str(obj)
+        return json.dumps(log_entry, ensure_ascii=False, default=enum_serializer)
 
 
 class MemoryLogger:

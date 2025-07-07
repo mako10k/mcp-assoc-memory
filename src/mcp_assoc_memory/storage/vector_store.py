@@ -173,18 +173,36 @@ class ChromaVectorStore(BaseVectorStore):
         embedding: List[float],
         metadata: Dict[str, Any]
     ) -> None:
-        """ベクトルを保存"""
+        """ベクトルを保存 (ChromaDBのmetadata仕様に合わせて変換)"""
         try:
             domain = MemoryDomain(metadata.get("domain", "user"))
             collection = self.collections[domain]
 
-            # ChromaDBに保存
+            # ChromaDBのmetadataはstr/int/float/bool/Noneのみ許容
+            def flatten_metadata(md: Dict[str, Any]) -> Dict[str, Any]:
+                flat = {}
+                for k, v in md.items():
+                    if isinstance(v, (str, int, float, bool)):
+                        flat[k] = v
+                    elif v is None:
+                        flat[k] = "null"
+                    else:
+                        # dictやlist等はstr化
+                        flat[k] = str(v)
+                return flat
+
+            chroma_metadata = flatten_metadata(metadata)
+
+            # 解析用ログ出力
+            logger.info("[DEBUG] store_vector metadata(raw): %s", metadata)
+            logger.info("[DEBUG] store_vector chroma_metadata(flat): %s", chroma_metadata)
+
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: collection.add(
                     ids=[memory_id],
                     embeddings=[embedding],
-                    metadatas=[metadata]
+                    metadatas=[chroma_metadata]
                 )
             )
 

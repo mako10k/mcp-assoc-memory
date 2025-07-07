@@ -10,8 +10,11 @@ class HttpTransport:
     """
     HTTP API (FastAPI) を担当
     """
-    def __init__(self, router):
+    def __init__(self, router, host="0.0.0.0", port=8000, enabled=True):
         self.router = router
+        self.host = host
+        self.port = port
+        self.enabled = enabled
         self.app = FastAPI()
         self._setup_routes()
         self.server_thread = None
@@ -20,12 +23,14 @@ class HttpTransport:
         @self.app.post("/mcp")
         async def mcp_endpoint(request: Request):
             req_json = await request.json()
-            resp = self.router.route(req_json)
+            resp = await self.router.route(req_json)
             return resp
 
     def start(self):
+        if not self.enabled:
+            return
         def run():
-            uvicorn.run(self.app, host="0.0.0.0", port=8000, log_level="info")
+            uvicorn.run(self.app, host=self.host, port=self.port, log_level="info")
         self.server_thread = threading.Thread(target=run, daemon=True)
         self.server_thread.start()
 

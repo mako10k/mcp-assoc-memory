@@ -290,8 +290,10 @@ def create_embedding_service(
         config = get_config()
 
     embedding_config = config.get("embedding", {})
-    service_type = embedding_config.get("service", "mock")
+    # "service"優先、なければ"provider"も許容
+    service_type = embedding_config.get("service") or embedding_config.get("provider", "mock")
 
+    logger.info(f"[create_embedding_service] embedding_config: {embedding_config}, service_type: {service_type}")
     if service_type == "openai":
         api_key = embedding_config.get("api_key")
         if not api_key:
@@ -300,6 +302,7 @@ def create_embedding_service(
             )
             return MockEmbeddingService()
 
+        logger.info("[create_embedding_service] OpenAIEmbeddingService selected")
         return OpenAIEmbeddingService(
             api_key=api_key,
             model=embedding_config.get("model", "text-embedding-3-small"),
@@ -308,6 +311,7 @@ def create_embedding_service(
         )
 
     elif service_type == "sentence_transformer":
+        logger.info("[create_embedding_service] SentenceTransformerEmbeddingService selected")
         return SentenceTransformerEmbeddingService(
             model_name=embedding_config.get("model_name", "all-MiniLM-L6-v2"),
             device=embedding_config.get("device", "cpu"),
@@ -316,6 +320,7 @@ def create_embedding_service(
         )
 
     elif service_type == "mock":
+        logger.info("[create_embedding_service] MockEmbeddingService selected")
         return MockEmbeddingService(
             embedding_dim=embedding_config.get("embedding_dim", 384),
             cache_size=embedding_config.get("cache_size", 1000),
@@ -323,8 +328,6 @@ def create_embedding_service(
         )
 
     else:
-        logger.warning(
-            f"Unknown embedding service type: {service_type}, "
-            "falling back to mock service"
-        )
+        logger.info("[create_embedding_service] Unknown service type, fallback to MockEmbeddingService")
+        logger.warning(f"Unknown embedding service type: {service_type}, falling back to mock service")
         return MockEmbeddingService()
