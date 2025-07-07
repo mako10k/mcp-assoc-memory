@@ -53,6 +53,56 @@ LLM用の連想記憶を形成するModel Context Protocol (MCP) サーバーで
 
 詳細な手順は `docs/installation.md` を参照してください。
 
+## サーバの起動方法・トランスポート設定
+
+### デフォルト起動モード
+
+`scripts/mcp_server_daemon.sh` で起動した場合、MCPサーバは **デフォルトでSTDIOモード** で起動します（`server.py`のFastMCPデフォルト設定に従います）。
+
+
+### HTTPモード・ポート指定での起動
+
+HTTPモードやポート番号を指定したい場合は、**環境変数**で設定してください（CLI引数 `--transport` や `--port` は未対応です）。
+
+例：HTTP/8080で起動したい場合
+
+```bash
+export HTTP_ENABLED=true
+export HTTP_PORT=8080
+export STDIO_ENABLED=false
+nohup python3 -m mcp_assoc_memory.server >> logs/mcp_server.log 2>&1 &
+```
+
+利用可能な主な環境変数：
+
+- `STDIO_ENABLED` (true/false)
+- `HTTP_ENABLED` (true/false)
+- `HTTP_HOST` (デフォルト: localhost)
+- `HTTP_PORT` (デフォルト: 8000)
+- `SSE_ENABLED` (true/false)
+- `SSE_HOST` (デフォルト: localhost)
+- `SSE_PORT` (デフォルト: 8001)
+
+詳細は `src/mcp_assoc_memory/config.py` を参照してください。
+
+### サーバの制御
+
+- 起動:   `./scripts/mcp_server_daemon.sh start`
+- 停止:   `./scripts/mcp_server_daemon.sh stop`
+- 再起動: `./scripts/mcp_server_daemon.sh restart`
+- 状態:   `./scripts/mcp_server_daemon.sh status`
+
+### ログ・PIDファイル
+
+- ログ: `logs/mcp_server.log`
+- PID:  `logs/mcp_server.pid`
+
+### 補足
+
+- デフォルトではSTDIOモードで起動します。
+- HTTP/SSEモードで起動したい場合は、スクリプトまたは環境変数で明示的に指定してください。
+- 詳細なトランスポート設定は `src/mcp_assoc_memory/config.py` および `docs/TRANSPORT_CONFIG.md` を参照してください。
+
 ## 開発者向け情報
 
 ### 開発ガイドライン

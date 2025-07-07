@@ -148,8 +148,12 @@
     - [x] change_domain（雛形のみ、ロジック未実装）
     - [x] batch_delete（雛形のみ、ロジック未実装）
     - [x] cleanup（雛形のみ、ロジック未実装）
-  - [ ] `search` ツール実装
-    - [ ] semantic, tags, timerange, advanced, similar
+  - [x] `search` ツール実装
+    - [x] semantic
+    - [x] tags
+    - [x] timerange
+    - [x] advanced
+    - [x] similar
   - [ ] `project` ツール実装
     - [ ] create, list, get, add_member, remove_member, update, delete
   - [ ] `user` ツール実装

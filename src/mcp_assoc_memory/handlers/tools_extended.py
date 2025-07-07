@@ -20,6 +20,30 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectToolHandler(BaseHandler):
+    async def __call__(self, args: Dict[str, Any]) -> ToolResponse:
+        mode = args.get('mode')
+        if not mode:
+            return ToolResponse(success=False, error="MODE_REQUIRED", message="mode（サブコマンド名）は必須です。例: mode='create'")
+        try:
+            if mode == 'create':
+                return await self.handle_create(args)
+            elif mode == 'list':
+                return await self.handle_list(args)
+            elif mode == 'get':
+                return await self.handle_get(args)
+            elif mode == 'add_member':
+                return await self.handle_add_member(args)
+            elif mode == 'remove_member':
+                return await self.handle_remove_member(args)
+            elif mode == 'update':
+                return await self.handle_update(args)
+            elif mode == 'delete':
+                return await self.handle_delete(args)
+            else:
+                return ToolResponse(success=False, error="UNKNOWN_MODE", message=f"未対応のmode: {mode}")
+        except Exception as e:
+            logger.error(f"ProjectToolHandler {mode} エラー: {e}")
+            return ToolResponse(success=False, error=str(e), message=f"{mode}の実行に失敗しました")
     """プロジェクト管理ツールハンドラー"""
 
     def __init__(self, memory_manager: MemoryManager, session_manager: SessionManager):
@@ -309,6 +333,28 @@ class ProjectToolHandler(BaseHandler):
 
 
 class UserToolHandler(BaseHandler):
+    async def __call__(self, args: Dict[str, Any]) -> ToolResponse:
+        mode = args.get('mode')
+        if not mode:
+            return ToolResponse(success=False, error="MODE_REQUIRED", message="mode（サブコマンド名）は必須です。例: mode='get_current'")
+        try:
+            if mode == 'get_current':
+                return await self.handle_get_current(args)
+            elif mode == 'get_projects':
+                return await self.handle_get_projects(args)
+            elif mode == 'get_sessions':
+                return await self.handle_get_sessions(args)
+            elif mode == 'create_session':
+                return await self.handle_create_session(args)
+            elif mode == 'switch_session':
+                return await self.handle_switch_session(args)
+            elif mode == 'end_session':
+                return await self.handle_end_session(args)
+            else:
+                return ToolResponse(success=False, error="UNKNOWN_MODE", message=f"未対応のmode: {mode}")
+        except Exception as e:
+            logger.error(f"UserToolHandler {mode} エラー: {e}")
+            return ToolResponse(success=False, error=str(e), message=f"{mode}の実行に失敗しました")
     """ユーザー・セッション管理ツールハンドラー"""
 
     def __init__(self, session_manager: SessionManager, project_handler: ProjectToolHandler):
@@ -495,6 +541,26 @@ class UserToolHandler(BaseHandler):
 
 
 class VisualizeToolHandler(BaseHandler):
+    async def __call__(self, args: Dict[str, Any]) -> ToolResponse:
+        mode = args.get('mode')
+        if not mode:
+            return ToolResponse(success=False, error="MODE_REQUIRED", message="mode（サブコマンド名）は必須です。例: mode='memory_map'")
+        try:
+            if mode == 'memory_map':
+                return await self.handle_memory_map(args)
+            elif mode == 'stats_dashboard':
+                return await self.handle_stats_dashboard(args)
+            elif mode == 'domain_graph':
+                return await self.handle_domain_graph(args)
+            elif mode == 'timeline':
+                return await self.handle_timeline(args)
+            elif mode == 'category_chart':
+                return await self.handle_category_chart(args)
+            else:
+                return ToolResponse(success=False, error="UNKNOWN_MODE", message=f"未対応のmode: {mode}")
+        except Exception as e:
+            logger.error(f"VisualizeToolHandler {mode} エラー: {e}")
+            return ToolResponse(success=False, error=str(e), message=f"{mode}の実行に失敗しました")
     """可視化ツールハンドラー"""
 
     def __init__(self, memory_manager: MemoryManager):
@@ -622,6 +688,28 @@ class VisualizeToolHandler(BaseHandler):
 
 
 class AdminToolHandler(BaseHandler):
+    async def __call__(self, args: Dict[str, Any]) -> ToolResponse:
+        mode = args.get('mode')
+        if not mode:
+            return ToolResponse(success=False, error="MODE_REQUIRED", message="mode（サブコマンド名）は必須です。例: mode='health_check'")
+        try:
+            if mode == 'health_check':
+                return await self.handle_health_check(args)
+            elif mode == 'system_stats':
+                return await self.handle_system_stats(args)
+            elif mode == 'backup':
+                return await self.handle_backup(args)
+            elif mode == 'restore':
+                return await self.handle_restore(args)
+            elif mode == 'reindex':
+                return await self.handle_reindex(args)
+            elif mode == 'cleanup_orphans':
+                return await self.handle_cleanup_orphans(args)
+            else:
+                return ToolResponse(success=False, error="UNKNOWN_MODE", message=f"未対応のmode: {mode}")
+        except Exception as e:
+            logger.error(f"AdminToolHandler {mode} エラー: {e}")
+            return ToolResponse(success=False, error=str(e), message=f"{mode}の実行に失敗しました")
     """システム管理ツールハンドラー"""
 
     def __init__(self, memory_manager: MemoryManager, session_manager: SessionManager):
