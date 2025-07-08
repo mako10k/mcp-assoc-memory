@@ -217,45 +217,26 @@ class ToolCall:
         }
 
 
+
+
+# MCP ToolResult: contentは常にリスト型（検索以外もラップ）
 @dataclass
-class ToolResponse:
-    """ツール実行結果"""
-    success: bool
-    data: Optional[Dict[str, Any]] = None
+class ToolResult:
+    content: Optional[List[Any]] = None
+    success: Optional[bool] = None
     error: Optional[str] = None
     message: Optional[str] = None
-    
-    def __post_init__(self):
-        if self.data is None:
-            self.data = {}
-    
-    @classmethod
-    def success_response(cls, data: Dict[str, Any], message: str = "") -> "ToolResponse":
-        """成功レスポンスを作成"""
-        return cls(success=True, data=data, message=message)
-    
-    @classmethod
-    def error_response(cls, error: str, message: str = "") -> "ToolResponse":
-        """エラーレスポンスを作成"""
-        return cls(success=False, error=error, message=message)
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """辞書に変換"""
-        result: Dict[str, Any] = {
-            "success": self.success
-        }
-        
-        if self.success:
-            if self.data is not None:
-                result["data"] = self.data
-            if self.message:
-                result["message"] = self.message
-        else:
-            if self.error is not None:
-                result["error"] = self.error
-            if self.message:
-                result["message"] = self.message
-        
+        result = {}
+        if self.content is not None:
+            result["content"] = self.content
+        if self.success is not None:
+            result["success"] = self.success
+        if self.error is not None:
+            result["error"] = self.error
+        if self.message is not None:
+            result["message"] = self.message
         return result
 
 

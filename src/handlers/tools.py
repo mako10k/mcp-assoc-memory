@@ -226,12 +226,30 @@ def admin_restore():
     # TODO: 実際のリストアロジックを実装
     return {"status": "success", "restored": True}
 
-def admin_reindex():
+
+from typing import Optional, Dict, Any
+# embedding_service, memory_managerは必要に応じてimport
+def admin_reindex_embeddings(
+    domain: Optional[str] = None,
+    project_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    dry_run: bool = False
+) -> Dict[str, Any]:
     """
-    再インデックス（雛形）
+    既存記憶のembeddingを再計算・再投入する管理用コマンド（雛形）。
+    フィルタ指定（domain, project_id, user_id）で範囲限定も可能。
     """
-    # TODO: 実際の再インデックスロジックを実装
-    return {"status": "success", "reindexed": True}
+    # TODO: memory_manager/metadata_storeから対象記憶を全件取得
+    # TODO: embedding_serviceで再計算し、vector_storeへ再投入
+    # TODO: dry_run時は件数のみ返す
+    # TODO: エラー件数・詳細も返却
+    return {
+        "status": "not_implemented",
+        "message": "admin.reindex_embeddingsは雛形です。実装を追加してください。",
+        "reindexed": 0,
+        "failed": 0,
+        "errors": []
+    }
 
 def admin_cleanup_orphans():
     """

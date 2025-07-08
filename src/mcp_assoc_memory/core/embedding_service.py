@@ -116,6 +116,13 @@ class OpenAIEmbeddingService(EmbeddingService):
         self.model = model
         self._client = None
 
+    async def _check_api_key(self):
+        """APIキーの有効性を起動時に検証（embedding生成を1回試行）"""
+        try:
+            await self._generate_embedding("APIキー検証用テキスト")
+        except Exception as e:
+            raise RuntimeError(f"OpenAI APIキーが不正です: {e}")
+
     async def _get_client(self):
         """OpenAI クライアントを遅延初期化"""
         if self._client is None:
@@ -154,6 +161,16 @@ class OpenAIEmbeddingService(EmbeddingService):
             return embedding
 
         except Exception as e:
+            # OpenAI認証エラー時は明示的に例外を投げてトランザクション失敗扱いにする
+            if hasattr(e, 'status_code') and e.status_code == 401:
+                logger.error(
+                    "OpenAI認証エラー（APIキー不正）",
+                    error_code="OPENAI_AUTH_ERROR",
+                    model=self.model,
+                    text_length=len(text),
+                    error=str(e)
+                )
+                raise RuntimeError("OpenAI APIキーが不正です（401 Unauthorized）")
             logger.error(
                 "Failed to generate OpenAI embedding",
                 error_code="OPENAI_EMBEDDING_ERROR",
@@ -161,7 +178,7 @@ class OpenAIEmbeddingService(EmbeddingService):
                 text_length=len(text),
                 error=str(e)
             )
-            return None
+            raise
 
 
 class SentenceTransformerEmbeddingService(EmbeddingService):

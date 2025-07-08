@@ -23,7 +23,8 @@ class HttpTransport:
         @self.app.post("/mcp")
         async def mcp_endpoint(request: Request):
             req_json = await request.json()
-            resp = await self.router.route(req_json)
+            # handle_requestでJSON-RPC/MCP両対応分岐
+            resp = await self.router.handle_request(req_json)
             return resp
 
     def start(self):

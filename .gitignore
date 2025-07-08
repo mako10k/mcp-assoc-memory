@@ -206,6 +206,7 @@ memory_data/
 # API Keys and secrets
 .env.secret
 config.secret.json
+config.json
 *.pem
 *.key
 

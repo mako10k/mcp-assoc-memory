@@ -1,3 +1,6 @@
+def domain_value(domain) -> str:
+    """MemoryDomain Enumまたはstrから値部分（'user'等）を返す"""
+    return domain.value if hasattr(domain, 'value') else str(domain)
 """
 入力値検証ユーティリティ
 """

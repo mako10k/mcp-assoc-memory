@@ -19,6 +19,7 @@ from ..core.embedding_service import EmbeddingService
 from ..core.similarity import SimilarityCalculator
 from ..utils.logging import get_memory_logger
 from ..utils.cache import LRUCache
+from ..utils.validation import domain_value
 
 
 logger = get_memory_logger(__name__)
@@ -35,7 +36,7 @@ class MemoryManager:
                     "id": m.id,
                     "label": m.content[:32],
                     "category": m.category,
-                    "domain": m.domain.value,
+                    "domain": str(m.domain),
                 }
                 for m in memories
             ]
@@ -120,7 +121,7 @@ class MemoryManager:
                 if success:
                     self.memory_cache.set(m.id, m)
                     moved += 1
-            logger.info(f"{moved}件を{source_domain.value}→{target_domain.value}へ移動")
+            logger.info(f"{moved}件を{str(source_domain)}→{str(target_domain)}へ移動")
             return moved
         except Exception as e:
             logger.error(f"ドメイン一括移動エラー: {e}")
@@ -140,7 +141,7 @@ class MemoryManager:
                 if success:
                     self.memory_cache.set(m.id, m)
                     updated += 1
-            logger.info(f"{updated}件を一括更新({domain.value})")
+            logger.info(f"{updated}件を一括更新({str(domain)})")
             return updated
         except Exception as e:
             logger.error(f"一括更新エラー: {e}")
@@ -291,7 +292,7 @@ class MemoryManager:
                     "Memory stored successfully",
                     extra_data={
                         "memory_id": memory.id,
-                        "domain": domain.value,
+                        "domain": str(domain),
                         "content_length": len(content),
                         "has_embedding": embedding is not None
                     }
@@ -312,7 +313,7 @@ class MemoryManager:
             logger.error(
                 "Failed to store memory",
                 error_code="MEMORY_STORE_ERROR",
-                domain=domain.value,
+                domain=str(domain),
                 content_length=len(content),
                 error=str(e),
                 traceback=tb
@@ -367,10 +368,18 @@ class MemoryManager:
         session_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         limit: int = 20,
-        similarity_threshold: float = 0.7
+        similarity_threshold: float = 0.7,
+        min_score: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """記憶を検索"""
         try:
+            # domainsは必ずList[MemoryDomain] or Noneで来る前提
+            if domains is not None:
+                if not isinstance(domains, list) or not all(isinstance(d, MemoryDomain) for d in domains):
+                    raise TypeError("domains must be a list of MemoryDomain or None")
+            if min_score is not None:
+                similarity_threshold = min_score
+            logger.info(f"[DEBUG] search_memories called with similarity_threshold={similarity_threshold!r} (min_score={min_score!r})")
             # クエリの埋め込みベクトル生成
             query_embedding = await self.embedding_service.get_embedding(query)
             if query_embedding is None:
@@ -380,7 +389,8 @@ class MemoryManager:
             # フィルタ条件構築
             filters = {}
             if domains:
-                filters["domain"] = [d.value for d in domains]
+                # ChromaDBのwhere句は単一値のみ許容
+                filters["domain"] = domain_value(domains[0])
             if user_id:
                 filters["user_id"] = user_id
             if project_id:
@@ -398,25 +408,49 @@ class MemoryManager:
                 embedding_list = query_embedding.tolist()
             else:
                 embedding_list = list(query_embedding) if not isinstance(query_embedding, list) else query_embedding
+            # search_similar expects MemoryDomain, not str
+            if "domain" in filters:
+                try:
+                    # domain_valueはstrを返すのでMemoryDomainに変換
+                    domain_for_search = MemoryDomain(str(filters["domain"]))
+                except Exception:
+                    domain_for_search = MemoryDomain.USER
+            else:
+                domain_for_search = MemoryDomain.USER
+
             vector_results = await self.vector_store.search_similar(
                 embedding_list,
-                domain=filters.get("domain", [MemoryDomain.USER])[0] if filters.get("domain") else MemoryDomain.USER,
+                domain=domain_for_search,
                 limit=limit * 2,
                 filters=filters
+            )
+            # DEBUG→INFO一時昇格（後で戻せるようコメントアウトしやすく）
+            logger.info(
+                f"[DEBUG] vector_results: {[{'id': r.get('id'), 'memory_id': r.get('memory_id'), 'similarity': r.get('similarity')} for r in vector_results]}"
             )
 
             # 類似度フィルタリング
             filtered_results = []
             for result in vector_results:
+                logger.info(f"[DEBUG] result dump: {result!r}")
+                logger.info(f"[DEBUG] similarity={result.get('similarity')!r} threshold={similarity_threshold!r}")
                 if result["similarity"] >= similarity_threshold:
-                    # 記憶詳細情報を取得
-                    memory = await self.get_memory(result["id"])
-                    if memory:
-                        filtered_results.append({
-                            "memory": memory,
-                            "similarity": result["similarity"],
-                            "score": result.get("score", result["similarity"])
-                        })
+                    memory_id = result.get("id") or result.get("memory_id")
+                    # memory_idの値を必ずダンプ
+                    logger.info(f"[DEBUG] memory_id before check: {memory_id!r} type={type(memory_id)}")
+                    if not memory_id:
+                        logger.info(f"[DEBUG] Skipping result with no id: {result}")
+                        continue
+                    logger.info(f"[DEBUG] get_memory({memory_id}) type={type(memory_id)} repr={repr(memory_id)}")
+                    memory = await self.get_memory(memory_id)
+                    if not memory:
+                        logger.info(f"[DEBUG] get_memory({memory_id}) returned None")
+                        continue
+                    filtered_results.append({
+                        "memory": memory,
+                        "similarity": result["similarity"],
+                        "score": result.get("score", result["similarity"])
+                    })
 
             # 結果を制限
             filtered_results = filtered_results[:limit]
@@ -434,6 +468,8 @@ class MemoryManager:
             return filtered_results
 
         except Exception as e:
+            import traceback
+            logger.error(traceback.format_exc())
             logger.error(
                 "Failed to search memories",
                 error_code="MEMORY_SEARCH_ERROR",
@@ -578,14 +614,15 @@ class MemoryManager:
 
             # 関連性を作成
             for result in similar_results:
-                if result["id"] == memory.id:
+                # vector_store.search_similarの返り値は{"memory_id": ..., ...}
+                if result["memory_id"] == memory.id:
                     continue  # 自己関連を除外
 
                 similarity_score = result["similarity"]
                 if similarity_score >= 0.7:  # 高い類似度のみ
                     association = Association(
                         source_memory_id=memory.id,
-                        target_memory_id=result["id"],
+                        target_memory_id=result["memory_id"],
                         association_type="semantic",
                         strength=similarity_score,
                         auto_generated=True
@@ -594,7 +631,8 @@ class MemoryManager:
                     # 関連性を保存
                     await self._store_association(association)
 
-            logger.debug(
+            # DEBUG→INFO一時昇格
+            logger.info(
                 "Auto-association completed",
                 extra_data={
                     "memory_id": memory.id,
@@ -788,7 +826,7 @@ class MemoryManager:
             if success:
                 # キャッシュを更新
                 self.memory_cache.set(memory_id, memory)
-                logger.info(f"記憶ドメイン変更: {memory_id} -> {new_domain.value}")
+                logger.info(f"記憶ドメイン変更: {memory_id} -> {str(new_domain)}")
             
             return success
         except Exception as e:
@@ -855,7 +893,7 @@ class MemoryManager:
             # ベクトル検索
             results = await self.vector_store.search(
                 embedding,
-                domain.value,
+                str(domain),
                 limit,
                 min_score
             )
@@ -972,7 +1010,7 @@ class MemoryManager:
             # 類似検索
             results = await self.vector_store.search(
                 reference_embedding,
-                domain.value,
+                str(domain),
                 limit + 1,  # 自分自身を除外するため+1
                 min_score
             )

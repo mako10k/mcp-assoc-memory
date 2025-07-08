@@ -11,7 +11,7 @@ MCPハンドラーモジュール
 7. admin - システム管理・保守
 """
 
-from .base import BaseHandler, ToolCall, ToolResponse, MCPHandler
+from .base import BaseHandler, ToolCall, ToolResult, MCPHandler
 from .tool_router import MCPToolRouter
 from .tools import MemoryToolHandler, MemoryManageToolHandler, SearchToolHandler
 from .tools_extended import (
@@ -24,7 +24,7 @@ from .tools_extended import (
 __all__ = [
     'BaseHandler',
     'ToolCall', 
-    'ToolResponse',
+    'ToolResult',
     'MCPHandler',
     'MCPToolRouter',
     'MemoryToolHandler',

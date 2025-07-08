@@ -14,7 +14,11 @@ MCPツール統合ルーター
 from typing import Dict, Any, Optional
 import logging
 
-from .base import BaseHandler, ToolCall, ToolResponse
+import mcp
+
+from mcp_assoc_memory.models import memory
+
+from .base import BaseHandler, ToolCall, ToolResult
 from .tools import (
     MemoryToolHandler, 
     MemoryManageToolHandler,
@@ -35,15 +39,66 @@ logger = logging.getLogger(__name__)
 
 class MCPToolRouter(BaseHandler):
     async def route(self, req_json: dict) -> dict:
-        """MCPリクエスト(JSON)を解釈し、対応ツールを呼び出す"""
-        # MCPRequest形式: {"tool": ..., "action": ..., "params": ...}
-        tool = req_json.get("tool")
-        action = req_json.get("action")
-        params = req_json.get("params", {})
-        if not tool or not action:
-            return {"success": False, "error": "INVALID_REQUEST", "message": "'tool'と'action'は必須です"}
-        tool_name = f"{tool}.{action}"
-        return await self.call_tool(tool_name, params)
+        """
+        MCPリクエスト(JSON)を解釈し、
+        params形式: {"subcommand": ..., "domain":..., ...各種引数...} のみをサポート。
+        後方互換は廃止。
+        """
+        logger.info(f"[MCPToolRouter.route] 受信req_json: {req_json}")
+        params_raw = req_json.get("params", {})
+        # MCPクライアントからのリクエスト形式に柔軟対応
+        # params: {name, arguments}
+        tool = params_raw.get("name")
+        arguments = params_raw.get("arguments", {})
+        if "subcommand" not in arguments:
+            logger.error(f"[MCPToolRouter.route] 'subcommand'がargumentsに存在しません: {arguments}")
+            return {
+                "success": False,
+                "error": "INVALID_PARAMS",
+                "message": "'params'は{subcommand: ..., ...}形式である必要があります",
+                "parameters": None
+            }
+        subcommand = arguments["subcommand"]
+        arguments = {k: v for k, v in arguments.items() if k != "subcommand"}
+        tool_name = f"{tool}.{subcommand}"
+        logger.info(f"[MCPToolRouter.route] tool_name: {tool_name}, arguments: {arguments}")
+        # スキーマ取得
+        tools_info = self.get_available_tools()
+        tool_entry = next((t for t in tools_info['tools'] if t['name'] == tool), None)
+        sub_schema = None
+        if tool_entry and 'parameters' in tool_entry and subcommand in tool_entry['parameters']:
+            sub_schema = tool_entry['parameters'][subcommand]
+        # バリデーション
+        validation_error = None
+        if sub_schema:
+            import jsonschema
+            try:
+                jsonschema.validate(arguments, {
+                    'type': 'object',
+                    'properties': sub_schema.get('properties', {}),
+                    'required': sub_schema.get('required', [])
+                })
+            except jsonschema.ValidationError as ve:
+                validation_error = str(ve)
+        if validation_error:
+            logger.info(f"[MCPToolRouter.route] バリデーションエラー: {validation_error}")
+            return {
+                "success": False,
+                "error": "INVALID_PARAMS",
+                "message": f"引数が不正です: {validation_error}",
+                "parameters": sub_schema
+            }
+        # ツール実行
+        try:
+            return await self.call_tool(tool_name, arguments)
+        except Exception as e:
+            logger.error(f"ツール実行例外: {tool_name}: {e}")
+            return {
+                "success": False,
+                "error": "TOOL_EXECUTION_ERROR",
+                "message": f"ツール '{tool_name}' の実行中に例外が発生しました: {str(e)}",
+                "parameters": sub_schema
+            }
     """MCPツール統合ルーター"""
     
     def __init__(
@@ -124,137 +179,197 @@ class MCPToolRouter(BaseHandler):
             'admin.cleanup_orphans': self.admin_handler.handle_cleanup_orphans,
         }
     
-    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """ツール呼び出しを実行"""
+    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> dict:
+        """
+        MCP仕様: サブコマンドinputSchemaで厳密バリデーションし、
+        バリデーションエラー時はinputSchema付きでエラー応答、
+        ツール実行時例外もinputSchema付きでエラー応答。
+        """
+        import jsonschema
+        # サブコマンドinputSchema取得
+        tools_info = self.get_available_tools()
+        input_schema = None
+        if '.' in tool_name:
+            group, sub = tool_name.split('.', 1)
+        else:
+            group, sub = tool_name, None
+        for tool in tools_info.get('tools', []):
+            if tool.get('name') == group:
+                subcommands = tool.get('parameters', {})
+                if sub and sub in subcommands:
+                    sub_schema = subcommands[sub]
+                    input_schema = {
+                        'type': 'object',
+                        'properties': sub_schema.get('properties', {}),
+                        'required': sub_schema.get('required', []),
+                        'description': sub_schema.get('description', '')
+                    }
+                break
+        # バリデーション
+        if input_schema:
+            try:
+                jsonschema.validate(arguments, input_schema)
+            except jsonschema.ValidationError as ve:
+                return {
+                    "success": False,
+                    "error": "INVALID_PARAMS",
+                    "message": f"引数が不正です: {ve.message}",
+                    "inputSchema": input_schema
+                }
+        # ツール実行
         try:
-            # ツールマッピングから対応するハンドラーを取得
             handler = self.tool_mappings.get(tool_name)
-            
             if not handler:
-                return ToolResponse(
+                return ToolResult(
                     success=False,
                     error="TOOL_NOT_FOUND",
                     message=f"ツール '{tool_name}' が見つかりません"
                 ).to_dict()
-            
-            # ハンドラーを実行
             response = await handler(arguments)
-            
-            # ログ出力
             logger.info(
                 f"Tool executed: {tool_name}",
                 extra={
                     'tool_name': tool_name,
-                    'success': response.success,
+                    'success': getattr(response, 'success', None),
                     'args_keys': list(arguments.keys())
                 }
             )
-            
-            return response.to_dict()
-            
+            # ToolResultまたはdict互換で返す
+            if hasattr(response, 'to_dict'):
+                return response.to_dict()
+            elif isinstance(response, dict):
+                return response
+            else:
+                logger.error(f"ツール応答型エラー: {tool_name}: {type(response)}")
+                return ToolResult(
+                    success=False,
+                    error="TOOL_EXECUTION_ERROR",
+                    message=f"ツール '{tool_name}' の応答型が不正です: {type(response)}"
+                ).to_dict()
         except Exception as e:
-            logger.error(f"ツール実行エラー ({tool_name}): {e}")
-            return ToolResponse(
+            logger.error(f"ツール実行例外: {tool_name}: {e}")
+            return ToolResult(
                 success=False,
                 error="TOOL_EXECUTION_ERROR",
-                message=f"ツール '{tool_name}' の実行中にエラーが発生しました: {str(e)}"
+                message=f"ツール '{tool_name}' の実行中に例外が発生しました: {str(e)}"
             ).to_dict()
     
-    def get_available_tools(self) -> Dict[str, Dict[str, Any]]:
-        """利用可能なツール一覧を取得"""
-        tools = {}
-        
-        # memory ツールグループ
-        tools['memory'] = {
-            'description': '基本記憶操作',
-            'subcommands': {
-                'store': '記憶を保存する',
-                'search': '記憶を検索する', 
-                'get': '記憶を取得する',
-                'get_related': '関連記憶を取得する',
-                'update': '記憶を更新する',
-                'delete': '記憶を削除する'
-            }
+    def get_available_tools(self) -> dict:
+        """
+        MCP仕様に準拠したツール一覧＋サブコマンドスキーマを返す。
+        - inputSchema: {type: "object", properties: {}}（全ツール共通、Zodバリデーション対応）
+        - parameters: サブコマンドスキーマ（memoryツールは詳細、他は空dict）
+        """
+        memory_parameters = {
+            'subcommand': {
+                'description': 'Subcommand to execute',
+                'type': 'string',
+                'enum': [
+                    'store', 'search', 'get', 'get_related', 'update', 'delete'
+                ]
+            },
+            'domain': {
+                'description': 'Domain of memory',
+                'type': 'string',
+                'enum': [
+                    'global', 'user', 'project', 'session'
+                ]
+            },
+            'project_id': {
+                'description': 'Project ID (Required for project domain)',
+                'type': 'string',
+            },
+            'content': {
+                'description': 'Content of memory (Required for store/update)',
+                'type': 'string'
+            },
+            'metadata': {
+                'description': 'Additional metadata (Required for store/update)',
+                'type': 'object',
+                'additionalProperties': True
+            },
+            'tags': {
+                'description': 'Tags for memory (Optional)',
+                'type': 'array',
+                'items': {'type': 'string'}
+            },
+            'category': {
+                'description': 'Category for memory (Optional)',
+                'type': 'string'
+            },
+            'memory_id': {
+                'description': 'Memory ID (Required for get, update, delete, get_related)',
+                'type': 'string'
+            },
+            'query': {
+                'description': 'Search query (Required for search)',
+                'type': 'string'
+            },
+            'limit': {
+                'description': 'Limit for search/get_related',
+                'type': 'integer',
+                'minimum': 1,
+                'default': 10
+            },
+            'min_score': {
+                'description': 'Minimum similarity score for get_related',
+                'type': 'number',
+                'minimum': 0,
+                'maximum': 1,
+                'default': 0.7
+            },
         }
-        
-        # memory_manage ツールグループ
-        tools['memory_manage'] = {
-            'description': '記憶管理・統計',
-            'subcommands': {
-                'stats': '記憶統計を取得する',
-                'export': '記憶をエクスポートする',
-                'import': '記憶をインポートする',
-                'change_domain': '記憶のドメインを変更する',
-                'batch_delete': '記憶を一括削除する',
-                'cleanup': 'データベースをクリーンアップする'
+        empty_input_schema = {"type": "object", "properties": {}}
+        tools = [
+            {
+                'name': 'memory',
+                'description': 'Basic memory operations',
+                'parameters': memory_parameters,
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': memory_parameters,
+                    'required': ["subcommand", "domain"],
+                    'description': 'Memory tool parameters'
+                }
+            },
+            {
+                'name': 'memory_manage',
+                'description': '記憶管理・統計',
+                'parameters': {},
+                'inputSchema': empty_input_schema
+            },
+            {
+                'name': 'search',
+                'description': '高度検索機能',
+                'parameters': {},
+                'inputSchema': empty_input_schema
+            },
+            {
+                'name': 'project',
+                'description': 'プロジェクト管理',
+                'parameters': {},
+                'inputSchema': empty_input_schema
+            },
+            {
+                'name': 'user',
+                'description': 'ユーザー・セッション管理',
+                'parameters': {},
+                'inputSchema': empty_input_schema
+            },
+            {
+                'name': 'visualize',
+                'description': '可視化・分析',
+                'parameters': {},
+                'inputSchema': empty_input_schema
+            },
+            {
+                'name': 'admin',
+                'description': 'システム管理・保守',
+                'parameters': {},
+                'inputSchema': empty_input_schema
             }
-        }
-        
-        # search ツールグループ
-        tools['search'] = {
-            'description': '高度検索機能',
-            'subcommands': {
-                'semantic': '意味的検索を実行する',
-                'tags': 'タグ検索を実行する',
-                'timerange': '時間範囲検索を実行する',
-                'advanced': '高度検索を実行する',
-                'similar': '類似記憶検索を実行する'
-            }
-        }
-        
-        # project ツールグループ
-        tools['project'] = {
-            'description': 'プロジェクト管理',
-            'subcommands': {
-                'create': 'プロジェクトを作成する',
-                'list': 'プロジェクト一覧を取得する',
-                'get': 'プロジェクト詳細を取得する',
-                'add_member': 'プロジェクトメンバーを追加する',
-                'remove_member': 'プロジェクトメンバーを削除する',
-                'update': 'プロジェクトを更新する',
-                'delete': 'プロジェクトを削除する'
-            }
-        }
-        
-        # user ツールグループ
-        tools['user'] = {
-            'description': 'ユーザー・セッション管理',
-            'subcommands': {
-                'get_current': '現在のユーザー情報を取得する',
-                'get_projects': 'ユーザーのプロジェクト一覧を取得する',
-                'get_sessions': 'ユーザーのセッション一覧を取得する',
-                'create_session': '新しいセッションを作成する',
-                'switch_session': 'セッションのプロジェクトを切り替える',
-                'end_session': 'セッションを終了する'
-            }
-        }
-        
-        # visualize ツールグループ
-        tools['visualize'] = {
-            'description': '可視化・分析',
-            'subcommands': {
-                'memory_map': '記憶マップを生成する',
-                'stats_dashboard': '統計ダッシュボードを生成する',
-                'domain_graph': 'ドメイングラフを生成する',
-                'timeline': 'タイムライン表示を生成する',
-                'category_chart': 'カテゴリチャートを生成する'
-            }
-        }
-        
-        # admin ツールグループ
-        tools['admin'] = {
-            'description': 'システム管理・保守',
-            'subcommands': {
-                'health_check': 'システムヘルスチェックを実行する',
-                'system_stats': 'システム統計を取得する',
-                'backup': 'システムバックアップを実行する',
-                'restore': 'システムリストアを実行する',
-                'reindex': 'インデックス再構築を実行する',
-                'cleanup_orphans': '孤立データをクリーンアップする'
-            }
-        }
-        
-        return tools
+        ]
+        return {'tools': tools}
     
     def get_tool_count(self) -> int:
         """総ツール数を取得"""
@@ -267,24 +382,134 @@ class MCPToolRouter(BaseHandler):
     
     async def handle_request(self, mcp_req) -> dict:
         """
-        JSON-RPC形式のmethod: initialize なら即時応答（toolsは7グループのみ）、それ以外はroute()へ委譲
+        JSON-RPC形式のmethodバリデーションを追加。
+        許可されたmethod以外はエラー返却。
         """
-        if hasattr(mcp_req, "method") and mcp_req.method == "initialize":
-            tools_info = self.get_available_tools()
+        def _tools_list_to_dict(tools_info):
+            # tools_info['tools']はlist→dictに変換
+            return {t['name']: t for t in tools_info.get('tools', [])}
+
+        # id抽出（どの形式でも必ずidを取得）
+        req_id = None
+        if hasattr(mcp_req, "id"):
+            req_id = getattr(mcp_req, "id", None)
+        elif isinstance(mcp_req, dict):
+            req_id = mcp_req.get("id")
+
+        # method抽出
+        method = None
+        if isinstance(mcp_req, dict):
+            method = mcp_req.get("method")
+        elif hasattr(mcp_req, "method"):
+            method = getattr(mcp_req, "method", None)
+        if method is None:
             return {
                 "jsonrpc": "2.0",
-                "id": getattr(mcp_req, "id", None),
+                "id": req_id,
+                "error": {
+                    "code": -32600,
+                    "message": "Missing or invalid 'method' field.",
+                }
+            }
+
+        # methodごとにルーティング
+        async def not_implemented():
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {
+                    "code": -32601,
+                    "message": f"Method '{method}' is not implemented.",
+                }
+            }
+
+        async def handle_initialize():
+            tools_info = self.get_available_tools()
+            tools_dict = _tools_list_to_dict(tools_info)
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
                 "result": {
+                    "protocolVersion": "2025-03-26",
                     "capabilities": {
                         "streaming": True,
-                        "tools": list(tools_info.keys()),  # 7グループのみ
-                        "tool_details": tools_info
+                        "tools": tools_dict
+                    },
+                    "serverInfo": {
+                        "name": "MCP Assoc Memory Server",
+                        "version": "0.1.0"
                     }
                 }
             }
-        # MCPツール形式はroute()で処理
-        if hasattr(mcp_req, "to_dict"):
-            req_json = mcp_req.to_dict()
-        else:
-            req_json = dict(mcp_req)
-        return await self.route(req_json)
+
+        async def handle_tools_list():
+            tools_info = self.get_available_tools()
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": tools_info
+            }
+
+        async def handle_tools_call():
+            # MCPツール呼び出し: route()に委譲
+            result = await self.route(mcp_req)
+            # MCPプロトコル: resultはToolResultまたはエラー
+            if isinstance(result, dict) and (result.get("success") is False or result.get("error")):
+                error_code = -32001
+                error_message = result.get("message") or result.get("error") or "MCP error"
+                error_data = {k: v for k, v in result.items() if k not in ("success", "error", "message")}
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {
+                        "code": error_code,
+                        "message": error_message,
+                        "data": error_data if error_data else None
+                    }
+                }
+            # MCPプロトコル: resultは必ず { content: [ToolResult, ...] }
+            # すでにバッチ形式（result={content: [...]})ならそのまま返す
+            if isinstance(result, dict) and "content" in result and isinstance(result["content"], list):
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "content": result["content"]
+                    }
+                }
+            # 単一ToolResultならラップ
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "content": [result]
+                }
+            }
+
+        async def handle_ping():
+            # シンプルなping応答
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "pong": True
+                }
+            }
+
+        # methodルーティングテーブル
+        method_table = {
+            "initialize": handle_initialize,
+            "tools/list": handle_tools_list,
+            "tools/call": handle_tools_call,
+            "resources/list": not_implemented,
+            "prompts/list": not_implemented,
+            "$/progress": not_implemented,
+            "$/cancelRequest": not_implemented,
+            "notifications/initialized": not_implemented,
+            "ping": handle_ping
+        }
+        handler = method_table.get(method, not_implemented)
+        return await handler()
+
+
+

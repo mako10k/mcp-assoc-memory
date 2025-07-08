@@ -24,14 +24,21 @@ start() {
 }
 
 stop() {
-    if [ ! -f "$PID_FILE" ] || ! kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+    if [ ! -f "$PID_FILE" ]; then
         echo "MCPサーバは起動していません"
         exit 1
     fi
-    echo "MCPサーバを停止します..."
-    kill $(cat "$PID_FILE")
-    rm -f "$PID_FILE"
-    echo "停止しました"
+    PID=$(cat "$PID_FILE")
+    if kill -0 $PID 2>/dev/null; then
+        echo "MCPサーバを停止します..."
+        kill $PID
+        rm -f "$PID_FILE"
+        echo "停止しました"
+    else
+        echo "MCPサーバプロセスは既に存在しません (PIDファイルのみ削除)"
+        rm -f "$PID_FILE"
+        echo "PIDファイルを削除しました"
+    fi
 }
 
 restart() {

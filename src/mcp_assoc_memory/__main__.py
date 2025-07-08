@@ -118,17 +118,13 @@ async def main():
                 @app.post("/mcp")
                 async def mcp_endpoint(request: Request):
                     req_json = await request.json()
-                    # JSON-RPC形式（jsonrpc, method, id, params）なら分岐
+                    # JSON-RPC形式ならdictのまま渡す
                     if "jsonrpc" in req_json and "method" in req_json:
-                        mcp_req = MCPRequest(
-                            id=req_json.get("id"),
-                            method=req_json.get("method"),
-                            params=req_json.get("params", {})
-                        )
+                        mcp_req = req_json
                     else:
                         mcp_req = MCPRequest.from_dict(req_json)
                     mcp_resp = await router.handle_request(mcp_req)
-                    return mcp_resp.to_dict()
+                    return mcp_resp.to_dict() if hasattr(mcp_resp, 'to_dict') else mcp_resp
                 mcp_server = FastMCP(app)
             except Exception as e:
                 import logging
