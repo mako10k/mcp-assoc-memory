@@ -94,3 +94,15 @@ If code behavior seems unclear, prompt Copilot with:
 - Always test changes using a real `tools/call` or `tools/list` JSON-RPC request, not just code shape.
 
 ---
+
+## 📋 Current Project Status & Next Steps
+
+**🔗 For detailed current status and immediate todos, see: [CURRENT_STATUS_AND_TODO.md](../CURRENT_STATUS_AND_TODO.md)**
+
+### Quick Context (Updated: 2025-07-09)
+- **FastMCP 2.0 migration**: ✅ Complete
+- **Associative memory features**: ✅ Restored (embedding-based search, similarity calculation)
+- **Core architecture**: ✅ Integrated (MemoryManager, EmbeddingService, ChromaVectorStore)
+- **Next priority**: 🔧 Dependency verification, initialization stabilization, basic testing
+
+**Important**: This project's core requirement is **associative memory functionality** - semantic similarity search and automatic association discovery between memories. Always maintain these capabilities.
