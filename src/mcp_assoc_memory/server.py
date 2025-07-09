@@ -8,14 +8,15 @@ from pydantic import Field, BaseModel
 from datetime import datetime, timedelta
 import logging
 import uuid
+from .simple_persistence import get_persistent_storage
 
 logger = logging.getLogger(__name__)
 
 # FastMCP server instance
 mcp = FastMCP(name="AssocMemoryServer")
 
-# Simple memory storage (stub for actual implementation)
-memory_storage = {}
+# Persistent memory storage with JSON file backup
+memory_storage, persistence = get_persistent_storage()
 
 
 # Pydantic model definitions
@@ -149,6 +150,9 @@ async def memory_store(
         
         memory_storage[memory_id] = memory_data
         
+        # Save to persistent storage
+        persistence.save_memories(memory_storage)
+        
         await ctx.info(f"Memory stored: {memory_id}")
         
         return MemoryResponse(**memory_data)
@@ -260,6 +264,8 @@ async def memory_delete(
         
         if memory_id in memory_storage:
             del memory_storage[memory_id]
+            # Save to persistent storage
+            persistence.save_memories(memory_storage)
             await ctx.info(f"Memory deleted: {memory_id}")
             return {"success": True, "message": "Memory deleted successfully", "memory_id": memory_id}
         else:
@@ -681,6 +687,10 @@ async def memory_move(
         
         old_scope_summary = ", ".join(old_scopes) if old_scopes else "unknown"
         
+        # Save to persistent storage if any memories were moved
+        if moved_memories > 0:
+            persistence.save_memories(memory_storage)
+        
         await ctx.info(f"Successfully moved {moved_memories} memories")
         
         return MemoryMoveResponse(
@@ -729,6 +739,9 @@ async def session_manage(
             }
             memory_storage[session_memory["memory_id"]] = session_memory
             
+            # Save to persistent storage
+            persistence.save_memories(memory_storage)
+            
             await ctx.info(f"Created session: {session_id}")
             
             return SessionManageResponse(
@@ -759,7 +772,7 @@ async def session_manage(
                         }
                     session_scopes[session_id]["memories"].append(memory_data)
                     session_scopes[session_id]["last_updated"] = max(
-                        session_scopes[session_id]["last_updated"], 
+                        session_scopes[session_id]["last_updated"],
                         memory_data["created_at"]
                     )
             
@@ -788,13 +801,17 @@ async def session_manage(
             
             memories_to_delete = []
             for memory_id, memory_data in memory_storage.items():
-                if (memory_data["scope"].startswith("session/") and 
-                    memory_data["created_at"] < cutoff_date):
+                if (memory_data["scope"].startswith("session/") and
+                        memory_data["created_at"] < cutoff_date):
                     memories_to_delete.append(memory_id)
             
             for memory_id in memories_to_delete:
                 del memory_storage[memory_id]
                 cleaned_count += 1
+            
+            # Save to persistent storage if any memories were cleaned
+            if cleaned_count > 0:
+                persistence.save_memories(memory_storage)
             
             await ctx.info(f"Cleaned up {cleaned_count} old session memories")
             

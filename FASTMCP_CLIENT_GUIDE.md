@@ -278,3 +278,91 @@ For VSCode MCP client integration, your `.vscode/mcp.json` should use STDIO:
 ```
 
 And update your server to run in STDIO mode for VSCode compatibility.
+
+## ✅ Data Persistence Status
+
+### Current Implementation
+**Persistence is now implemented!** The FastMCP server uses JSON file storage for data persistence:
+
+```python
+# Current implementation in server.py with SimplePersistence
+from .simple_persistence import SimplePersistence
+
+persistence = SimplePersistence()
+memory_storage = persistence.load_memories()  # Load from file on startup
+```
+
+### Current Data Status
+```
+保存されているメモリ数: 1
+  test1...: Test memory... (scope: test)
+
+データファイル: /workspaces/mcp-assoc-memory/data/memories.json
+ファイルサイズ: 111 bytes
+```
+
+### Benefits
+- ✅ **Memories survive server restarts**
+- ✅ **Data persists between sessions**
+- ✅ **Suitable for development and testing**
+- ✅ **Automatic backup to `/workspaces/mcp-assoc-memory/data/memories.json`**
+
+### ⚠️ Important Notes
+- **Server restart required**: Data is loaded only at startup
+- **In-memory during runtime**: Changes to JSON file won't affect running server
+- **Auto-save on modifications**: Server saves changes to file automatically
+
+### Available Storage Infrastructure
+Your project already has the infrastructure for persistence:
+
+```
+src/mcp_assoc_memory/storage/
+├── base.py           # Storage interface
+├── metadata_store.py # SQLite storage
+├── vector_store.py   # Vector embeddings
+└── graph_store.py    # Graph relationships
+
+data/
+├── chroma.sqlite3    # Vector database
+└── memory.db         # Metadata database
+```
+
+### Quick Fix: JSON Persistence
+Add simple file persistence:
+
+```python
+import json
+import os
+from pathlib import Path
+
+# Replace memory_storage = {} with:
+STORAGE_FILE = Path("/workspaces/mcp-assoc-memory/data/memories.json")
+
+def load_memories():
+    if STORAGE_FILE.exists():
+        with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_memories(storage):
+    STORAGE_FILE.parent.mkdir(exist_ok=True)
+    with open(STORAGE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(storage, f, ensure_ascii=False, indent=2, default=str)
+
+# Load at startup
+memory_storage = load_memories()
+
+# Save after each modification in tools
+```
+
+### Proper Solution: Database Integration
+Integrate the existing storage layers:
+
+```python
+from .storage.metadata_store import MetadataStore
+from .storage.vector_store import VectorStore
+
+# Initialize persistent storage
+metadata_store = MetadataStore("/workspaces/mcp-assoc-memory/data/memory.db")
+vector_store = VectorStore("/workspaces/mcp-assoc-memory/data/chroma.sqlite3")
+```
