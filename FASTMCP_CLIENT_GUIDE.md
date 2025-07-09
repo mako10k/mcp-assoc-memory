@@ -312,6 +312,11 @@ memory_storage = persistence.load_memories()  # Load from file on startup
 - **In-memory during runtime**: Changes to JSON file won't affect running server
 - **Auto-save on modifications**: Server saves changes to file automatically
 
+### Future Enhancements
+- **SQLite migration**: Complete SQLite storage infrastructure is available for future upgrade
+- **Vector embeddings**: ChromaDB integration ready for semantic search
+- **Advanced search**: Full-text search and filtering capabilities
+
 ### Available Storage Infrastructure
 Your project already has the infrastructure for persistence:
 

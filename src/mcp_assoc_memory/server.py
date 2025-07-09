@@ -1,5 +1,5 @@
 """
-FastMCP-compliant memory management server implementation
+FastMCP-compliant memory management server implementation with associative memory capabilities
 """
 
 from typing import Any, Dict, List, Optional, Annotated
@@ -8,6 +8,17 @@ from pydantic import Field, BaseModel
 from datetime import datetime, timedelta
 import logging
 import uuid
+import asyncio
+
+# Import the full associative memory architecture
+from .core.memory_manager import MemoryManager
+from .core.embedding_service import EmbeddingService
+from .core.similarity import SimilarityCalculator
+from .storage.vector_store import ChromaVectorStore
+from .storage.metadata_store import SQLiteMetadataStore
+from .storage.graph_store import NetworkXGraphStore
+from .models.memory import MemoryDomain
+from .config import get_config
 from .simple_persistence import get_persistent_storage
 
 logger = logging.getLogger(__name__)
@@ -15,8 +26,38 @@ logger = logging.getLogger(__name__)
 # FastMCP server instance
 mcp = FastMCP(name="AssocMemoryServer")
 
-# Persistent memory storage with JSON file backup
+# Initialize the associative memory system
+config = get_config()
+
+# Initialize storage components
+vector_store = ChromaVectorStore()
+metadata_store = SQLiteMetadataStore()
+graph_store = NetworkXGraphStore()
+embedding_service = EmbeddingService()
+similarity_calculator = SimilarityCalculator()
+
+# Initialize memory manager
+memory_manager = MemoryManager(
+    vector_store=vector_store,
+    metadata_store=metadata_store,
+    graph_store=graph_store,
+    embedding_service=embedding_service,
+    similarity_calculator=similarity_calculator
+)
+
+# Fallback simple storage for compatibility
 memory_storage, persistence = get_persistent_storage()
+
+# Global initialization flag
+_initialized = False
+
+
+async def ensure_initialized():
+    """Ensure memory manager is initialized"""
+    global _initialized
+    if not _initialized:
+        await memory_manager.initialize()
+        _initialized = True
 
 
 # Pydantic model definitions
@@ -24,6 +65,9 @@ class MemoryStoreRequest(BaseModel):
     content: str = Field(description="Memory content to store")
     scope: str = Field(default="user/default", description="Memory scope (hierarchical path)")
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+    tags: Optional[List[str]] = Field(default=None, description="Memory tags")
+    category: Optional[str] = Field(default=None, description="Memory category")
+    auto_associate: bool = Field(default=True, description="Enable automatic association discovery")
 
 
 class MemoryResponse(BaseModel):
@@ -31,7 +75,11 @@ class MemoryResponse(BaseModel):
     content: str
     scope: str
     metadata: Dict[str, Any]
+    tags: List[str]
+    category: Optional[str]
     created_at: datetime
+    similarity_score: Optional[float] = Field(default=None, description="Similarity score when from search")
+    associations: Optional[List[str]] = Field(default=None, description="Related memory IDs")
 
 
 class MemorySearchRequest(BaseModel):
@@ -39,6 +87,8 @@ class MemorySearchRequest(BaseModel):
     scope: Optional[str] = Field(default=None, description="Target scope for search (supports hierarchy)")
     include_child_scopes: bool = Field(default=False, description="Include child scopes in search")
     limit: int = Field(default=10, ge=1, le=100, description="Maximum number of results")
+    similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="Minimum similarity score")
+    include_associations: bool = Field(default=True, description="Include related memories in results")
 
 
 class ScopeListRequest(BaseModel):
@@ -122,7 +172,7 @@ class SessionManageResponse(BaseModel):
 # Memory management tools
 @mcp.tool(
     name="memory_store",
-    description="Store a new memory",
+    description="Store a new memory with automatic association discovery",
     annotations={
         "title": "Store Memory",
         "readOnlyHint": False,
@@ -134,28 +184,63 @@ async def memory_store(
     request: MemoryStoreRequest,
     ctx: Context
 ) -> MemoryResponse:
-    """Store a memory"""
+    """Store a memory with full associative capabilities"""
     try:
+        await ensure_initialized()
         await ctx.info(f"Storing memory in scope '{request.scope}': {request.content[:50]}...")
         
-        # Store memory
-        memory_id = str(uuid.uuid4())
+        # Convert scope to domain (scope is more flexible than the old domain enum)
+        # Map scope to domain for backward compatibility
+        domain = MemoryDomain.USER
+        if request.scope.startswith("work/"):
+            domain = MemoryDomain.PROJECT  # Use PROJECT for work-related memories
+        elif request.scope.startswith("personal/"):
+            domain = MemoryDomain.USER
+        elif request.scope.startswith("project/"):
+            domain = MemoryDomain.PROJECT
+        elif request.scope.startswith("session/"):
+            domain = MemoryDomain.SESSION
+        
+        # Store using the full memory manager
+        memory = await memory_manager.store_memory(
+            domain=domain,
+            content=request.content,
+            metadata={
+                **(request.metadata or {}),
+                "scope": request.scope  # Preserve the flexible scope in metadata
+            },
+            tags=request.tags or [],
+            category=request.category,
+            auto_associate=request.auto_associate
+        )
+        
+        if not memory:
+            raise ValueError("Failed to store memory")
+        
+        # Also store in simple storage for compatibility
         memory_data = {
-            "memory_id": memory_id,
-            "content": request.content,
+            "memory_id": memory.id,
+            "content": memory.content,
             "scope": request.scope,
-            "metadata": request.metadata or {},
-            "created_at": datetime.now()
+            "metadata": memory.metadata,
+            "tags": memory.tags,
+            "category": memory.category,
+            "created_at": memory.created_at
         }
-        
-        memory_storage[memory_id] = memory_data
-        
-        # Save to persistent storage
+        memory_storage[memory.id] = memory_data
         persistence.save_memories(memory_storage)
         
-        await ctx.info(f"Memory stored: {memory_id}")
+        await ctx.info(f"Memory stored with associations: {memory.id}")
         
-        return MemoryResponse(**memory_data)
+        return MemoryResponse(
+            memory_id=memory.id,
+            content=memory.content,
+            scope=request.scope,
+            metadata=memory.metadata,
+            tags=memory.tags,
+            category=memory.category,
+            created_at=memory.created_at
+        )
         
     except Exception as e:
         await ctx.error(f"Failed to store memory: {e}")
@@ -164,7 +249,7 @@ async def memory_store(
 
 @mcp.tool(
     name="memory_search",
-    description="Search memories using similarity-based search",
+    description="Search memories using semantic similarity and associations",
     annotations={
         "title": "Search Memories",
         "readOnlyHint": True,
@@ -176,18 +261,42 @@ async def memory_search(
     request: MemorySearchRequest,
     ctx: Context
 ) -> List[MemoryResponse]:
-    """Search memories with scope support"""
+    """Search memories with full semantic and associative capabilities"""
     try:
+        await ensure_initialized()
         scope_info = f" in scope '{request.scope}'" if request.scope else ""
         child_info = " (including child scopes)" if request.include_child_scopes else ""
-        await ctx.info(f"Searching memories: '{request.query}'{scope_info}{child_info}")
+        await ctx.info(f"Searching memories: '{request.query}'{scope_info}{child_info} (similarity >= {request.similarity_threshold})")
         
-        # Search implementation with scope filtering
+        # Map scope to domains for search
+        domains = None
+        if request.scope:
+            if request.scope.startswith("work/") or request.scope.startswith("project/"):
+                domains = [MemoryDomain.PROJECT]
+            elif request.scope.startswith("personal/"):
+                domains = [MemoryDomain.USER]
+            elif request.scope.startswith("session/"):
+                domains = [MemoryDomain.SESSION]
+            else:
+                domains = [MemoryDomain.USER]
+        
+        # Perform semantic search using memory manager
+        search_results = await memory_manager.search_memories(
+            query=request.query,
+            domains=domains,
+            limit=request.limit,
+            similarity_threshold=request.similarity_threshold
+        )
+        
+        # Convert results to response format
         results = []
-        for memory_data in memory_storage.values():
-            # Scope filtering
+        for result in search_results:
+            memory = result["memory"]
+            similarity = result["similarity"]
+            
+            # Check scope filtering if needed
+            memory_scope = memory.metadata.get("scope", f"{memory.domain.value}/default")
             if request.scope:
-                memory_scope = memory_data["scope"]
                 if request.include_child_scopes:
                     # Include if memory scope starts with request scope (hierarchical match)
                     if not (memory_scope == request.scope or memory_scope.startswith(request.scope + "/")):
@@ -197,23 +306,73 @@ async def memory_search(
                     if memory_scope != request.scope:
                         continue
             
-            # Content search (simple text matching - will be enhanced with embeddings later)
-            if request.query.lower() in memory_data["content"].lower():
-                results.append(MemoryResponse(**memory_data))
-                if len(results) >= request.limit:
-                    break
+            # Get associations if requested
+            associations = []
+            if request.include_associations:
+                try:
+                    assoc_results = await memory_manager.search_memories(
+                        query=memory.content,
+                        domains=domains,
+                        limit=5,
+                        similarity_threshold=0.8
+                    )
+                    associations = [r["memory"].id for r in assoc_results if r["memory"].id != memory.id][:3]
+                except Exception as e:
+                    await ctx.warning(f"Failed to get associations for {memory.id}: {e}")
+            
+            results.append(MemoryResponse(
+                memory_id=memory.id,
+                content=memory.content,
+                scope=memory_scope,
+                metadata=memory.metadata,
+                tags=memory.tags,
+                category=memory.category,
+                created_at=memory.created_at,
+                similarity_score=similarity,
+                associations=associations if associations else None
+            ))
         
-        await ctx.info(f"Found {len(results)} memories")
+        await ctx.info(f"Found {len(results)} memories with semantic similarity")
         return results
         
     except Exception as e:
         await ctx.error(f"Failed to search memories: {e}")
-        raise
+        
+        # Fallback to simple text search for compatibility
+        await ctx.warning("Falling back to simple text search")
+        
+        results = []
+        for memory_data in memory_storage.values():
+            # Scope filtering
+            if request.scope:
+                memory_scope = memory_data["scope"]
+                if request.include_child_scopes:
+                    if not (memory_scope == request.scope or memory_scope.startswith(request.scope + "/")):
+                        continue
+                else:
+                    if memory_scope != request.scope:
+                        continue
+            
+            # Simple text matching
+            if request.query.lower() in memory_data["content"].lower():
+                results.append(MemoryResponse(
+                    memory_id=memory_data["memory_id"],
+                    content=memory_data["content"],
+                    scope=memory_data["scope"],
+                    metadata=memory_data.get("metadata", {}),
+                    tags=memory_data.get("tags", []),
+                    category=memory_data.get("category"),
+                    created_at=memory_data["created_at"]
+                ))
+                if len(results) >= request.limit:
+                    break
+        
+        return results
 
 
 @mcp.tool(
     name="memory_get",
-    description="Retrieve a memory by its ID",
+    description="Retrieve a memory by its ID with associations",
     annotations={
         "title": "Get Memory",
         "readOnlyHint": True,
@@ -223,21 +382,65 @@ async def memory_search(
 )
 async def memory_get(
     memory_id: Annotated[str, Field(description="Memory ID")],
-    ctx: Context
+    ctx: Context,
+    include_associations: Annotated[bool, Field(default=True, description="Include related memories")] = True
 ) -> Optional[MemoryResponse]:
-    """Retrieve a memory"""
+    """Retrieve a memory with its associations"""
     try:
+        await ensure_initialized()
         await ctx.info(f"Retrieving memory: {memory_id}")
         
+        # Try to get from memory manager first
+        memory = await memory_manager.get_memory(memory_id)
+        
+        if memory:
+            # Get associations if requested
+            associations = []
+            if include_associations:
+                try:
+                    # Search for similar memories
+                    assoc_results = await memory_manager.search_memories(
+                        query=memory.content,
+                        limit=5,
+                        similarity_threshold=0.7
+                    )
+                    associations = [r["memory"].id for r in assoc_results if r["memory"].id != memory.id][:3]
+                except Exception as e:
+                    await ctx.warning(f"Failed to get associations: {e}")
+            
+            memory_scope = memory.metadata.get("scope", f"{memory.domain.value}/default")
+            
+            await ctx.info(f"Memory retrieved with {len(associations)} associations: {memory_id}")
+            
+            return MemoryResponse(
+                memory_id=memory.id,
+                content=memory.content,
+                scope=memory_scope,
+                metadata=memory.metadata,
+                tags=memory.tags,
+                category=memory.category,
+                created_at=memory.created_at,
+                associations=associations if associations else None
+            )
+        
+        # Fallback to simple storage
         memory_data = memory_storage.get(memory_id)
         
         if not memory_data:
             await ctx.warning(f"Memory not found: {memory_id}")
             return None
             
-        await ctx.info(f"Memory retrieved: {memory_id}")
+        await ctx.info(f"Memory retrieved from fallback storage: {memory_id}")
         
-        return MemoryResponse(**memory_data)
+        return MemoryResponse(
+            memory_id=memory_data["memory_id"],
+            content=memory_data["content"],
+            scope=memory_data["scope"],
+            metadata=memory_data.get("metadata", {}),
+            tags=memory_data.get("tags", []),
+            category=memory_data.get("category"),
+            created_at=memory_data["created_at"]
+        )
         
     except Exception as e:
         await ctx.error(f"Failed to retrieve memory: {e}")
@@ -829,6 +1032,73 @@ async def session_manage(
         raise
 
 
+# Associative memory discovery tool
+@mcp.tool(
+    name="memory_discover_associations",
+    description="Discover and analyze associations between memories",
+    annotations={
+        "title": "Discover Memory Associations",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True
+    }
+)
+async def memory_discover_associations(
+    memory_id: Annotated[str, Field(description="Memory ID to find associations for")],
+    ctx: Context,
+    limit: Annotated[int, Field(default=10, ge=1, le=50, description="Maximum number of associations")] = 10,
+    similarity_threshold: Annotated[float, Field(default=0.6, ge=0.0, le=1.0, description="Minimum similarity score")] = 0.6
+) -> Dict[str, Any]:
+    """Discover semantic associations for a specific memory"""
+    try:
+        await ensure_initialized()
+        await ctx.info(f"Discovering associations for memory: {memory_id}")
+        
+        # Get the source memory
+        memory = await memory_manager.get_memory(memory_id)
+        if not memory:
+            await ctx.warning(f"Memory not found: {memory_id}")
+            return {"error": "Memory not found", "associations": []}
+        
+        # Find similar memories
+        search_results = await memory_manager.search_memories(
+            query=memory.content,
+            limit=limit + 1,  # +1 to account for the source memory itself
+            similarity_threshold=similarity_threshold
+        )
+        
+        # Filter out the source memory and format results
+        associations = []
+        for result in search_results:
+            if result["memory"].id != memory_id:
+                assoc_memory = result["memory"]
+                memory_scope = assoc_memory.metadata.get("scope", f"{assoc_memory.domain.value}/default")
+                
+                associations.append({
+                    "memory_id": assoc_memory.id,
+                    "content": assoc_memory.content[:100] + "..." if len(assoc_memory.content) > 100 else assoc_memory.content,
+                    "scope": memory_scope,
+                    "similarity_score": result["similarity"],
+                    "category": assoc_memory.category,
+                    "tags": assoc_memory.tags,
+                    "created_at": assoc_memory.created_at
+                })
+        
+        await ctx.info(f"Found {len(associations)} associations for memory {memory_id}")
+        
+        return {
+            "source_memory_id": memory_id,
+            "source_content": memory.content[:100] + "..." if len(memory.content) > 100 else memory.content,
+            "associations": associations,
+            "total_found": len(associations),
+            "similarity_threshold": similarity_threshold
+        }
+        
+    except Exception as e:
+        await ctx.error(f"Failed to discover associations: {e}")
+        return {"error": str(e), "associations": []}
+
+
 # Scope validation utilities
 def validate_scope_path(scope: str) -> bool:
     """Validate scope path format and constraints"""
@@ -874,5 +1144,17 @@ def get_child_scopes(parent_scope: str, all_scopes: List[str]) -> List[str]:
 
 
 if __name__ == "__main__":
+    async def startup():
+        """Initialize the memory system on startup"""
+        try:
+            await ensure_initialized()
+            logger.info("Associative memory system initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize associative memory system: {e}")
+            # Continue with simple storage as fallback
+    
+    # Initialize before running
+    asyncio.run(startup())
+    
     # Run with stdio transport for better MCP client compatibility
     mcp.run(transport="stdio")
