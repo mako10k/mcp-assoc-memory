@@ -2,10 +2,10 @@
 関連性モデル定義
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Any, Optional, List
-import uuid
+from typing import Any, Dict, List, Optional
 
 
 @dataclass

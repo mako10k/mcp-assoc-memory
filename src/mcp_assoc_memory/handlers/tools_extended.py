@@ -2,20 +2,19 @@
 MCPツールハンドラー実装 - プロジェクト・ユーザー・可視化・管理ツール
 """
 
-from typing import Any, Dict, List, Optional, Union
 import json
 import logging
-from datetime import datetime, timedelta
 from dataclasses import asdict
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Union
 
+from ..auth.session import SessionManager
+from ..core.memory_manager import MemoryManager
 from ..models.memory import Memory, MemoryDomain
 from ..models.project import Project, ProjectMember, ProjectRole
-from ..core.memory_manager import MemoryManager
-from ..auth.session import SessionManager
 from ..utils.validation import ValidationError
-from .base import BaseHandler, ToolCall, ToolResult
-from .tool_utils import tool_result, error_result
-
+from .base import BaseHandler
+from .tool_utils import ToolResult, error_result, tool_result
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +59,13 @@ class ProjectToolHandler(BaseHandler):
             name = args['name']
             description = args.get('description', '')
             owner_id = args['owner_id']
-            
+
             project = Project(
                 name=name,
                 description=description,
                 owner_id=owner_id
             )
-            
+
             self.projects[project.id] = project
             self.project_members[project.id] = [
                 ProjectMember(
@@ -75,7 +74,7 @@ class ProjectToolHandler(BaseHandler):
                     role=ProjectRole.OWNER
                 )
             ]
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -95,7 +94,7 @@ class ProjectToolHandler(BaseHandler):
         """プロジェクト一覧を取得する"""
         try:
             user_id = args.get('user_id')
-            
+
             user_projects = []
             for project in self.projects.values():
                 # ユーザーがメンバーかチェック
@@ -104,12 +103,12 @@ class ProjectToolHandler(BaseHandler):
                     user_is_member = any(m.user_id == user_id for m in members)
                     if not user_is_member:
                         continue
-                
+
                 project_data = project.to_dict()
                 members = self.project_members.get(project.id, [])
                 project_data['member_count'] = len(members)
                 user_projects.append(project_data)
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -127,15 +126,15 @@ class ProjectToolHandler(BaseHandler):
         """プロジェクト詳細を取得する"""
         try:
             project_id = args['project_id']
-            
+
             project = self.projects.get(project_id)
             if not project:
                 return error_result("PROJECT_NOT_FOUND", f"プロジェクト {project_id} が見つかりません")
-            
+
             members = self.project_members.get(project_id, [])
             project_data = project.to_dict()
             project_data['members'] = [m.to_dict() for m in members]
-            
+
             return tool_result(
                 success=True,
                 content=[project_data],
@@ -152,25 +151,25 @@ class ProjectToolHandler(BaseHandler):
             project_id = args['project_id']
             user_id = args['user_id']
             role = ProjectRole(args.get('role', 'member'))
-            
+
             if project_id not in self.projects:
                 return error_result("PROJECT_NOT_FOUND", f"プロジェクト {project_id} が見つかりません")
-            
+
             members = self.project_members.get(project_id, [])
-            
+
             # 既存メンバーチェック
             if any(m.user_id == user_id for m in members):
                 return error_result("MEMBER_EXISTS", "ユーザーは既にプロジェクトメンバーです")
-            
+
             member = ProjectMember(
                 project_id=project_id,
                 user_id=user_id,
                 role=role
             )
-            
+
             members.append(member)
             self.project_members[project_id] = members
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -191,20 +190,20 @@ class ProjectToolHandler(BaseHandler):
         try:
             project_id = args['project_id']
             user_id = args['user_id']
-            
+
             if project_id not in self.projects:
                 return error_result("PROJECT_NOT_FOUND", f"プロジェクト {project_id} が見つかりません")
-            
+
             members = self.project_members.get(project_id, [])
             original_count = len(members)
-            
+
             # メンバーを削除
             members = [m for m in members if m.user_id != user_id]
             self.project_members[project_id] = members
-            
+
             if len(members) == original_count:
                 return error_result("MEMBER_NOT_FOUND", "指定されたユーザーはプロジェクトメンバーではありません")
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -225,18 +224,18 @@ class ProjectToolHandler(BaseHandler):
             project_id = args['project_id']
             name = args.get('name')
             description = args.get('description')
-            
+
             project = self.projects.get(project_id)
             if not project:
                 return error_result("PROJECT_NOT_FOUND", f"プロジェクト {project_id} が見つかりません")
-            
+
             if name is not None:
                 project.name = name
             if description is not None:
                 project.description = description
-            
+
             project.updated_at = datetime.utcnow()
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -254,15 +253,15 @@ class ProjectToolHandler(BaseHandler):
         """プロジェクトを削除する"""
         try:
             project_id = args['project_id']
-            
+
             if project_id not in self.projects:
                 return error_result("PROJECT_NOT_FOUND", f"プロジェクト {project_id} が見つかりません")
-            
+
             # プロジェクトとメンバーを削除
             del self.projects[project_id]
             if project_id in self.project_members:
                 del self.project_members[project_id]
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -312,19 +311,19 @@ class UserToolHandler(BaseHandler):
         """現在のユーザー情報を取得する"""
         try:
             session_id = args.get('session_id')
-            
+
             if not session_id:
                 return error_result("SESSION_REQUIRED", "セッションIDが必要です")
-            
+
             session = self.session_manager.get_session(session_id)
             if not session:
                 return error_result("SESSION_NOT_FOUND", "セッションが見つかりません")
-            
+
             user_info = self.users.get(session.user_id, {
                 'user_id': session.user_id,
                 'created_at': datetime.utcnow().isoformat()
             })
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -342,12 +341,12 @@ class UserToolHandler(BaseHandler):
         """ユーザーのプロジェクト一覧を取得する"""
         try:
             user_id = args['user_id']
-            
+
             # プロジェクトハンドラーから取得
             projects_response = await self.project_handler.handle_list({
                 'user_id': user_id
             })
-            
+
             return projects_response
 
         except Exception as e:
@@ -358,10 +357,10 @@ class UserToolHandler(BaseHandler):
         """ユーザーのセッション一覧を取得する"""
         try:
             user_id = args['user_id']
-            
+
             sessions = self.session_manager.get_user_sessions(user_id)
             session_data = [session.to_dict() for session in sessions]
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -381,13 +380,13 @@ class UserToolHandler(BaseHandler):
             user_id = args['user_id']
             project_id = args.get('project_id')
             metadata = args.get('metadata', {})
-            
+
             session = self.session_manager.create_session(
                 user_id=user_id,
                 project_id=project_id,
                 metadata=metadata
             )
-            
+
             return tool_result(
                 success=True,
                 content=[session.to_dict()],
@@ -403,18 +402,18 @@ class UserToolHandler(BaseHandler):
         try:
             session_id = args['session_id']
             project_id = args['project_id']
-            
+
             success = self.session_manager.switch_session(session_id, project_id)
-            
+
             if not success:
                 return tool_result(
                     success=False,
                     error="SESSION_NOT_FOUND",
                     message="セッションが見つかりません"
                 )
-            
+
             session = self.session_manager.get_session(session_id)
-            
+
             return tool_result(
                 success=True,
                 content=[session.to_dict()] if session else [{}],
@@ -433,16 +432,16 @@ class UserToolHandler(BaseHandler):
         """セッションを終了する"""
         try:
             session_id = args['session_id']
-            
+
             success = self.session_manager.end_session(session_id)
-            
+
             if not success:
                 return tool_result(
                     success=False,
                     error="SESSION_NOT_FOUND",
                     message="セッションが見つかりません"
                 )
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -492,11 +491,10 @@ class VisualizeToolHandler(BaseHandler):
         """記憶マップを生成する"""
         try:
             domain = MemoryDomain(args.get('domain', 'user'))
-            limit = args.get('limit', 50)
-            
+
             # 簡易実装: 記憶リストを返す
             # 本来はグラフ構造を生成
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -522,7 +520,7 @@ class VisualizeToolHandler(BaseHandler):
         try:
             # 記憶統計を取得
             stats = await self.memory_manager.get_memory_stats()
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -565,7 +563,7 @@ class VisualizeToolHandler(BaseHandler):
         """タイムライン表示を生成する"""
         try:
             domain = MemoryDomain(args.get('domain', 'user'))
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -588,7 +586,7 @@ class VisualizeToolHandler(BaseHandler):
         """カテゴリチャートを生成する"""
         try:
             domain = MemoryDomain(args.get('domain', 'user'))
-            
+
             return tool_result(
                 success=True,
                 content=[{
@@ -633,6 +631,7 @@ class AdminToolHandler(BaseHandler):
         except Exception as e:
             logger.error(f"AdminToolHandler {mode} エラー: {e}")
             return error_result(str(e), message=f"{mode}の実行に失敗しました")
+
     async def handle_reindex_embeddings(self, args: Dict[str, Any]) -> ToolResult:
         """
         既存記憶のembeddingを再計算・再投入する管理用コマンド（雛形）。
@@ -802,3 +801,83 @@ class AdminToolHandler(BaseHandler):
                 error=str(e),
                 message="クリーンアップに失敗しました"
             )
+
+
+class SearchToolHandler(BaseHandler):
+    def __init__(self, memory_manager, similarity_calc):
+        super().__init__()
+        self.memory_manager = memory_manager
+        self.similarity_calc = similarity_calc
+
+    async def handle_semantic(self, args: Dict[str, Any]) -> dict:
+        """意味的検索: MemoryManager.semantic_search を呼び出す"""
+        try:
+            query = args.get("query")
+            domain = args.get("domain")
+            limit = args.get("limit", 10)
+            min_score = args.get("min_score", 0.7)
+
+            if not query or not domain:
+                return {
+                    "success": False,
+                    "error": "INVALID_PARAMS",
+                    "message": "query, domainは必須です"
+                }
+
+            # domainはstrで来るのでMemoryDomainに変換
+            try:
+                domain_enum = MemoryDomain(domain)
+            except Exception:
+                return {
+                    "success": False,
+                    "error": "INVALID_DOMAIN",
+                    "message": f"不正なdomain: {domain}"
+                }
+
+            results = await self.memory_manager.semantic_search(
+                query=query,
+                domain=domain_enum,
+                limit=limit,
+                min_score=min_score
+            )
+            # [(Memory, score)] のリスト
+            content = [
+                {
+                    "id": m.id,
+                    "content": m.content,
+                    "score": score,
+                    "domain": m.domain.value,
+                    "tags": m.tags,
+                    "category": m.category,
+                    "user_id": m.user_id,
+                    "project_id": m.project_id,
+                    "session_id": m.session_id,
+                    "created_at": m.created_at.isoformat(),
+                    "updated_at": m.updated_at.isoformat(),
+                }
+                for m, score in results
+            ]
+            return {
+                "success": True,
+                "content": content,
+                "message": f"semantic検索: {len(content)}件"
+            }
+        except Exception as e:
+            logger.error(f"semantic検索エラー: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "semantic検索でエラーが発生しました"
+            }
+
+    async def handle_tags(self, args: Dict[str, Any]) -> dict:
+        return {"success": True, "content": [], "message": "tags検索は未実装です"}
+
+    async def handle_timerange(self, args: Dict[str, Any]) -> dict:
+        return {"success": True, "content": [], "message": "timerange検索は未実装です"}
+
+    async def handle_advanced(self, args: Dict[str, Any]) -> dict:
+        return {"success": True, "content": [], "message": "advanced検索は未実装です"}
+
+    async def handle_similar(self, args: Dict[str, Any]) -> dict:
+        return {"success": True, "content": [], "message": "similar検索は未実装です"}

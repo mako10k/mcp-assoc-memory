@@ -2,14 +2,16 @@
 STDIOトランスポートハンドラー（雛形）
 """
 
-import sys
 import json
+import sys
 import threading
+
 
 class StdioTransport:
     """
     STDIO通信を担当
     """
+
     def __init__(self, router):
         self.router = router
         self.running = False

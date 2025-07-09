@@ -2,11 +2,11 @@
 プロジェクトモデル定義
 """
 
-from enum import Enum
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Any, List, Optional
-import uuid
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class ProjectRole(Enum):

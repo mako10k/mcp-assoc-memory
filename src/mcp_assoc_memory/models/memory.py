@@ -2,11 +2,11 @@
 記憶モデル定義
 """
 
-from enum import Enum
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Any, Optional, List
-import uuid
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class MemoryDomain(Enum):
@@ -31,7 +31,7 @@ class Memory:
     user_id: Optional[str] = None
     project_id: Optional[str] = None
     session_id: Optional[str] = None
-    
+
     # カテゴリ
     category: Optional[str] = None
 

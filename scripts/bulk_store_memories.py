@@ -1,6 +1,7 @@
-import requests
 import json
 import time
+
+import requests
 
 MCP_URL = "http://localhost:3006/mcp"
 
@@ -27,7 +28,7 @@ for i, mem in enumerate(memories):
             "metadata": mem["metadata"]
         }
     }
-    print(f"[{i+1}/{len(memories)}] POST {MCP_URL} : {mem['content']}")
+    print(f"[{i + 1}/{len(memories)}] POST {MCP_URL} : {mem['content']}")
     response = requests.post(MCP_URL, json=store_request, timeout=10)
     try:
         resp_json = response.json()

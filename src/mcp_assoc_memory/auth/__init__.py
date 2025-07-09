@@ -8,6 +8,6 @@ from .session import SessionManager
 
 __all__ = [
     'APIKeyAuth',
-    'JWTAuth', 
+    'JWTAuth',
     'SessionManager'
 ]

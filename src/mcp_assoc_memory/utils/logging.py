@@ -1,241 +1,150 @@
 """
-ログ設定ユーティリティ
-構造化ログの設定と管理
+構造化ログ設定ユーティリティ
 """
-
 import logging
-import sys
-import json
-from datetime import datetime
-from typing import Dict, Any, Optional
-from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
 
 
-class StructuredFormatter(logging.Formatter):
-    """構造化ログフォーマッター"""
+class StructuredLogger(logging.Logger):
+    def __init__(self, name: str = "mcp_assoc_memory"):
+        super().__init__(name)
+        self.setLevel(logging.DEBUG)
+        self.propagate = True
 
-    def format(self, record: logging.LogRecord) -> str:
-        """ログレコードを構造化JSONに変換"""
-        log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-            "module": record.module,
-            "function": record.funcName,
-            "line": record.lineno,
-        }
-
-        # 追加情報があれば含める
-        if hasattr(record, 'extra_data'):
-            log_entry.update(record.extra_data)
-
-        # 例外情報があれば含める
-        if record.exc_info:
-            log_entry["exception"] = self.formatException(record.exc_info)
-
-        def enum_serializer(obj):
-            import enum
-            if isinstance(obj, enum.Enum):
-                return str(obj)
-            if isinstance(obj, set):
-                return list(obj)
-            return str(obj)
-        return json.dumps(log_entry, ensure_ascii=False, default=enum_serializer)
-
-
-class MemoryLogger:
-    """記憶システム専用ログ"""
-
-    def __init__(self, name: str):
-        self.logger = logging.getLogger(name)
-
-    def memory_stored(
-            self,
-            memory_id: str,
-            domain: str,
-            content_length: int,
-            **kwargs):
-        """記憶保存ログ"""
-        self.logger.info(
-            "Memory stored",
-            extra={
-                "extra_data": {
-                    "action": "memory_stored",
-                    "memory_id": memory_id,
-                    "domain": domain,
-                    "content_length": content_length,
-                    **kwargs
-                }
-            }
-        )
-
-    def memory_searched(
-            self,
-            query: str,
-            domain: str,
-            result_count: int,
-            duration_ms: float,
-            **kwargs):
-        """記憶検索ログ"""
-        self.logger.info(
-            "Memory searched",
-            extra={
-                "extra_data": {
-                    "action": "memory_searched",
-                    "query": query,
-                    "domain": domain,
-                    "result_count": result_count,
-                    "duration_ms": duration_ms,
-                    **kwargs
-                }
-            }
-        )
-
-    def memory_accessed(
-            self,
-            memory_id: str,
-            domain: str,
-            access_type: str,
-            **kwargs):
-        """記憶アクセスログ"""
-        self.logger.info(
-            "Memory accessed",
-            extra={
-                "extra_data": {
-                    "action": "memory_accessed",
-                    "memory_id": memory_id,
-                    "domain": domain,
-                    "access_type": access_type,
-                    **kwargs
-                }
-            }
-        )
-
-    def error(self, message: str, error_code: str = None, **kwargs):
-        """エラーログ"""
-        self.logger.error(
-            message,
-            extra={
-                "extra_data": {
-                    "action": "error",
-                    "error_code": error_code,
-                    **kwargs
-                }
-            }
-        )
-
-    def info(self, message: str, extra_data: Dict[str, Any] = None, **kwargs):
-        """情報ログ"""
-        data = {"action": "info"}
-        if extra_data:
-            data.update(extra_data)
-        data.update(kwargs)
-
-        self.logger.info(
-            message,
-            extra={"extra_data": data}
-        )
-
-    def debug(self, message: str, extra_data: Dict[str, Any] = None, **kwargs):
-        """デバッグログ"""
-        data = {"action": "debug"}
-        if extra_data:
-            data.update(extra_data)
-        data.update(kwargs)
-
-        self.logger.debug(
-            message,
-            extra={"extra_data": data}
-        )
-
-    def warning(
-        self,
-        message: str,
-        extra_data: Dict[str, Any] = None,
-        **kwargs
-    ):
-        """警告ログ"""
-        data = {"action": "warning"}
-        if extra_data:
-            data.update(extra_data)
-        data.update(kwargs)
-
-        self.logger.warning(
-            message,
-            extra={"extra_data": data}
-        )
-
-
-class PerformanceTimer:
-    """パフォーマンス測定"""
-
-    def __init__(self, logger: logging.Logger, operation: str):
-        self.logger = logger
-        self.operation = operation
-        self.start_time = None
-
-    def __enter__(self):
-        """コンテキスト開始"""
-        self.start_time = datetime.utcnow()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """コンテキスト終了"""
-        if self.start_time:
-            duration = (
-                datetime.utcnow() - self.start_time
-            ).total_seconds() * 1000
-            self.logger.info(
-                f"Operation completed: {self.operation}",
-                extra={
-                    "extra_data": {
-                        "action": "performance",
-                        "operation": self.operation,
-                        "duration_ms": duration,
-                        "success": exc_type is None
-                    }
-                }
+        # ルートロガーもDEBUG/StreamHandler必須
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        if not root_logger.handlers:
+            sh = logging.StreamHandler()
+            sh.setLevel(logging.DEBUG)
+            formatter = logging.Formatter(
+                '[%(asctime)s][%(levelname)s][%(name)s] %(message)s'
             )
+            sh.setFormatter(formatter)
+            root_logger.addHandler(sh)
+        for handler in root_logger.handlers:
+            handler.setLevel(logging.DEBUG)
+
+        # 自分自身のハンドラもDEBUG
+        for handler in self.handlers:
+            handler.setLevel(logging.DEBUG)
+        if not self.handlers:
+            sh = logging.StreamHandler()
+            sh.setLevel(logging.DEBUG)
+            formatter = logging.Formatter(
+                '[%(asctime)s][%(levelname)s][%(name)s] %(message)s'
+            )
+            sh.setFormatter(formatter)
+            self.addHandler(sh)
+        for handler in self.handlers:
+            handler.setLevel(logging.DEBUG)
+
+    def log(self, level: str, message: str, **kwargs: Any) -> None:
+        # カスタムパラメータを処理
+        error_code = kwargs.pop('error_code', None)
+        extra_data = kwargs.pop('extra_data', None)
+        error = kwargs.pop('error', None)
+        
+        # extraに統合
+        extra = {}
+        if error_code:
+            extra['error_code'] = error_code
+        if extra_data:
+            extra.update(extra_data)
+        if error:
+            extra['error'] = error
+        
+        # 残りのkwargsもextraに含める
+        extra.update(kwargs)
+        
+        # メッセージを拡張
+        if error_code or error:
+            extended_message = message
+            if error_code:
+                extended_message += f" [Error Code: {error_code}]"
+            if error:
+                extended_message += f" [Error: {error}]"
+            message = extended_message
+        
+        super().log(getattr(logging, level.upper(), logging.INFO), message, extra=extra if extra else None)
+
+    def info(self, message: str, **kwargs: Any) -> None:
+        self.log("info", message, **kwargs)
+
+    def debug(self, message: str, **kwargs: Any) -> None:
+        self.log("debug", message, **kwargs)
+
+    def warning(self, message: str, **kwargs: Any) -> None:
+        self.log("warning", message, **kwargs)
+
+    def error(self, message: str, **kwargs: Any) -> None:
+        self.log("error", message, **kwargs)
 
 
-def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> None:
-    """ログ設定を初期化"""
+class LoggerWrapper:
+    """標準ロガーラッパー - カスタムパラメータを処理"""
+    
+    def __init__(self, logger: logging.Logger):
+        self._logger = logger
+    
+    def _format_message(self, message: str, **kwargs: Any) -> Tuple[str, Optional[Dict[str, Any]]]:
+        """メッセージとextraを処理"""
+        error_code = kwargs.pop('error_code', None)
+        extra_data = kwargs.pop('extra_data', None)
+        error = kwargs.pop('error', None)
+        
+        # extraに統合
+        extra = {}
+        if error_code:
+            extra['error_code'] = error_code
+        if extra_data:
+            extra.update(extra_data)
+        if error:
+            extra['error'] = error
+        
+        # 残りのkwargsもextraに含める
+        extra.update(kwargs)
+        
+        # メッセージを拡張
+        if error_code or error:
+            extended_message = message
+            if error_code:
+                extended_message += f" [Error Code: {error_code}]"
+            if error:
+                extended_message += f" [Error: {error}]"
+            message = extended_message
+        
+        return message, extra if extra else None
+    
+    def info(self, message: str, *args, **kwargs: Any) -> None:
+        formatted_msg, extra = self._format_message(message, **kwargs)
+        self._logger.info(formatted_msg, *args, extra=extra)
+    
+    def debug(self, message: str, *args, **kwargs: Any) -> None:
+        formatted_msg, extra = self._format_message(message, **kwargs)
+        self._logger.debug(formatted_msg, *args, extra=extra)
+    
+    def warning(self, message: str, *args, **kwargs: Any) -> None:
+        formatted_msg, extra = self._format_message(message, **kwargs)
+        self._logger.warning(formatted_msg, *args, extra=extra)
+    
+    def error(self, message: str, *args, **kwargs: Any) -> None:
+        formatted_msg, extra = self._format_message(message, **kwargs)
+        self._logger.error(formatted_msg, *args, extra=extra)
 
-    # ログレベル設定
-    numeric_level = getattr(logging, level.upper(), None)
-    if not isinstance(numeric_level, int):
-        raise ValueError(f"Invalid log level: {level}")
 
-    # ルートロガー設定
-    root_logger = logging.getLogger()
-    root_logger.setLevel(numeric_level)
-
-    # 既存のハンドラーをクリア
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
-
-    # コンソールハンドラー
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(numeric_level)
-    console_handler.setFormatter(StructuredFormatter())
-    root_logger.addHandler(console_handler)
-
-    # ファイルハンドラー（オプション）
-    if log_file:
-        file_path = Path(log_file)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        file_handler = logging.FileHandler(file_path, encoding='utf-8')
-        file_handler.setLevel(numeric_level)
-        file_handler.setFormatter(StructuredFormatter())
-        root_logger.addHandler(file_handler)
-
-    # 外部ライブラリのログレベル調整
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("chromadb").setLevel(logging.WARNING)
-
-
-def get_memory_logger(name: str) -> MemoryLogger:
-    """記憶システム専用ログの取得"""
-    return MemoryLogger(name)
+def get_memory_logger(name: str = "mcp_assoc_memory"):
+    """カスタムパラメータ対応ロガーを返す"""
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            fmt="%(asctime)s [%(levelname)s][%(name)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    logger.propagate = True
+    return LoggerWrapper(logger)

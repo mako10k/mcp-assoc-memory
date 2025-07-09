@@ -2,10 +2,12 @@
 RequestRouter（雛形）
 """
 
+
 class RequestRouter:
     """
     リクエストルーティングを担当
     """
+
     def __init__(self):
         # ハンドラーを格納する辞書
         self.handlers = {}

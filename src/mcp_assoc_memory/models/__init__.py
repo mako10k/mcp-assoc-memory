@@ -2,8 +2,8 @@
 データモデル
 """
 
-from .memory import Memory, MemoryDomain, MemorySearchResult, MemoryStats
 from .association import Association, AssociationGraph
+from .memory import Memory, MemoryDomain, MemorySearchResult, MemoryStats
 from .project import Project, ProjectMember, ProjectRole, UserSession
 
 __all__ = [

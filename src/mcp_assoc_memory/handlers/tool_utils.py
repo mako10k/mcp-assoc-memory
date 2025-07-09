@@ -1,7 +1,13 @@
+from dataclasses import dataclass, field
+from typing import Any, List, Optional
 
 
-from typing import Optional, Dict, Any, List
-from .base import ToolResult
+@dataclass
+class ToolResult:
+    content: Optional[List[Any]] = field(default_factory=list)
+    success: Optional[bool] = None
+    error: Optional[str] = None
+    message: Optional[str] = None
 
 
 def tool_result(
@@ -34,6 +40,7 @@ def tool_result(
         error=error,
         message=message
     )
+
 
 def error_result(
     code: str,

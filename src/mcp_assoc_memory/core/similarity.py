@@ -3,12 +3,12 @@
 ベクトル間の類似度計算とランキング機能
 """
 
-import numpy as np
-from typing import List, Dict, Any, Tuple, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 
 from ..utils.logging import get_memory_logger
-
 
 logger = get_memory_logger(__name__)
 

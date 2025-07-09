@@ -2,14 +2,16 @@
 TransportManager（雛形）
 """
 
-from .stdio_handler import StdioTransport
 from .http_handler import HttpTransport
 from .sse_handler import SseTransport
+from .stdio_handler import StdioTransport
+
 
 class TransportManager:
     """
     各種トランスポート（STDIO/HTTP/SSE）を管理するマネージャ
     """
+
     def __init__(self, router, config=None, sse_enabled=False, mcp_server=None):
         # 設定値取得
         stdio_enabled = True
@@ -28,7 +30,6 @@ class TransportManager:
         self.http = HttpTransport(router, host=http_host, port=http_port, enabled=http_enabled)
         if sse_enabled_flag and mcp_server is not None:
             try:
-                from .sse_handler import SseTransport
                 # mount_pathを"/mcp"に変更し、/mcpでSSEストリームを受け付ける
                 self.sse = SseTransport(mcp_server, mount_path="/mcp")
             except Exception as e:

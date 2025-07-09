@@ -3,8 +3,8 @@ ChromaDBベクトルストア実装
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import chromadb
@@ -13,11 +13,10 @@ try:
 except ImportError:
     CHROMADB_AVAILABLE = False
 
-from .base import BaseVectorStore
 from ..models.memory import MemoryDomain
 from ..utils.logging import get_memory_logger
 from ..utils.validation import domain_value
-
+from .base import BaseVectorStore
 
 logger = get_memory_logger(__name__)
 
@@ -112,7 +111,7 @@ class ChromaVectorStore(BaseVectorStore):
 
             logger.info(
                 "ChromaDB initialized",
-                extra_data={
+                extra={
                     "persist_directory": self.persist_directory,
                     "collections": list(self.collections.keys())
                 }
@@ -196,8 +195,8 @@ class ChromaVectorStore(BaseVectorStore):
             chroma_metadata = flatten_metadata(metadata)
 
             # 解析用ログ出力
-            logger.info("[DEBUG] store_vector metadata(raw): %s", metadata)
-            logger.info("[DEBUG] store_vector chroma_metadata(flat): %s", chroma_metadata)
+            logger.info(f"[DEBUG] store_vector metadata(raw): {metadata}")
+            logger.info(f"[DEBUG] store_vector chroma_metadata(flat): {chroma_metadata}")
 
             await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -210,7 +209,7 @@ class ChromaVectorStore(BaseVectorStore):
 
             logger.info(
                 "Vector stored",
-                extra_data={
+                extra={
                     "memory_id": memory_id,
                     "domain": str(domain),
                     "embedding_dim": len(embedding)
@@ -236,7 +235,7 @@ class ChromaVectorStore(BaseVectorStore):
     ) -> List[Dict[str, Any]]:
         """類似ベクトルを検索"""
         try:
-            domain_key = domain_value(domain)
+            domain_key = str(domain)
             collection = self.collections[domain_key]
 
             # ChromaDBで検索
@@ -274,7 +273,7 @@ class ChromaVectorStore(BaseVectorStore):
 
             logger.info(
                 "Vector search completed",
-                extra_data={
+                extra={
                     "domain": str(domain),
                     "query_dim": len(query_embedding),
                     "result_count": len(similar_memories),
@@ -306,7 +305,7 @@ class ChromaVectorStore(BaseVectorStore):
                 deleted = True
                 logger.info(
                     "Vector deleted",
-                    extra_data={
+                    extra={
                         "memory_id": memory_id,
                         "domain": domain_key
                     }
@@ -344,7 +343,7 @@ class ChromaVectorStore(BaseVectorStore):
 
             logger.info(
                 "Vector metadata updated",
-                extra_data={
+                extra={
                     "memory_id": memory_id,
                     "domain": str(domain)
                 }

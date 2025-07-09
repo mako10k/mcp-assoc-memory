@@ -4,23 +4,18 @@
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
-from ..models.memory import Memory, MemoryDomain
-from ..models.association import Association
-from ..storage.base import (
-    BaseVectorStore,
-    BaseMetadataStore,
-    BaseGraphStore
-)
 from ..core.embedding_service import EmbeddingService
 from ..core.similarity import SimilarityCalculator
-from ..utils.logging import get_memory_logger
+from ..models.association import Association
+from ..models.memory import Memory, MemoryDomain
+from ..storage.base import BaseGraphStore, BaseMetadataStore, BaseVectorStore
 from ..utils.cache import LRUCache
-from ..utils.validation import domain_value
-
+from ..utils.logging import get_memory_logger
 
 logger = get_memory_logger(__name__)
 
@@ -191,9 +186,9 @@ class MemoryManager:
 
         except Exception as e:
             logger.error(
-                "Failed to initialize memory manager",
-                error_code="MEMORY_MANAGER_INIT_ERROR",
-                error=str(e)
+                "Failed to initialize memory manager: %s",
+                str(e),
+                extra={"error_code": "MEMORY_MANAGER_INIT_ERROR"}
             )
             raise
 
@@ -390,7 +385,7 @@ class MemoryManager:
             filters = {}
             if domains:
                 # ChromaDBのwhere句は単一値のみ許容
-                filters["domain"] = domain_value(domains[0])
+                filters["domain"] = domains[0].value if hasattr(domains[0], "value") else str(domains[0])
             if user_id:
                 filters["user_id"] = user_id
             if project_id:
@@ -691,11 +686,11 @@ class MemoryManager:
             cache_stats = {
                 "memory_cache": {
                     "size": len(self.memory_cache.cache),
-                    "max_size": self.memory_cache.max_size
+                    "max_size": self.memory_cache.capacity
                 },
                 "association_cache": {
                     "size": len(self.association_cache.cache),
-                    "max_size": self.association_cache.max_size
+                    "max_size": self.association_cache.capacity
                 },
                 "embedding_cache": self.embedding_service.get_cache_stats()
             }
@@ -722,7 +717,7 @@ class MemoryManager:
             stats = await self.metadata_store.get_memory_stats(domain)
             cache_stats = self.memory_cache.get_stats()
             embedding_stats = self.embedding_service.get_cache_stats()
-            
+
             return {
                 'total_memories': stats.get('total_count', 0),
                 'memories_by_domain': stats.get('by_domain', {}),
@@ -737,19 +732,19 @@ class MemoryManager:
             return {'error': str(e)}
 
     async def export_memories(
-        self, 
+        self,
         domain: Optional[MemoryDomain] = None,
         format_type: str = 'json'
     ) -> Dict[str, Any]:
         """記憶をエクスポート"""
         try:
             memories = await self.metadata_store.get_memories_by_domain(domain)
-            
+
             if format_type == 'json':
                 exported_data = [memory.to_dict() for memory in memories]
             else:
                 raise ValueError(f"Unsupported format: {format_type}")
-            
+
             return {
                 'format': format_type,
                 'count': len(exported_data),
@@ -770,7 +765,7 @@ class MemoryManager:
         imported_count = 0
         skipped_count = 0
         error_count = 0
-        
+
         try:
             for item in data:
                 try:
@@ -780,7 +775,7 @@ class MemoryManager:
                         if existing:
                             skipped_count += 1
                             continue
-                    
+
                     # 記憶を作成・保存
                     memory = await self.store_memory(
                         domain=domain,
@@ -789,16 +784,16 @@ class MemoryManager:
                         tags=item.get('tags', []),
                         category=item.get('category')
                     )
-                    
+
                     if memory:
                         imported_count += 1
                     else:
                         error_count += 1
-                        
+
                 except Exception as e:
                     logger.error(f"インポートアイテムエラー: {e}")
                     error_count += 1
-            
+
             return {
                 'imported_count': imported_count,
                 'skipped_count': skipped_count,
@@ -818,16 +813,16 @@ class MemoryManager:
             memory = await self.get_memory(memory_id)
             if not memory:
                 return False
-            
+
             memory.domain = new_domain
             memory.updated_at = datetime.utcnow()
-            
+
             success = await self.metadata_store.update_memory(memory)
             if success:
                 # キャッシュを更新
                 self.memory_cache.set(memory_id, memory)
                 logger.info(f"記憶ドメイン変更: {memory_id} -> {str(new_domain)}")
-            
+
             return success
         except Exception as e:
             logger.error(f"ドメイン変更エラー: {e}")
@@ -837,10 +832,10 @@ class MemoryManager:
         """記憶を一括削除"""
         try:
             deleted_count = await self.metadata_store.batch_delete_memories(criteria)
-            
+
             # キャッシュからも削除（簡易実装）
             self.memory_cache.clear()
-            
+
             logger.info(f"一括削除完了: {deleted_count}件")
             return deleted_count
         except Exception as e:
@@ -860,18 +855,18 @@ class MemoryManager:
                 'reindex_completed': False,
                 'vacuum_completed': False
             }
-            
+
             if cleanup_orphans:
                 result['cleanup_orphans'] = await self.metadata_store.cleanup_orphans()
-            
+
             if reindex:
                 await self.metadata_store.reindex()
                 result['reindex_completed'] = True
-            
+
             if vacuum:
                 await self.metadata_store.vacuum()
                 result['vacuum_completed'] = True
-            
+
             return result
         except Exception as e:
             logger.error(f"クリーンアップエラー: {e}")
@@ -889,7 +884,7 @@ class MemoryManager:
             embedding = await self.embedding_service.get_embedding(query)
             if not embedding:
                 return []
-            
+
             # ベクトル検索
             results = await self.vector_store.search(
                 embedding,
@@ -897,14 +892,14 @@ class MemoryManager:
                 limit,
                 min_score
             )
-            
+
             # 記憶オブジェクトに変換
             memories_with_scores = []
             for memory_id, score in results:
                 memory = await self.get_memory(memory_id)
                 if memory:
                     memories_with_scores.append((memory, score))
-            
+
             return memories_with_scores
         except Exception as e:
             logger.error(f"意味的検索エラー: {e}")
@@ -964,16 +959,16 @@ class MemoryManager:
                 end_date=end_date,
                 limit=limit * 3  # より多く取得してスコアフィルタリング
             )
-            
+
             if not query:
                 # クエリなしの場合は時系列順
                 return [(memory, 1.0) for memory in memories[:limit]]
-            
+
             # 意味的類似度でフィルタリング
             query_embedding = await self.embedding_service.get_embedding(query)
             if not query_embedding:
                 return [(memory, 1.0) for memory in memories[:limit]]
-            
+
             scored_memories = []
             for memory in memories:
                 # 記憶の埋め込みを取得
@@ -984,11 +979,11 @@ class MemoryManager:
                     )
                     if score >= min_score:
                         scored_memories.append((memory, score))
-            
+
             # スコア順にソート
             scored_memories.sort(key=lambda x: x[1], reverse=True)
             return scored_memories[:limit]
-            
+
         except Exception as e:
             logger.error(f"高度検索エラー: {e}")
             return []
@@ -1006,7 +1001,7 @@ class MemoryManager:
             reference_embedding = await self.vector_store.get_embedding(reference_id)
             if not reference_embedding:
                 return []
-            
+
             # 類似検索
             results = await self.vector_store.search(
                 reference_embedding,
@@ -1014,7 +1009,7 @@ class MemoryManager:
                 limit + 1,  # 自分自身を除外するため+1
                 min_score
             )
-            
+
             # 記憶オブジェクトに変換（参照記憶を除外）
             memories_with_scores = []
             for memory_id, score in results:
@@ -1022,7 +1017,7 @@ class MemoryManager:
                     memory = await self.get_memory(memory_id)
                     if memory:
                         memories_with_scores.append((memory, score))
-            
+
             return memories_with_scores[:limit]
         except Exception as e:
             logger.error(f"類似記憶検索エラー: {e}")
@@ -1039,7 +1034,7 @@ class MemoryManager:
             memory = await self.get_memory(memory_id)
             if not memory:
                 return []
-            
+
             return await self.find_similar_memories(
                 reference_id=memory_id,
                 domain=memory.domain,

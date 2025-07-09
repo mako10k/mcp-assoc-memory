@@ -1,10 +1,10 @@
 {
     "servers": {
-        "MCPBridge": {
-            "url": "http://localhost:3002/mcp"
+        "Google": {
+            "url": "http://localhost:3000/mcp"
         },
         "AssocMemory": {
-            "url": "http://localhost:3006/mcp"
+            "url": "http://localhost:8000/mcp"
         }
     }
 }

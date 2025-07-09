@@ -2,14 +2,17 @@
 HTTPトランスポートハンドラー（雛形）
 """
 
-from fastapi import FastAPI, Request
-import uvicorn
 import threading
+
+import uvicorn
+from fastapi import FastAPI, Request
+
 
 class HttpTransport:
     """
     HTTP API (FastAPI) を担当
     """
+
     def __init__(self, router, host="0.0.0.0", port=8000, enabled=True):
         self.router = router
         self.host = host
@@ -30,6 +33,7 @@ class HttpTransport:
     def start(self):
         if not self.enabled:
             return
+
         def run():
             uvicorn.run(self.app, host=self.host, port=self.port, log_level="info")
         self.server_thread = threading.Thread(target=run, daemon=True)

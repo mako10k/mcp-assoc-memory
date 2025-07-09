@@ -5,17 +5,16 @@ NetworkXベースのグラフストア実装
 
 import asyncio
 import pickle
-from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import networkx as nx
 
-from .base import BaseGraphStore
-from ..models.memory import Memory, MemoryDomain
 from ..models.association import Association
+from ..models.memory import Memory, MemoryDomain
 from ..utils.logging import get_memory_logger
-
+from .base import BaseGraphStore
 
 logger = get_memory_logger(__name__)
 
@@ -103,8 +102,9 @@ class NetworkXGraphStore(BaseGraphStore):
     async def detect_communities(self) -> Dict[str, List[str]]:
         """コミュニティを検出"""
         try:
-            import networkx.algorithms.community as nx_comm
             import collections.abc
+
+            import networkx.algorithms.community as nx_comm
             try:
                 communities = []
                 if hasattr(nx_comm, "greedy_modularity_communities"):

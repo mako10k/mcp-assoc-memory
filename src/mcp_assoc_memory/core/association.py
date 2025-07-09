@@ -3,16 +3,16 @@
 記憶間の関連性の自動生成と管理
 """
 
-from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
-from ..models.memory import Memory, MemoryDomain
-from ..models.association import Association
 from ..core.similarity import SimilarityCalculator, SimilarityMetric
+from ..models.association import Association
+from ..models.memory import Memory, MemoryDomain
 from ..utils.logging import get_memory_logger
-
 
 logger = get_memory_logger(__name__)
 
@@ -219,8 +219,8 @@ class AssociationEngine:
         if time_diff <= self.temporal_threshold:
             # 時間差が小さいほど強い関連
             strength = 1.0 - (
-                time_diff.total_seconds() /
-                self.temporal_threshold.total_seconds()
+                time_diff.total_seconds()
+                / self.temporal_threshold.total_seconds()
             )
             return max(0.0, strength)
 
@@ -384,8 +384,8 @@ class AssociationEngine:
             pair_key = (assoc.source_memory_id, assoc.target_memory_id)
             reverse_pair_key = (assoc.target_memory_id, assoc.source_memory_id)
 
-            if (pair_key not in seen_pairs and
-                    reverse_pair_key not in seen_pairs):
+            if (pair_key not in seen_pairs
+                    and reverse_pair_key not in seen_pairs):
                 seen_pairs.add(pair_key)
                 deduplicated.append(assoc)
 

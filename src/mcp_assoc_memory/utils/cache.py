@@ -1,199 +1,90 @@
 """
-LRUキャッシュ実装
+LRUCache実装
 """
-
-from typing import Any, Dict, Optional, OrderedDict
-from datetime import datetime, timedelta
-import threading
-import json
-import hashlib
+from collections import OrderedDict
+from typing import Any, Optional
 
 
 class LRUCache:
-    """LRU（Least Recently Used）キャッシュ"""
-
-    def __init__(
-            self,
-            max_size: int = 1000,
-            ttl_seconds: Optional[int] = None):
-        self.max_size = max_size
+    def __init__(self, max_size: int = 128, ttl_seconds: Optional[float] = None):
+        self.cache = OrderedDict()
+        self.capacity = max_size
         self.ttl_seconds = ttl_seconds
-        self.cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
-        self.lock = threading.RLock()
+        self.expiry = dict()  # key: expire_time
         self.hits = 0
         self.misses = 0
 
-    def _generate_key(self, key: Any) -> str:
-        """キーからハッシュを生成"""
-        if isinstance(key, str):
-            return key
+    def clear(self) -> None:
+        """キャッシュを全消去"""
+        self.cache.clear()
 
-        # 複雑なオブジェクトの場合はJSONシリアライズしてハッシュ化
-        try:
-            key_str = json.dumps(key, sort_keys=True, ensure_ascii=False)
-            return hashlib.md5(key_str.encode('utf-8')).hexdigest()
-        except (TypeError, ValueError):
-            return str(hash(str(key)))
-
-    def _is_expired(self, entry: Dict[str, Any]) -> bool:
-        """エントリが期限切れかチェック"""
-        if self.ttl_seconds is None:
-            return False
-
-        created_at = entry.get('created_at')
-        if not created_at:
-            return True
-
-        expiry_time = created_at + timedelta(seconds=self.ttl_seconds)
-        return datetime.utcnow() > expiry_time
+    def get_stats(self) -> dict:
+        """キャッシュ統計情報を返す"""
+        total = len(self.cache)
+        hit_rate = self.hits / (self.hits + self.misses) if (self.hits + self.misses) > 0 else 0.0
+        return {
+            "size": total,
+            "max_size": self.capacity,
+            "hits": self.hits,
+            "misses": self.misses,
+            "hit_rate": hit_rate
+        }
 
     def get(self, key: Any) -> Optional[Any]:
-        """値を取得"""
-        cache_key = self._generate_key(key)
-
-        with self.lock:
-            if cache_key not in self.cache:
+        import time
+        if key not in self.cache:
+            self.misses += 1
+            return None
+        if self.ttl_seconds is not None:
+            expire = self.expiry.get(key)
+            if expire is not None and time.time() > expire:
+                del self.cache[key]
+                del self.expiry[key]
                 self.misses += 1
                 return None
-
-            entry = self.cache[cache_key]
-
-            # 期限切れチェック
-            if self._is_expired(entry):
-                del self.cache[cache_key]
-                self.misses += 1
-                return None
-
-            # 最後にアクセスしたアイテムを最新にする
-            self.cache.move_to_end(cache_key)
-            entry['accessed_at'] = datetime.utcnow()
-
-            self.hits += 1
-            return entry['value']
+        self.cache.move_to_end(key)
+        self.hits += 1
+        return self.cache[key]
 
     def set(self, key: Any, value: Any) -> None:
-        """値を設定"""
-        cache_key = self._generate_key(key)
-
-        with self.lock:
-            # 既存エントリの更新
-            if cache_key in self.cache:
-                self.cache[cache_key] = {
-                    'value': value,
-                    'created_at': datetime.utcnow(),
-                    'accessed_at': datetime.utcnow()
-                }
-                self.cache.move_to_end(cache_key)
-                return
-
-            # 新規エントリの追加
-            self.cache[cache_key] = {
-                'value': value,
-                'created_at': datetime.utcnow(),
-                'accessed_at': datetime.utcnow()
-            }
-
-            # サイズ制限チェック
-            if len(self.cache) > self.max_size:
-                # 最も古いアイテムを削除
-                self.cache.popitem(last=False)
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if self.ttl_seconds is not None:
+            import time
+            self.expiry[key] = time.time() + self.ttl_seconds
+        if len(self.cache) > self.capacity:
+            old_key, _ = self.cache.popitem(last=False)
+            if old_key in self.expiry:
+                del self.expiry[old_key]
 
     def delete(self, key: Any) -> bool:
-        """値を削除"""
-        cache_key = self._generate_key(key)
+        """指定したキーを削除。成功時True、未存在時False"""
+        if key in self.cache:
+            del self.cache[key]
+            return True
+        return False
 
-        with self.lock:
-            if cache_key in self.cache:
-                del self.cache[cache_key]
-                return True
-            return False
-
-    def clear(self) -> None:
-        """キャッシュをクリア"""
-        with self.lock:
-            self.cache.clear()
-            self.hits = 0
-            self.misses = 0
-
-    def cleanup_expired(self) -> int:
-        """期限切れエントリをクリーンアップ"""
-        if self.ttl_seconds is None:
-            return 0
-
-        removed_count = 0
-        with self.lock:
-            expired_keys = []
-            for key, entry in self.cache.items():
-                if self._is_expired(entry):
-                    expired_keys.append(key)
-
-            for key in expired_keys:
-                del self.cache[key]
-                removed_count += 1
-
-        return removed_count
-
-    def get_hit_ratio(self) -> float:
-        """ヒット率を取得"""
-        with self.lock:
-            total_requests = self.hits + self.misses
-            return self.hits / total_requests if total_requests > 0 else 0.0
-
-    def get_stats(self) -> Dict[str, Any]:
-        """キャッシュ統計を取得"""
-        with self.lock:
-            total_requests = self.hits + self.misses
-            hit_rate = self.hits / total_requests if total_requests > 0 else 0
-
-            return {
-                'size': len(self.cache),
-                'max_size': self.max_size,
-                'hits': self.hits,
-                'misses': self.misses,
-                'hit_rate': hit_rate,
-                'ttl_seconds': self.ttl_seconds
-            }
+# --- EmbeddingCache ---
 
 
 class EmbeddingCache(LRUCache):
-    """埋め込みベクトル専用キャッシュ"""
-
-    def __init__(self, max_size: int = 1000, ttl_seconds: int = 3600):  # 1時間TTL
-        super().__init__(max_size, ttl_seconds)
+    def set_embedding(self, text: str, model: str, embedding: list) -> None:
+        key = (text, model)
+        self.set(key, embedding)
 
     def get_embedding(self, text: str, model: str) -> Optional[list]:
-        """埋め込みベクトルを取得"""
-        key = f"{model}:{text}"
+        key = (text, model)
         return self.get(key)
 
-    def set_embedding(self, text: str, model: str, embedding: list) -> None:
-        """埋め込みベクトルを設定"""
-        key = f"{model}:{text}"
-        self.set(key, embedding)
+# --- SearchCache ---
 
 
 class SearchCache(LRUCache):
-    """検索結果専用キャッシュ"""
-
-    def __init__(self, max_size: int = 500, ttl_seconds: int = 300):  # 5分TTL
-        super().__init__(max_size, ttl_seconds)
-
-    def get_search_result(self, query: str, domain: str,
-                          filters: Dict[str, Any]) -> Optional[list]:
-        """検索結果を取得"""
-        key = {
-            'query': query,
-            'domain': domain,
-            'filters': filters
-        }
-        return self.get(key)
-
-    def set_search_result(self, query: str, domain: str,
-                          filters: Dict[str, Any], results: list) -> None:
-        """検索結果を設定"""
-        key = {
-            'query': query,
-            'domain': domain,
-            'filters': filters
-        }
+    def set_search_result(self, query: str, domain: str, filters: dict, results: list) -> None:
+        key = (query, domain, frozenset(filters.items()) if filters else None)
         self.set(key, results)
+
+    def get_search_result(self, query: str, domain: str, filters: dict) -> Optional[list]:
+        key = (query, domain, frozenset(filters.items()) if filters else None)
+        return self.get(key)

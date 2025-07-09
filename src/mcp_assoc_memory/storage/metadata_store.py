@@ -1,18 +1,17 @@
 
 
-
-import aiosqlite
 import asyncio
 import json
-from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from .base import BaseMetadataStore
-from ..models.memory import Memory, MemoryDomain
+import aiosqlite
+
 from ..models.association import Association
+from ..models.memory import Memory, MemoryDomain
 from ..utils.logging import get_memory_logger
-
+from .base import BaseMetadataStore
 
 logger = get_memory_logger(__name__)
 
@@ -372,14 +371,14 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
             logger.info(
                 "SQLite metadata store initialized",
-                extra_data={"database_path": self.database_path}
+                extra={"database_path": self.database_path}
             )
 
         except Exception as e:
             logger.error(
-                "Failed to initialize SQLite metadata store",
-                error_code="SQLITE_INIT_ERROR",
-                error=str(e)
+                "Failed to initialize SQLite metadata store: %s",
+                str(e),
+                extra={"error_code": "SQLITE_INIT_ERROR"}
             )
             raise
 
@@ -571,6 +570,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 error=str(e)
             )
             return False
+
     async def search_memories(
         self,
         domain: MemoryDomain,
