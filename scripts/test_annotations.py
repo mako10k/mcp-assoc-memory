@@ -1,5 +1,5 @@
 """
-FastMCPアノテーション機能のテストスクリプト
+FastMCP annotation functionality test script
 """
 
 import asyncio
@@ -7,62 +7,62 @@ import json
 from fastmcp import Client
 
 async def test_annotations():
-    """アノテーション機能をテストする"""
+    """Test annotation functionality"""
     
     async with Client("http://localhost:8000/mcp") as client:
-        print("🏷️ FastMCPアノテーション機能のテスト")
+        print("🏷️ FastMCP Annotation Functionality Test")
         
-        # ツール一覧を取得してアノテーションを確認
+        # Get tool list and check annotations
         tools = await client.list_tools()
         
-        print("\n=== 📋 ツールアノテーションの詳細 ===")
+        print("\n=== 📋 Tool Annotation Details ===")
         for tool in tools:
-            print(f"\n🔧 ツール: {tool.name}")
-            print(f"   説明: {tool.description}")
+            print(f"\n🔧 Tool: {tool.name}")
+            print(f"   Description: {tool.description}")
             
-            # アノテーションがある場合
+            # If annotations exist
             if hasattr(tool, 'annotations') and tool.annotations:
-                print("   アノテーション:")
+                print("   Annotations:")
                 annotations_dict = tool.annotations.model_dump() if hasattr(tool.annotations, 'model_dump') else tool.annotations.__dict__
                 for key, value in annotations_dict.items():
                     print(f"     {key}: {value}")
             else:
-                print("   アノテーション: なし")
+                print("   Annotations: None")
         
-        # 実際にツールを呼び出してログ出力を確認
-        print("\n=== 🎯 実際のツール呼び出しテスト ===")
+        # Actually call tools to check log output
+        print("\n=== 🎯 Actual Tool Call Tests ===")
         
-        # 破壊的でない操作
-        print("\n📊 非破壊的操作のテスト (memory_list_all):")
+        # Non-destructive operation
+        print("\n📊 Non-destructive operation test (memory_list_all):")
         list_result = await client.call_tool("memory_list_all", {})
         memories = json.loads(list_result.content[0].text)
-        print(f"取得された記憶数: {len(memories)}")
+        print(f"Retrieved memory count: {len(memories)}")
         
-        # 新しい記憶を保存（非破壊的）
-        print("\n💾 記憶保存のテスト (memory_store):")
+        # Store new memory (non-destructive)
+        print("\n💾 Memory storage test (memory_store):")
         store_result = await client.call_tool("memory_store", {
             "request": {
-                "content": "アノテーション機能のテスト記憶",
+                "content": "Annotation functionality test memory",
                 "domain": "test",
                 "metadata": {"test": "annotations"}
             }
         })
         stored_memory = json.loads(store_result.content[0].text)
-        print(f"保存された記憶ID: {stored_memory['memory_id']}")
+        print(f"Stored memory ID: {stored_memory['memory_id']}")
         
-        # 検索（読み取り専用）
-        print("\n🔍 検索のテスト (memory_search):")
+        # Search (read-only)
+        print("\n🔍 Search test (memory_search):")
         search_result = await client.call_tool("memory_search", {
             "request": {
-                "query": "アノテーション",
+                "query": "Annotation",
                 "limit": 5
             }
         })
         found_memories = json.loads(search_result.content[0].text)
-        print(f"検索結果: {len(found_memories)}件")
+        print(f"Search results: {len(found_memories)} items")
         
-        print("\n✅ アノテーションテスト完了")
-        print("サーバーログでContext.info()、Context.warning()等の出力を確認してください")
+        print("\n✅ Annotation test completed")
+        print("Please check server logs for Context.info(), Context.warning(), etc. output")
 
 if __name__ == "__main__":
     asyncio.run(test_annotations())

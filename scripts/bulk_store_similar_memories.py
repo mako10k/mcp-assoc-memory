@@ -5,19 +5,19 @@ import requests
 
 MCP_URL = "http://localhost:8000/mcp"
 
-# ほぼ同じ文を複数保存するテストデータ
+# Test data with similar content for bulk storage
 memories = [
-    {"content": "テスト用メモリA", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "テスト用メモリAです", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "テスト用メモリAの詳細", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "テスト用メモリAの補足説明", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "テスト用メモリAの関連情報", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "テスト用メモリAの追加情報", "domain": "user", "metadata": {"tag": "similar_test"}}
+    {"content": "Test memory A", "domain": "user", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A variant", "domain": "user", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A details", "domain": "user", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A supplementary info", "domain": "user", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A related information", "domain": "user", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A additional info", "domain": "user", "metadata": {"tag": "similar_test"}}
 ]
 
 results = []
 for i, mem in enumerate(memories):
-    # FastMCP形式のリクエスト
+    # FastMCP format request
     store_request = {
         "jsonrpc": "2.0",
         "id": i + 1,
@@ -43,12 +43,12 @@ for i, mem in enumerate(memories):
         print(f"Response decode error: {e}\nRaw: {response.text}")
     time.sleep(0.5)
 
-print("\n保存されたmemory_id一覧:")
+print("\nStored memory_id list:")
 for r in results:
     if r.get("result") and r["result"].get("content"):
         result_data = r["result"]["content"][0]["text"] if isinstance(r["result"]["content"], list) else r["result"]
         try:
-            # 構造化された出力を確認
+            # Check structured output
             if isinstance(result_data, dict) and "memory_id" in result_data:
                 print(result_data["memory_id"])
         except Exception:

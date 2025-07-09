@@ -1,5 +1,5 @@
 """
-FastMCPクライアントを使用したテストスクリプト
+Test script using FastMCP client
 """
 
 import asyncio
@@ -7,64 +7,64 @@ import json
 from fastmcp import Client
 
 async def test_memory_operations():
-    """メモリ操作をテストする"""
+    """Test memory operations"""
     
-    # FastMCPクライアントを使用してサーバーに接続
+    # Connect to server using FastMCP client
     async with Client("http://localhost:8000/mcp") as client:
-        print("FastMCPサーバーに接続しました")
+        print("Connected to FastMCP server")
         
-        # 利用可能なツールの一覧を取得
+        # Get list of available tools
         tools = await client.list_tools()
-        print(f"利用可能なツール: {[tool.name for tool in tools]}")
+        print(f"Available tools: {[tool.name for tool in tools]}")
         
-        # テストデータ
+        # Test data
         memories = [
-            {"content": "テスト用メモリA", "domain": "user", "metadata": {"tag": "similar_test"}},
-            {"content": "テスト用メモリAです", "domain": "user", "metadata": {"tag": "similar_test"}},
-            {"content": "テスト用メモリAの詳細", "domain": "user", "metadata": {"tag": "similar_test"}},
+            {"content": "Test memory A", "domain": "user", "metadata": {"tag": "similar_test"}},
+            {"content": "Test memory A variant", "domain": "user", "metadata": {"tag": "similar_test"}},
+            {"content": "Test memory A details", "domain": "user", "metadata": {"tag": "similar_test"}},
         ]
         
         stored_memory_ids = []
         
-        # メモリを保存
+        # Store memories
         for i, mem in enumerate(memories):
-            print(f"\n[{i + 1}/{len(memories)}] 記憶を保存: {mem['content']}")
+            print(f"\n[{i + 1}/{len(memories)}] Storing memory: {mem['content']}")
             
             result = await client.call_tool("memory_store", {"request": mem})
-            print(f"保存結果: {result.content}")
+            print(f"Store result: {result.content}")
             
-            # 構造化された出力からmemory_idを取得
+            # Get memory_id from structured output
             if hasattr(result, 'structured_content') and result.structured_content:
                 memory_id = result.structured_content.get('memory_id')
                 if memory_id:
                     stored_memory_ids.append(memory_id)
                     print(f"Memory ID: {memory_id}")
         
-        print(f"\n保存されたメモリID: {stored_memory_ids}")
+        print(f"\nStored memory IDs: {stored_memory_ids}")
         
-        # 検索をテスト
-        print("\n=== 検索テスト ===")
+        # Test search
+        print("\n=== Search Test ===")
         search_result = await client.call_tool("memory_search", {
             "request": {
-                "query": "テスト用メモリA",
+                "query": "Test memory A",
                 "domain": "user",
                 "limit": 10
             }
         })
-        print(f"検索結果: {search_result.content}")
+        print(f"Search result: {search_result.content}")
         
-        # 全記憶の一覧を取得
-        print("\n=== 全記憶一覧 ===")
+        # Get all memories
+        print("\n=== All Memories List ===")
         list_result = await client.call_tool("memory_list_all", {})
-        print(f"全記憶: {list_result.content}")
+        print(f"All memories: {list_result.content}")
         
-        # 特定のメモリを取得
+        # Get specific memory
         if stored_memory_ids:
-            print(f"\n=== 特定記憶取得: {stored_memory_ids[0]} ===")
+            print(f"\n=== Get Specific Memory: {stored_memory_ids[0]} ===")
             get_result = await client.call_tool("memory_get", {"memory_id": stored_memory_ids[0]})
-            print(f"取得結果: {get_result.content}")
+            print(f"Get result: {get_result.content}")
         
-        print("\nテスト完了")
+        print("\nTest completed")
 
 if __name__ == "__main__":
     asyncio.run(test_memory_operations())
