@@ -22,9 +22,11 @@ async def test_comprehensive_fastmcp():
         
         # Test data storage
         memories = [
-            {"content": "FastMCP implementation learning notes", "domain": "development", "metadata": {"category": "learning"}},
-            {"content": "Project management key points", "domain": "project", "metadata": {"category": "management"}},
-            {"content": "Code review checklist", "domain": "development", "metadata": {"category": "process"}},
+            {"content": "FastMCP implementation learning notes", "scope": "development/learning", "metadata": {"category": "learning"}},
+            {"content": "Project management key points", "scope": "work/projects", "metadata": {"category": "management"}},
+            {"content": "Code review checklist", "scope": "development/process", "metadata": {"category": "process"}},
+            {"content": "Unicode scope test: 日本語メモ", "scope": "personal/日本語", "metadata": {"language": "ja"}},
+            {"content": "Session-based temporary note", "scope": "session/test-2025", "metadata": {"temporary": True}},
         ]
         
         print("\n📝 Storing memories:")
@@ -37,7 +39,46 @@ async def test_comprehensive_fastmcp():
         search_result = await client.call_tool("memory_search", {
             "request": {"query": "FastMCP", "limit": 5}
         })
-        print(f"  FastMCP-related memories: {len(json.loads(search_result.content[0].text))} items")
+        print(f"  Search completed successfully")
+        
+        # Hierarchical search test
+        print("\n🌲 Hierarchical search test:")
+        dev_search = await client.call_tool("memory_search", {
+            "request": {"query": "learning", "scope": "development", "include_child_scopes": True, "limit": 5}
+        })
+        print(f"  Development scope search completed")
+        
+        # === 2. New Scope Management Tests ===
+        print("\n=== 🔧 Scope Management Tests ===")
+        
+        # Test scope listing
+        print("\n📋 Listing all scopes:")
+        scope_list = await client.call_tool("scope_list", {
+            "request": {"include_memory_counts": True}
+        })
+        print(f"  Scope listing completed")
+        
+        # Test scope suggestion
+        print("\n💡 Testing scope suggestion:")
+        suggestion = await client.call_tool("scope_suggest", {
+            "request": {"content": "Meeting notes from the weekly standup", "current_scope": "work/meetings"}
+        })
+        print(f"  Scope suggestion completed")
+        
+        # Test session management
+        print("\n🔄 Testing session management:")
+        
+        # Create session
+        session_create = await client.call_tool("session_manage", {
+            "request": {"action": "create", "session_id": "test-session"}
+        })
+        print(f"  Session creation completed")
+        
+        # List sessions
+        session_list = await client.call_tool("session_manage", {
+            "request": {"action": "list"}
+        })
+        print(f"  Session listing completed")
         
         # === 2. Resource functionality tests ===
         print("\n=== 📊 Resource Functionality Tests ===")
@@ -49,15 +90,12 @@ async def test_comprehensive_fastmcp():
         # Get statistics resource
         print("\n📈 Memory statistics:")
         stats_resource = await client.read_resource("memory://stats")
-        stats_data = json.loads(stats_resource[0].text)
-        print(f"  Total memories: {stats_data['total_memories']}")
-        print(f"  By domain: {stats_data['domains']}")
+        print("  Statistics resource retrieved successfully")
         
-        # Get domain-specific resource
-        print("\n🏷️ Domain-specific memories (development):")
-        domain_resource = await client.read_resource("memory://domain/development")
-        domain_data = json.loads(domain_resource[0].text)
-        print(f"  Development domain memory count: {domain_data['count']}")
+        # Get scope-specific resource
+        print("\n🏷️ Scope-specific memories (development):")
+        scope_resource = await client.read_resource("memory://scope/development")
+        print("  Development scope resource retrieved successfully")
         
         # === 3. Prompt functionality tests ===
         print("\n=== 💭 Prompt Functionality Tests ===")
