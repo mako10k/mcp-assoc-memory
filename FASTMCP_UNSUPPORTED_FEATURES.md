@@ -135,6 +135,26 @@ This document lists features that were planned or partially implemented in the l
 3. **Phase 3**: Develop external services for complex features
 4. **Phase 4**: Create client libraries for common patterns
 
+## Requirement vs Implementation Gap Analysis
+
+The table below compares major requirements from `SPECIFICATION.md` with the
+current FastMCP implementation. It highlights features that are missing or only
+partially implemented.
+
+| Requirement (SPECIFICATION.md)                                    | Status | Notes |
+|------------------------------------------------------------------|--------|-------|
+| `memory` tool: `update` subcommand                                | ❌    | Only `store`, `search`, `get`, `delete`, `list_all` are implemented |
+| `memory_manage` tool (stats/export/import/change_domain/batch_delete/cleanup) | ❌    | Some functionality exists as resources or helpers but the unified tool is absent |
+| `search` tool for tags/timerange/advanced/similar searches        | ❌    | Only semantic `memory_search` is implemented |
+| `project` management tool                                         | ❌    | No project CRUD or membership features |
+| `user` management tool                                            | ❌    | Session operations are handled via `session_manage` instead |
+| `visualize` tool                                                  | ❌    | Visualization features were removed during migration |
+| `admin` tool                                                      | ❌    | System maintenance operations not implemented |
+| `scope_list` / `scope_suggest` tools                              | ✅    | Implemented in `server.py` |
+| `memory_move` tool                                                | ✅    | Implemented as standalone tool |
+| `session_manage` tool                                             | ✅    | Provides session creation, listing and cleanup |
+
+
 ## Conclusion
 
 The FastMCP migration successfully simplified the architecture and focused on core memory functionality. While some advanced features were lost, the current implementation provides a solid foundation for memory-based LLM applications. Complex features should be implemented as complementary services rather than MCP tools.
