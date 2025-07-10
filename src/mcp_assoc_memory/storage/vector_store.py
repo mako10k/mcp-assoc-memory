@@ -103,9 +103,11 @@ class ChromaVectorStore(BaseVectorStore):
                     collection = self.client.get_collection(collection_name)
                 except Exception:
                     # コレクションが存在しない場合は作成
+                    # embedding_functionを設定しないことで、手動でembeddingを管理
                     collection = self.client.create_collection(
                         name=collection_name,
-                        metadata={"domain": domain_key}
+                        metadata={"domain": domain_key},
+                        embedding_function=None  # 手動でembeddingを管理
                     )
                 self.collections[domain_key] = collection
 
@@ -235,7 +237,16 @@ class ChromaVectorStore(BaseVectorStore):
     ) -> List[Dict[str, Any]]:
         """類似ベクトルを検索"""
         try:
-            domain_key = str(domain)
+            # ドメインを適切な文字列キーに変換
+            if hasattr(domain, 'value'):
+                domain_key = domain.value
+            else:
+                domain_key = str(domain)
+            
+            if domain_key not in self.collections:
+                logger.warning(f"Collection not found for domain: {domain_key}")
+                return []
+                
             collection = self.collections[domain_key]
 
             # ChromaDBで検索

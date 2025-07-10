@@ -12,7 +12,7 @@ import asyncio
 
 # Import the full associative memory architecture
 from .core.memory_manager import MemoryManager
-from .core.embedding_service import EmbeddingService
+from .core.embedding_service import EmbeddingService, MockEmbeddingService, SentenceTransformerEmbeddingService
 from .core.similarity import SimilarityCalculator
 from .storage.vector_store import ChromaVectorStore
 from .storage.metadata_store import SQLiteMetadataStore
@@ -33,7 +33,16 @@ config = get_config()
 vector_store = ChromaVectorStore()
 metadata_store = SQLiteMetadataStore()
 graph_store = NetworkXGraphStore()
-embedding_service = EmbeddingService()
+
+# Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
+try:
+    embedding_service = SentenceTransformerEmbeddingService()
+    logger.info("Using SentenceTransformerEmbeddingService for production")
+except Exception as e:
+    logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
+    embedding_service = MockEmbeddingService()
+    logger.info("Falling back to MockEmbeddingService")
+
 similarity_calculator = SimilarityCalculator()
 
 # Initialize memory manager
@@ -509,7 +518,17 @@ async def memory_list_all(
         
         # Get page items
         page_memories = all_memories[start_idx:end_idx]
-        results = [MemoryResponse(**memory_data) for memory_data in page_memories]
+        results = []
+        for memory_data in page_memories:
+            results.append(MemoryResponse(
+                memory_id=memory_data["memory_id"],
+                content=memory_data["content"],
+                scope=memory_data["scope"],
+                metadata=memory_data.get("metadata", {}),
+                tags=memory_data.get("tags", []),
+                category=memory_data.get("category"),
+                created_at=memory_data["created_at"]
+            ))
         
         pagination = PaginationInfo(
             page=page,

@@ -106,3 +106,18 @@ If code behavior seems unclear, prompt Copilot with:
 - **Next priority**: 🔧 Dependency verification, initialization stabilization, basic testing
 
 **Important**: This project's core requirement is **associative memory functionality** - semantic similarity search and automatic association discovery between memories. Always maintain these capabilities.
+
+## ✅ Terminal and Output Handling
+
+**Note**: When using terminal commands, be aware of potential output display issues:
+
+- **Terminal Output Bug**: The `run_in_terminal` tool may sometimes not display output properly
+- **Workaround**: For critical commands, use output redirection: `command 2>&1 | tee /workspaces/mcp-assoc-memory/.copilot-temp/{task_name}-00001.log`
+- **Alternative**: Use `script` command for complex scenarios that need full terminal emulation
+- **Verification**: If terminal output appears empty, check the generated log files in `.copilot-temp/` directory
+- **Best Practice**: Always verify command execution results through file system checks or direct file reading when output is missing
+- **File Naming**: Use simple task names with 5-digit sequence numbers (e.g., `chroma-test-00001.log`), always ending with `.log`
+
+## 📝 Note on Instruction Organization
+
+This section was added to consolidate user-provided instructions. All relevant guidance has been integrated into the appropriate sections above to maintain consistency and clarity for LLM interactions.

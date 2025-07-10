@@ -214,3 +214,6 @@ config.json
 *.backup
 *.bak
 *.orig
+
+# Misc
+/.copilot-temp/
