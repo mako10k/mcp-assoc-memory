@@ -220,10 +220,29 @@ class MemoryManager:
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
         session_id: Optional[str] = None,
-        auto_associate: bool = True
+        auto_associate: bool = True,
+        allow_duplicates: bool = False,  # 新しいパラメータ
+        similarity_threshold: float = 0.95  # 重複判定の閾値
     ) -> Optional[Memory]:
         """記憶を保存"""
         try:
+            # 重複チェック（allow_duplicatesがFalseの場合）
+            if not allow_duplicates:
+                existing_memory = await self.check_content_duplicate(
+                    content, 
+                    domain, 
+                    similarity_threshold
+                )
+                if existing_memory:
+                    logger.info(
+                        "Duplicate content detected, returning existing memory",
+                        extra_data={
+                            "existing_memory_id": existing_memory.id,
+                            "content_preview": content[:50]
+                        }
+                    )
+                    return existing_memory
+            
             # 記憶オブジェクト作成
             memory = Memory(
                 domain=domain,
@@ -1045,7 +1064,88 @@ class MemoryManager:
             logger.error(f"関連記憶取得エラー: {e}")
             return []
 
-    # --- 既存の update_memory は上位で定義済みのため、ここでは省略 ---
+    async def check_content_duplicate(
+        self,
+        content: str,
+        domain: Optional[MemoryDomain] = None,
+        similarity_threshold: float = 0.95
+    ) -> Optional[Memory]:
+        """
+        同じ内容の記憶が既に存在するかチェック
+        
+        Args:
+            content: チェックする内容
+            domain: 検索対象のドメイン（Noneの場合は全ドメイン）
+            similarity_threshold: 重複と判定する類似度閾値（デフォルト0.95）
+            
+        Returns:
+            重複する記憶が見つかった場合はそのMemoryオブジェクト、見つからなければNone
+        """
+        try:
+            # 完全一致チェック（高速）
+            try:
+                memories = await self.metadata_store.get_memories_by_domain(domain)
+                for memory in memories:
+                    if memory.content.strip() == content.strip():
+                        logger.info(
+                            "Exact content duplicate found",
+                            extra_data={
+                                "existing_memory_id": memory.id,
+                                "content_preview": content[:50]
+                            }
+                        )
+                        return memory
+            except Exception as db_error:
+                logger.warning(
+                    "Error during database duplicate check, skipping",
+                    extra_data={"error": str(db_error)}
+                )
+            
+            # 高類似度チェック（埋め込みベクトルベース）
+            try:
+                if await self.embedding_service.is_available():
+                    embedding = await self.embedding_service.get_embedding(content)
+                    if embedding is not None:
+                        # 高い類似度で検索
+                        similar_memories = await self.vector_store.search_similar(
+                            embedding,
+                            top_k=5,
+                            similarity_threshold=similarity_threshold,
+                            domain=domain
+                        )
+                        
+                        if similar_memories:
+                            # 最も類似度が高いものを返す
+                            most_similar = similar_memories[0]
+                            existing_memory = await self.metadata_store.get_memory(most_similar["memory_id"])
+                            if existing_memory:
+                                logger.info(
+                                    "High similarity duplicate found",
+                                    extra_data={
+                                        "existing_memory_id": existing_memory.id,
+                                        "similarity_score": most_similar["similarity_score"],
+                                        "content_preview": content[:50]
+                                    }
+                                )
+                                return existing_memory
+            except Exception as vector_error:
+                logger.warning(
+                    "Error during vector similarity duplicate check, skipping",
+                    extra_data={"error": str(vector_error)}
+                )
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(
+                "Error during duplicate check, allowing storage",
+                extra_data={
+                    "error": str(e),
+                    "content_preview": content[:50]
+                }
+            )
+            # エラーの場合は重複なしとして扱う（安全側に倒す）
+            return None
 
     # Phase 3: MCPツール用メソッド群の未実装部分（例: get_memory_stats, export_memories, import_memories など）は既に実装済み
 

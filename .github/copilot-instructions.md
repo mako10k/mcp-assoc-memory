@@ -121,3 +121,9 @@ If code behavior seems unclear, prompt Copilot with:
 ## 📝 Note on Instruction Organization
 
 This section was added to consolidate user-provided instructions. All relevant guidance has been integrated into the appropriate sections above to maintain consistency and clarity for LLM interactions.
+
+## 📝 Note on Instruction Organization
+
+For detailed developer guidelines including knowledge management workflow, library-first approach, and log file maintenance, see:
+- **[docs/DEVELOPER_GUIDELINES.md](../docs/DEVELOPER_GUIDELINES.md)** - Developer workflow and best practices
+- **[docs/knowledges/diversified-search-algorithm.md](../docs/knowledges/diversified-search-algorithm.md)** - Future search algorithm enhancements

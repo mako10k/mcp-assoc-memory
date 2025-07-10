@@ -77,6 +77,8 @@ class MemoryStoreRequest(BaseModel):
     tags: Optional[List[str]] = Field(default=None, description="Memory tags")
     category: Optional[str] = Field(default=None, description="Memory category")
     auto_associate: bool = Field(default=True, description="Enable automatic association discovery")
+    allow_duplicates: bool = Field(default=False, description="Allow storing duplicate content")
+    similarity_threshold: float = Field(default=0.95, ge=0.0, le=1.0, description="Duplicate detection threshold")
 
 
 class MemoryResponse(BaseModel):
@@ -89,6 +91,8 @@ class MemoryResponse(BaseModel):
     created_at: datetime
     similarity_score: Optional[float] = Field(default=None, description="Similarity score when from search")
     associations: Optional[List[str]] = Field(default=None, description="Related memory IDs")
+    is_duplicate: bool = Field(default=False, description="Whether this was a duplicate detection")
+    duplicate_of: Optional[str] = Field(default=None, description="Original memory ID if duplicate")
 
 
 class MemorySearchRequest(BaseModel):
@@ -211,6 +215,7 @@ async def memory_store(
             domain = MemoryDomain.SESSION
         
         # Store using the full memory manager
+        original_memory_id = None
         memory = await memory_manager.store_memory(
             domain=domain,
             content=request.content,
@@ -220,11 +225,31 @@ async def memory_store(
             },
             tags=request.tags or [],
             category=request.category,
-            auto_associate=request.auto_associate
+            auto_associate=request.auto_associate,
+            allow_duplicates=request.allow_duplicates,
+            similarity_threshold=request.similarity_threshold
         )
         
         if not memory:
             raise ValueError("Failed to store memory")
+        
+        # Check if this was a duplicate detection
+        is_duplicate = False
+        if not request.allow_duplicates:
+            # If the content was not new and we have an existing memory
+            existing_in_storage = any(
+                stored_mem["content"].strip() == request.content.strip() 
+                for stored_mem in memory_storage.values()
+                if stored_mem["memory_id"] != memory.id
+            )
+            if existing_in_storage:
+                is_duplicate = True
+                # Find the original memory ID
+                for stored_mem in memory_storage.values():
+                    if (stored_mem["content"].strip() == request.content.strip() and 
+                        stored_mem["memory_id"] != memory.id):
+                        original_memory_id = stored_mem["memory_id"]
+                        break
         
         # Also store in simple storage for compatibility
         memory_data = {
@@ -239,7 +264,8 @@ async def memory_store(
         memory_storage[memory.id] = memory_data
         persistence.save_memories(memory_storage)
         
-        await ctx.info(f"Memory stored with associations: {memory.id}")
+        action_msg = "existing duplicate returned" if is_duplicate else "new memory stored"
+        await ctx.info(f"Memory {action_msg} with associations: {memory.id}")
         
         return MemoryResponse(
             memory_id=memory.id,
@@ -248,7 +274,9 @@ async def memory_store(
             metadata=memory.metadata,
             tags=memory.tags,
             category=memory.category,
-            created_at=memory.created_at
+            created_at=memory.created_at,
+            is_duplicate=is_duplicate,
+            duplicate_of=original_memory_id
         )
         
     except Exception as e:
@@ -1079,29 +1107,63 @@ async def memory_discover_associations(
             await ctx.warning(f"Memory not found: {memory_id}")
             return {"error": "Memory not found", "associations": []}
         
-        # Find similar memories
+        # Find similar memories with enhanced search strategy
         search_results = await memory_manager.search_memories(
             query=memory.content,
-            limit=limit + 1,  # +1 to account for the source memory itself
-            similarity_threshold=similarity_threshold
+            limit=limit * 3,  # Search more to account for filtering
+            similarity_threshold=max(0.1, similarity_threshold - 0.2)  # Lower threshold for diversity
         )
+        
+        # If we didn't find enough diverse results, try with the original content plus tags
+        if len(search_results) < limit:
+            # Create enhanced query with tags and category
+            enhanced_query = memory.content
+            if memory.tags:
+                enhanced_query += " " + " ".join(memory.tags)
+            if memory.category:
+                enhanced_query += " " + memory.category
+            
+            additional_results = await memory_manager.search_memories(
+                query=enhanced_query,
+                limit=limit * 2,
+                similarity_threshold=max(0.1, similarity_threshold - 0.3)
+            )
+            
+            # Merge results (will be deduplicated later)
+            search_results.extend(additional_results)
         
         # Filter out the source memory and format results
         associations = []
+        seen_content = set()  # Track content to avoid duplicates
+        
         for result in search_results:
-            if result["memory"].id != memory_id:
-                assoc_memory = result["memory"]
-                memory_scope = assoc_memory.metadata.get("scope", f"{assoc_memory.domain.value}/default")
-                
-                associations.append({
-                    "memory_id": assoc_memory.id,
-                    "content": assoc_memory.content[:100] + "..." if len(assoc_memory.content) > 100 else assoc_memory.content,
-                    "scope": memory_scope,
-                    "similarity_score": result["similarity"],
-                    "category": assoc_memory.category,
-                    "tags": assoc_memory.tags,
-                    "created_at": assoc_memory.created_at
-                })
+            assoc_memory = result["memory"]
+            
+            # Skip the source memory itself
+            if assoc_memory.id == memory_id:
+                continue
+            
+            # Skip memories with identical content to promote diversity
+            content_hash = hash(assoc_memory.content.strip().lower())
+            if content_hash in seen_content:
+                continue
+            seen_content.add(content_hash)
+            
+            memory_scope = assoc_memory.metadata.get("scope", f"{assoc_memory.domain.value}/default")
+            
+            associations.append({
+                "memory_id": assoc_memory.id,
+                "content": assoc_memory.content[:100] + "..." if len(assoc_memory.content) > 100 else assoc_memory.content,
+                "scope": memory_scope,
+                "similarity_score": result["similarity"],
+                "category": assoc_memory.category,
+                "tags": assoc_memory.tags,
+                "created_at": assoc_memory.created_at
+            })
+            
+            # Break if we have enough diverse associations
+            if len(associations) >= limit:
+                break
         
         await ctx.info(f"Found {len(associations)} associations for memory {memory_id}")
         
