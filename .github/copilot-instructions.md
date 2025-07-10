@@ -99,13 +99,14 @@ If code behavior seems unclear, prompt Copilot with:
 
 ## 📋 Current Project Status & Next Steps
 
-**🔗 For detailed current status and immediate todos, see: [CURRENT_STATUS_AND_TODO.md](../CURRENT_STATUS_AND_TODO.md)**
+**� Note**: Current project status and development tasks are now stored in the associative memory system. Use memory search to find current progress, completed tasks, and next priorities.
 
-### Quick Context (Updated: 2025-07-09)
+### Quick Context (Updated: 2025-07-10)
 - **FastMCP 2.0 migration**: ✅ Complete
 - **Associative memory features**: ✅ Restored (embedding-based search, similarity calculation)
 - **Core architecture**: ✅ Integrated (MemoryManager, EmbeddingService, ChromaVectorStore)
-- **Next priority**: 🔧 Dependency verification, initialization stabilization, basic testing
+- **User documentation**: ✅ Complete (Quick Start, Best Practices, API Reference, Examples, Troubleshooting)
+- **Development reference**: ✅ Organized in development/ directory
 
 **Important**: This project's core requirement is **associative memory functionality** - semantic similarity search and automatic association discovery between memories. Always maintain these capabilities.
 
@@ -127,8 +128,8 @@ This section was added to consolidate user-provided instructions. All relevant g
 ## 📝 Note on Instruction Organization
 
 For detailed developer guidelines including knowledge management workflow, library-first approach, and log file maintenance, see:
-- **[docs/DEVELOPER_GUIDELINES.md](../docs/DEVELOPER_GUIDELINES.md)** - Developer workflow and best practices
-- **[docs/knowledges/diversified-search-algorithm.md](../docs/knowledges/diversified-search-algorithm.md)** - Future search algorithm enhancements
+- **[development/workflow/DEVELOPER_GUIDELINES.md](../development/workflow/DEVELOPER_GUIDELINES.md)** - Developer workflow and best practices
+- **[development/knowledge/diversified-search-algorithm.md](../development/knowledge/diversified-search-algorithm.md)** - Future search algorithm enhancements
 
 ---
 

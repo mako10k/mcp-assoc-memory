@@ -1,43 +1,93 @@
 # MCP Associative Memory Server
 
-A Model Context Protocol (MCP) server implementing associative memory for LLMs using FastMCP 2.0.
+🧠 **An intelligent associative memory system for LLMs** that stores, searches, and discovers connections between knowledge using the Model Context Protocol (MCP).
 
-## Overview
+## 🌟 Overview
 
-This project provides an MCP server that enables LLMs to efficiently store information and retrieve related content through associative memory. The system combines vector embeddings with graph structures to create memory systems similar to human associative memory.
+Transform your development workflow with an AI-powered memory system that:
+- **Stores insights** from your daily work and learning
+- **Finds related knowledge** when you need it most  
+- **Discovers unexpected connections** between ideas
+- **Organizes knowledge** in intuitive hierarchical scopes
+- **Syncs across environments** for seamless workflow integration
 
-## Key Features
+Built with **FastMCP 2.0** for modern LLM integration, optimized for **GitHub Copilot** workflows.
 
-- **Memory Storage**: Store text information as vector embeddings organized by domains
-- **Semantic Search**: Advanced memory retrieval based on semantic similarity
-- **Related Memory**: Retrieve associated memories through graph relationships
-- **Memory Management**: Basic memory operations (store, search, get, delete)
-- **Domain Organization**: Organize memories by domains (user, project, global, session)
-- **Vector Similarity**: Efficient similarity search using embeddings
+## ✨ Key Features
 
-## MCP Tools (FastMCP 2.0)
+### 🧠 **Intelligent Memory Operations**
+- **Semantic Search**: Find relevant memories using natural language queries
+- **Association Discovery**: Automatically discover connections between concepts
+- **Complete CRUD**: Create, Read, Update, Delete with full lifecycle management
+- **Smart Organization**: Hierarchical scopes with auto-categorization
 
-The server provides **5 core tools** using FastMCP 2.0 best practices:
+### 🔍 **Advanced Discovery**
+- **Top-K Search**: Optimized threshold (0.1) with LLM-guided relevance judgment
+- **Cross-Scope Associations**: Find connections across different knowledge domains
+- **Similarity Scoring**: Transparent relevance metrics for intelligent filtering
+- **Creative Connections**: Discover unexpected relationships for innovation
 
-1. **`memory_store`** - Store new memory with content, domain, and metadata
-2. **`memory_search`** - Search memories using semantic similarity
-3. **`memory_get`** - Retrieve specific memory by ID
-4. **`memory_delete`** - Delete memory by ID
-5. **`memory_list_all`** - List all stored memories
+### 🗂️ **Powerful Organization**
+- **Hierarchical Scopes**: `work/projects/name`, `learning/technology`, `personal/ideas`
+- **Flexible Categorization**: Tags, metadata, and automatic scope suggestions
+- **Session Management**: Temporary workspaces for project isolation
+- **Memory Movement**: Reorganize knowledge as understanding evolves
 
-## MCP Resources
+### 🔄 **Cross-Environment Sync**
+- **Export/Import**: Backup and restore memories across development environments
+- **Multiple Formats**: JSON, YAML with compression support
+- **Merge Strategies**: Handle duplicates intelligently during sync
+- **Git Workflow**: Integrate memory backup into version control processes
 
-- **`memory_stats`** - Memory statistics and domain information
-- **`domain_memories/{domain}`** - Memories for specific domain
+### 🛠️ **Developer Experience**
+- **GitHub Copilot Integration**: Natural language memory operations
+- **VS Code Tasks**: One-click server management and maintenance
+- **Real-time Association**: Automatic relationship discovery during storage
+- **Performance Optimized**: Sub-second search across thousands of memories
 
-## MCP Prompts
+## 🎯 Complete MCP Tool Suite
 
-- **`analyze_memories`** - Analyze memory patterns for a domain
-- **`summarize_memory`** - Generate summary for a specific memory
+### Core Memory Operations
+- **`memory_store`** - Store insights with automatic association discovery
+- **`memory_search`** - Semantic search with configurable similarity thresholds
+- **`memory_get`** - Retrieve detailed memory information with associations
+- **`memory_update`** - Modify content, scope, tags, and metadata
+- **`memory_delete`** - Clean removal with association cleanup
 
-## Unsupported Features
+### Discovery and Analysis
+- **`memory_discover_associations`** - Find semantically related memories
+- **`memory_list_all`** - Browse complete memory collection with pagination
 
-For features removed during FastMCP migration, see [FASTMCP_UNSUPPORTED_FEATURES.md](FASTMCP_UNSUPPORTED_FEATURES.md).
+### Organization Management  
+- **`scope_list`** - Browse hierarchical memory organization
+- **`scope_suggest`** - AI-powered scope recommendations
+- **`memory_move`** - Reorganize memories into better categories
+
+### Sync and Backup
+- **`memory_export`** - Export memories for backup or cross-environment sync
+- **`memory_import`** - Import memories with flexible merge strategies
+
+### Session Management
+- **`session_manage`** - Create, list, and cleanup temporary working sessions
+
+## 📚 Comprehensive Documentation
+
+### 🚀 **[Quick Start Guide](docs/user-guide/QUICK_START.md)**
+Get up and running in 5 minutes with essential commands and patterns.
+
+### 💡 **[Best Practices](docs/user-guide/BEST_PRACTICES.md)**  
+Comprehensive guide to optimizing your associative memory workflow.
+
+### 🔧 **[API Reference](docs/api-reference/README.md)**
+Complete technical documentation for all MCP tools and parameters.
+
+### 🏢 **[Real-World Examples](docs/examples/README.md)**
+Practical usage patterns for developers, teams, and organizations.
+
+### 🆘 **[Troubleshooting Guide](docs/troubleshooting/README.md)**
+Solutions for common issues and system maintenance procedures.
+
+## 🚀 **[Complete Documentation →](docs/README.md)**
 
 ## Architecture
 
@@ -97,23 +147,24 @@ The server starts in STDIO mode by default for MCP client integration.
 
 ### Development Guidelines
 
-🤖 **AI Development Agent**: [AGENT.md](AGENT.md)  
+🤖 **AI Development Agent**: [development/workflow/AGENT.md](development/workflow/AGENT.md)  
 📋 **GitHub Copilot Rules**: [.github/copilot-instructions.md](.github/copilot-instructions.md)  
-⚡ **FastMCP Migration**: [FASTMCP_FINAL_REPORT.md](FASTMCP_FINAL_REPORT.md)
+🔄 **Development Workflow**: [development/workflow/DEVELOPER_GUIDELINES.md](development/workflow/DEVELOPER_GUIDELINES.md)
 
-### Documentation
+### Technical Reference
 
-- **[Unsupported Features](FASTMCP_UNSUPPORTED_FEATURES.md)** - Features not available in FastMCP
-- **[Migration Report](FASTMCP_MIGRATION_REPORT.md)** - FastMCP migration details
-- **[Specification](SPECIFICATION.md)** - API specifications and feature details
-- **[Architecture](ARCHITECTURE.md)** - System design and components
-- **[Project Structure](PROJECT_STRUCTURE.md)** - Directory structure and file organization
+- **[System Architecture](development/architecture/)** - Architecture and structure documentation
+- **[Technical Specifications](development/specifications/)** - API specs and feature details
+- **[Security & Configuration](development/security/)** - Authentication and transport configuration
+- **[Knowledge Base](development/knowledge/)** - Curated development knowledge
+- **[Complete Development Docs →](development/README.md)**
 
 ### Contributing
 
-1. Check [development guidelines](.github/copilot-instructions.md) before contributing
-2. Update relevant documentation when making changes
-3. Follow FastMCP 2.0 best practices for tool implementation
+1. Check [development guidelines](development/workflow/DEVELOPER_GUIDELINES.md) before contributing
+2. Review [architecture documentation](development/architecture/) for system understanding
+3. Follow [GitHub Copilot instructions](.github/copilot-instructions.md) for AI-assisted development
+4. Update relevant documentation when making changes
 
 ## License
 
