@@ -97,6 +97,46 @@ If code behavior seems unclear, prompt Copilot with:
 
 ---
 
+## ✅ Server Management Guidelines
+
+### 🖥️ Server Start/Stop Operations
+
+**Use these methods for server lifecycle management:**
+
+1. **Daemon Script (Recommended)**:
+   ```bash
+   # Start server
+   ./scripts/mcp_server_daemon.sh start
+   
+   # Stop server
+   ./scripts/mcp_server_daemon.sh stop
+   
+   # Restart server
+   ./scripts/mcp_server_daemon.sh restart
+   
+   # Check status
+   ./scripts/mcp_server_daemon.sh status
+   ```
+
+2. **VS Code Tasks**:
+   - Use VS Code's built-in task runner for development
+   - Access via Command Palette: "Tasks: Run Task"
+
+### 📝 Log Management
+
+- **Server logs**: `logs/mcp_server.log`
+- **Real-time monitoring**: `tail -f logs/mcp_server.log`
+- **Log rotation**: Handled automatically by the daemon script
+
+### ⚠️ Important Rules
+
+- **Never use `run_in_terminal` for server management** - always use daemon script or VS Code tasks
+- **Check server status** before making changes: `./scripts/mcp_server_daemon.sh status`
+- **Monitor logs** after changes to verify successful operation
+- **Use graceful restart** when updating configuration or code
+
+---
+
 ## 📋 Current Project Status & Next Steps
 
 **� Note**: Current project status and development tasks are now stored in the associative memory system. Use memory search to find current progress, completed tasks, and next priorities.

@@ -36,8 +36,6 @@ def get_server_config():
     return {
         "host": os.getenv("SERVER_HOST", "0.0.0.0"),
         "port": int(os.getenv("SERVER_PORT", "8000")),
-        "debug": os.getenv("DEBUG", "false").lower() == "true",
-        "reload": os.getenv("RELOAD", "false").lower() == "true",
         "workers": int(os.getenv("WORKERS", "0")) or None,
     }
 
@@ -63,14 +61,11 @@ def main():
     logs_dir.mkdir(parents=True, exist_ok=True)
     
     try:
-        # Start server
+        # Start server with HTTP transport
         mcp.run(
             transport="http",
             host=config["host"],
-            port=config["port"],
-            debug=config["debug"],
-            reload=config["reload"],
-            workers=config["workers"]
+            port=config["port"]
         )
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
