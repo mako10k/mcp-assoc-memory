@@ -1,5 +1,5 @@
 """
-ChromaDBベクトルストア実装
+ChromaDB Vector Store Implementation
 """
 
 import asyncio
@@ -23,7 +23,7 @@ logger = get_memory_logger(__name__)
 
 class ChromaVectorStore(BaseVectorStore):
     async def store_embedding(self, memory_id: str, embedding: Any, metadata: Dict[str, Any]) -> bool:
-        """埋め込みを保存 (memory_manager.py互換)"""
+        """Store embedding (memory_manager.py compatible)"""
         try:
             await self.store_vector(memory_id, embedding, metadata)
             return True

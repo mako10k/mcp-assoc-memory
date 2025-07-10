@@ -1,0 +1,195 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "MCP Server: Start",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/mcp_server_daemon.sh",
+            "args": ["start"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "MCP Server: Stop",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/mcp_server_daemon.sh",
+            "args": ["stop"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "MCP Server: Restart",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/mcp_server_daemon.sh",
+            "args": ["restart"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "MCP Server: Status",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/mcp_server_daemon.sh",
+            "args": ["status"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Lint: Run flake8",
+            "type": "shell",
+            "command": "flake8",
+            "args": [
+                "src/",
+                "--output-file=.copilot-temp/flake8-report.txt",
+                "--format=%(path)s:%(row)d:%(col)d: %(code)s %(text)s",
+                "--max-line-length=120",
+                "--extend-ignore=E203,W503"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": {
+                "owner": "python",
+                "fileLocation": "relative",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(\\w\\d+)\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "code": 4,
+                    "message": 5
+                }
+            }
+        },
+        {
+            "label": "Lint: Run mypy",
+            "type": "shell",
+            "command": "mypy",
+            "args": [
+                "src/mcp_assoc_memory/",
+                "--output=.copilot-temp/mypy-report.txt",
+                "--ignore-missing-imports",
+                "--show-error-codes",
+                "--pretty"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": {
+                "owner": "mypy",
+                "fileLocation": "relative",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(error|warning|note):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            }
+        },
+        {
+            "label": "Format: Run black",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "-c",
+                "black src/ --line-length=120 --diff > .copilot-temp/black-diff.txt 2>&1 && black src/ --line-length=120 && echo 'Black formatting completed. Diff saved to .copilot-temp/black-diff.txt'"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Format: Run isort",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "-c",
+                "isort src/ --diff > .copilot-temp/isort-diff.txt 2>&1 && isort src/ && echo 'Import sorting completed. Diff saved to .copilot-temp/isort-diff.txt'"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Code Quality: Run All",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Lint: Run flake8",
+                "Lint: Run mypy",
+                "Format: Run black",
+                "Format: Run isort"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        }
+    ]
+}

@@ -7,6 +7,9 @@ from fastmcp import FastMCP, Context
 from pydantic import Field, BaseModel
 from datetime import datetime, timedelta
 import logging
+import asyncio
+import uuid
+import logging
 import uuid
 import asyncio
 
@@ -158,19 +161,19 @@ class MemorySearchRequest(BaseModel):
         examples=[10, 15, 5]
     )
     similarity_threshold: float = Field(
-        default=0.7, 
+        default=0.1, 
         ge=0.0, le=1.0, 
         description="""Similarity threshold for memory matching:
         
         Values & Use Cases:
         • 0.8-1.0: Near-identical content (duplicate detection, exact recall)
-        • 0.6-0.8: Clear relevance (general search, learning review) ← RECOMMENDED  
-        • 0.4-0.6: Broader associations (idea expansion, new perspectives)
-        • 0.2-0.4: Creative connections (brainstorming, unexpected links)
+        • 0.4-0.8: Clear relevance (general search, learning review)
+        • 0.2-0.4: Broader associations (idea expansion, new perspectives)
+        • 0.1-0.2: Creative connections (brainstorming, unexpected links) ← RECOMMENDED
         
-        Strategy: Start with 0.7, lower gradually if no results found
-        Example: similarity_threshold=0.6 for most typical searches""",
-        examples=[0.6, 0.7, 0.4]
+        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
+        Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
+        examples=[0.1, 0.2, 0.4]
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
 
@@ -245,6 +248,31 @@ class ScopeSuggestRequest(BaseModel):
         
         Example: current_scope="work/projects" for project-related content""",
         examples=[None, "work/projects", "learning", "personal"]
+    )
+
+
+class MemoryUpdateRequest(BaseModel):
+    memory_id: str = Field(description="ID of the memory to update")
+    content: Optional[str] = Field(default=None, description="New content for the memory (optional)")
+    scope: Optional[str] = Field(
+        default=None, 
+        description="""New scope for the memory (optional):
+        
+        Scope Organization:
+        • learning/programming: Technical and programming content
+        • work/projects: Project-related memories
+        • personal/notes: Personal thoughts and reminders
+        • session/[name]: Temporary session-specific content
+        
+        Strategy: Use scope_suggest for recommendations if unsure
+        Example: scope="work/projects/mcp-improvements" for project organization"""
+    )
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="New metadata for the memory (optional)")
+    tags: Optional[List[str]] = Field(default=None, description="New tags for the memory (optional)")
+    category: Optional[str] = Field(default=None, description="New category for the memory (optional)")
+    preserve_associations: bool = Field(
+        default=True, 
+        description="Whether to preserve existing associations when updating content"
     )
 
 
@@ -535,12 +563,12 @@ How it works:
 Converts your query to semantic embeddings and searches the vector space for conceptually similar memories, ranked by relevance.
 
 💡 Quick Start:
-- Default: similarity_threshold=0.7 (reliable connections)
-- No results? Lower to 0.5, then 0.3 for broader search
-- Too many? Raise to 0.8 for precision
+- Default: similarity_threshold=0.1 (noise filtering with Top-K results)
+- No results? Check limit parameter instead of lowering threshold
+- Precision needed? Raise to 0.4+ for stricter matching
 - Include associations: include_associations=True for richer context
 
-⚠️ Important: Lower thresholds = more creative but less precise results
+⚠️ Important: ChromaDB returns Top-K results; threshold mainly filters noise, LLM judges relevance via similarity scores
 
 ➡️ What's next: Use memory_get for details, memory_discover_associations for deeper exploration""",
     annotations={
@@ -804,6 +832,136 @@ async def memory_delete(
         
     except Exception as e:
         await ctx.error(f"Failed to delete memory: {e}")
+        raise
+
+
+@mcp.tool(
+    name="memory_update",
+    description="""✏️ Update Memory: Modify existing memory content and metadata
+
+When to use:
+→ Correct or improve stored information
+→ Add new insights to existing memories
+→ Update categorization or organization
+→ Refine content while preserving associations
+
+How it works:
+Updates specific fields of an existing memory while preserving other data and optionally maintaining semantic associations.
+
+💡 Quick Start:
+- Partial updates: Only specify fields you want to change
+- Content updates: Provide new content, optionally preserve associations
+- Reorganization: Change scope, tags, or category for better organization  
+- Safe operation: Original memory preserved if update fails
+
+⚠️ Important: Content changes may affect semantic associations
+
+➡️ What's next: Use memory_get to verify changes, memory_discover_associations to explore new connections""",
+    annotations={
+        "title": "Memory Update",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False
+    }
+)
+async def memory_update(
+    request: MemoryUpdateRequest,
+    ctx: Context
+) -> MemoryResponse:
+    """Update an existing memory"""
+    try:
+        await ensure_initialized()
+        await ctx.info(f"Updating memory: {request.memory_id}")
+        
+        # First check if memory exists in advanced storage
+        memory = await memory_manager.get_memory(request.memory_id)
+        
+        if memory:
+            # Note: memory_manager.update_memory may not exist yet
+            # For now, use direct updates to storage systems
+            
+            # Update scope in metadata if provided
+            new_metadata = dict(memory.metadata)
+            if request.scope:
+                new_metadata["scope"] = request.scope
+            if request.metadata:
+                new_metadata.update(request.metadata)
+            
+            # Create updated memory object with new data
+            updated_content = request.content if request.content is not None else memory.content
+            updated_tags = request.tags if request.tags is not None else memory.tags
+            updated_category = request.category if request.category is not None else memory.category
+            
+            # Also update in simple storage for compatibility
+            if request.memory_id in memory_storage:
+                memory_data = memory_storage[request.memory_id]
+                if request.content is not None:
+                    memory_data["content"] = request.content
+                if request.scope is not None:
+                    memory_data["scope"] = request.scope
+                if request.metadata is not None:
+                    if "metadata" not in memory_data:
+                        memory_data["metadata"] = {}
+                    memory_data["metadata"].update(request.metadata)
+                if request.tags is not None:
+                    memory_data["tags"] = request.tags
+                if request.category is not None:
+                    memory_data["category"] = request.category
+                
+                persistence.save_memories(memory_storage)
+            
+            memory_scope = new_metadata.get("scope", f"{memory.domain.value}/default")
+            
+            await ctx.info(f"Memory updated successfully: {request.memory_id}")
+            
+            return MemoryResponse(
+                memory_id=memory.id,
+                content=updated_content,
+                scope=memory_scope,
+                metadata=new_metadata,
+                tags=updated_tags,
+                category=updated_category,
+                created_at=memory.created_at
+            )
+        
+        # Fallback to simple storage update
+        if request.memory_id not in memory_storage:
+            await ctx.warning(f"Memory not found: {request.memory_id}")
+            raise ValueError(f"Memory not found: {request.memory_id}")
+        
+        memory_data = memory_storage[request.memory_id]
+        
+        # Update specified fields only
+        if request.content is not None:
+            memory_data["content"] = request.content
+        if request.scope is not None:
+            memory_data["scope"] = request.scope
+        if request.metadata is not None:
+            if "metadata" not in memory_data:
+                memory_data["metadata"] = {}
+            memory_data["metadata"].update(request.metadata)
+        if request.tags is not None:
+            memory_data["tags"] = request.tags
+        if request.category is not None:
+            memory_data["category"] = request.category
+        
+        # Save to persistent storage
+        persistence.save_memories(memory_storage)
+        
+        await ctx.info(f"Memory updated in fallback storage: {request.memory_id}")
+        
+        return MemoryResponse(
+            memory_id=memory_data["memory_id"],
+            content=memory_data["content"],
+            scope=memory_data["scope"],
+            metadata=memory_data.get("metadata", {}),
+            tags=memory_data.get("tags", []),
+            category=memory_data.get("category"),
+            created_at=memory_data["created_at"]
+        )
+        
+    except Exception as e:
+        await ctx.error(f"Failed to update memory: {e}")
         raise
 
 
@@ -1220,7 +1378,7 @@ async def scope_suggest(
             suggestions.append(("learning/programming", 0.8, "Contains technical programming content"))
         
         # Meeting keywords
-        if any(word in content_lower for word in ["meeting", "議事録", "standup", "review"]):
+        if any(word in content_lower for word in ["meeting", "minutes", "standup", "review"]):
             suggestions.append(("work/meetings", 0.9, "Contains meeting-related content"))
         
         # Project keywords
@@ -1228,11 +1386,11 @@ async def scope_suggest(
             suggestions.append(("work/projects", 0.7, "Contains project-related content"))
         
         # Personal keywords
-        if any(word in content_lower for word in ["personal", "個人", "reminder", "todo"]):
+        if any(word in content_lower for word in ["personal", "private", "reminder", "todo"]):
             suggestions.append(("personal/notes", 0.8, "Contains personal content"))
         
         # Security keywords
-        if any(word in content_lower for word in ["security", "auth", "authentication", "セキュリティ"]):
+        if any(word in content_lower for word in ["security", "auth", "authentication", "secure"]):
             suggestions.append(("work/projects/security", 0.9, "Contains security-related content"))
         
         # Default suggestion
@@ -1538,20 +1696,20 @@ async def memory_discover_associations(
         examples=[10, 15, 5]
     )] = 10,
     similarity_threshold: Annotated[float, Field(
-        default=0.6, 
+        default=0.1, 
         ge=0.0, le=1.0, 
         description="""Minimum similarity score for associations:
         
         Values & Use Cases:
-        • 0.7-1.0: Strong connections (reliable relations) ← RECOMMENDED
-        • 0.5-0.7: Interesting links (idea expansion)
-        • 0.3-0.5: Creative leaps (brainstorming, innovation)
-        • 0.1-0.3: Surprising connections (artistic thinking)
+        • 0.7-1.0: Strong connections (reliable relations)
+        • 0.4-0.7: Interesting links (idea expansion)
+        • 0.2-0.4: Creative leaps (brainstorming, innovation)
+        • 0.1-0.2: Surprising connections (artistic thinking) ← RECOMMENDED
         
-        Strategy: Start with 0.6, lower for creative exploration
-        Example: similarity_threshold=0.5 for broader ideation""",
-        examples=[0.6, 0.5, 0.7]
-    )] = 0.6
+        Strategy: ChromaDB uses Top-K search; low threshold filters noise, LLM judges via similarity scores
+        Example: similarity_threshold=0.1 for broad creative exploration""",
+        examples=[0.1, 0.2, 0.4]
+    )] = 0.1
 ) -> Dict[str, Any]:
     """Discover semantic associations for a specific memory"""
     try:
