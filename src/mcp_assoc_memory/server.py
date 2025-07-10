@@ -72,13 +72,43 @@ async def ensure_initialized():
 # Pydantic model definitions
 class MemoryStoreRequest(BaseModel):
     content: str = Field(description="Memory content to store")
-    scope: str = Field(default="user/default", description="Memory scope (hierarchical path)")
+    scope: str = Field(
+        default="user/default", 
+        description="""Memory scope for hierarchical organization:
+        
+        Values & Use Cases:
+        • learning/[topic]/[subtopic]: Academic and skill development
+          Example: learning/programming/python, learning/ml/transformers
+        • work/[project]/[category]: Professional and project content  
+          Example: work/webapp/backend, work/client-meetings/feedback
+        • personal/[category]: Private thoughts and ideas
+          Example: personal/ideas, personal/reflections, personal/goals
+        • session/[identifier]: Temporary session-based memories
+          Example: session/2025-07-10, session/current-project
+        
+        Strategy: Use scope_suggest for automatic categorization
+        Example: scope="learning/mcp/implementation" for this context""",
+        examples=["learning/programming/python", "work/project/backend", "personal/ideas"]
+    )
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
     tags: Optional[List[str]] = Field(default=None, description="Memory tags")
     category: Optional[str] = Field(default=None, description="Memory category")
     auto_associate: bool = Field(default=True, description="Enable automatic association discovery")
     allow_duplicates: bool = Field(default=False, description="Allow storing duplicate content")
-    similarity_threshold: float = Field(default=0.95, ge=0.0, le=1.0, description="Duplicate detection threshold")
+    similarity_threshold: float = Field(
+        default=0.95, 
+        ge=0.0, le=1.0, 
+        description="""Duplicate detection threshold:
+        
+        Values & Use Cases:
+        • 0.95-1.0: Prevent only near-identical content ← RECOMMENDED
+        • 0.85-0.95: Block similar variations (stricter)
+        • 0.70-0.85: Aggressive duplicate prevention
+        
+        Strategy: Keep high (0.95) unless you need strict deduplication
+        Example: similarity_threshold=0.95 for most cases""",
+        examples=[0.95, 0.90, 0.85]
+    )
 
 
 class MemoryResponse(BaseModel):
@@ -97,10 +127,51 @@ class MemoryResponse(BaseModel):
 
 class MemorySearchRequest(BaseModel):
     query: str = Field(description="Search query")
-    scope: Optional[str] = Field(default=None, description="Target scope for search (supports hierarchy)")
+    scope: Optional[str] = Field(
+        default=None, 
+        description="""Target scope for search (supports hierarchy):
+        
+        Examples:
+        • learning/programming: Find programming-related memories
+        • work/current-project: Search current project context
+        • personal: Browse personal thoughts and ideas
+        • None: Search across all scopes
+        
+        Strategy: Start broad, narrow down if too many results""",
+        examples=["learning/programming", "work/project", None]
+    )
     include_child_scopes: bool = Field(default=False, description="Include child scopes in search")
-    limit: int = Field(default=10, ge=1, le=100, description="Maximum number of results")
-    similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="Minimum similarity score")
+    limit: int = Field(
+        default=10, 
+        ge=1, le=100, 
+        description="""Maximum number of memories to retrieve:
+        
+        Values & Use Cases:
+        • 5-10: Focused search (finding specific information) ← RECOMMENDED
+        • 10-20: Balanced exploration (general ideation, learning review)
+        • 20-50: Comprehensive discovery (brainstorming, research phase)
+        
+        Strategy: Start small (10), increase if you need broader context
+        Example: limit=15 for creative thinking sessions
+        
+        ⚠️ Performance: Higher values increase processing time""",
+        examples=[10, 15, 5]
+    )
+    similarity_threshold: float = Field(
+        default=0.7, 
+        ge=0.0, le=1.0, 
+        description="""Similarity threshold for memory matching:
+        
+        Values & Use Cases:
+        • 0.8-1.0: Near-identical content (duplicate detection, exact recall)
+        • 0.6-0.8: Clear relevance (general search, learning review) ← RECOMMENDED  
+        • 0.4-0.6: Broader associations (idea expansion, new perspectives)
+        • 0.2-0.4: Creative connections (brainstorming, unexpected links)
+        
+        Strategy: Start with 0.7, lower gradually if no results found
+        Example: similarity_threshold=0.6 for most typical searches""",
+        examples=[0.6, 0.7, 0.4]
+    )
     include_associations: bool = Field(default=True, description="Include related memories in results")
 
 
@@ -185,9 +256,27 @@ class SessionManageResponse(BaseModel):
 # Memory management tools
 @mcp.tool(
     name="memory_store",
-    description="Store a new memory with automatic association discovery",
+    description="""💾 Store New Memory: Solve "I want to remember this for later"
+
+When to use:
+→ Important insights you don't want to lose
+→ Learning content that should connect with existing knowledge
+→ Reference information for future projects
+
+How it works:
+Stores your content as a searchable memory, automatically discovers connections to existing memories, and integrates into your knowledge network.
+
+💡 Quick Start:
+- Auto-categorize: Let scope_suggest recommend the best scope
+- Prevent duplicates: allow_duplicates=False (default) saves space
+- Enable connections: auto_associate=True (default) builds knowledge links
+- Quality control: similarity_threshold=0.95 prevents near-duplicates
+
+⚠️ Important: Duplicate detection may block intentionally similar content
+
+➡️ What's next: Use memory_discover_associations to explore new connections""",
     annotations={
-        "title": "Store Memory",
+        "title": "記憶保存と自動連想",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False
@@ -286,9 +375,27 @@ async def memory_store(
 
 @mcp.tool(
     name="memory_search",
-    description="Search memories using semantic similarity and associations",
+    description="""🔍 Semantic Memory Search: Find related memories using natural language
+
+When to use:
+→ "What did I learn about [topic]?"
+→ "Find memories related to [concept]"  
+→ "Show me similar ideas to [content]"
+
+How it works:
+Converts your query to semantic embeddings and searches the vector space for conceptually similar memories, ranked by relevance.
+
+💡 Quick Start:
+- Default: similarity_threshold=0.7 (reliable connections)
+- No results? Lower to 0.5, then 0.3 for broader search
+- Too many? Raise to 0.8 for precision
+- Include associations: include_associations=True for richer context
+
+⚠️ Important: Lower thresholds = more creative but less precise results
+
+➡️ What's next: Use memory_get for details, memory_discover_associations for deeper exploration""",
     annotations={
-        "title": "Search Memories",
+        "title": "意味的記憶検索",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -1082,9 +1189,27 @@ async def session_manage(
 # Associative memory discovery tool
 @mcp.tool(
     name="memory_discover_associations",
-    description="Discover and analyze associations between memories",
+    description="""🧩 Discover Memory Associations: "What else is related to this idea?"
+
+When to use:
+→ After finding a relevant memory (follow-up exploration)
+→ Before making decisions (gather related context)
+→ During creative thinking (find unexpected connections)
+
+How it works:
+Takes a specific memory as starting point and finds semantically related memories using advanced similarity matching and diversity filtering.
+
+💡 Quick Start:
+- Reliable connections: similarity_threshold=0.7, limit=10
+- Idea expansion: threshold=0.5, limit=15 (broader exploration)
+- Creative brainstorming: threshold=0.3, limit=20+ (surprising links)
+- Quality results: System automatically filters duplicates for diversity
+
+⚠️ Important: Lower thresholds may include tangentially related content
+
+➡️ What's next: Use memory_get for details, memory_store for new insights""",
     annotations={
-        "title": "Discover Memory Associations",
+        "title": "記憶連想発見",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -1093,8 +1218,35 @@ async def session_manage(
 async def memory_discover_associations(
     memory_id: Annotated[str, Field(description="Memory ID to find associations for")],
     ctx: Context,
-    limit: Annotated[int, Field(default=10, ge=1, le=50, description="Maximum number of associations")] = 10,
-    similarity_threshold: Annotated[float, Field(default=0.6, ge=0.0, le=1.0, description="Minimum similarity score")] = 0.6
+    limit: Annotated[int, Field(
+        default=10, 
+        ge=1, le=50, 
+        description="""Maximum number of associations to discover:
+        
+        Values & Use Cases:
+        • 5-10: Quick overview (essential connections) ← RECOMMENDED
+        • 10-20: Thorough exploration (comprehensive context)
+        • 20-50: Deep discovery (research, creative sessions)
+        
+        Strategy: Start with 10, increase for broader exploration
+        Example: limit=15 for creative brainstorming""",
+        examples=[10, 15, 5]
+    )] = 10,
+    similarity_threshold: Annotated[float, Field(
+        default=0.6, 
+        ge=0.0, le=1.0, 
+        description="""Minimum similarity score for associations:
+        
+        Values & Use Cases:
+        • 0.7-1.0: Strong connections (reliable relations) ← RECOMMENDED
+        • 0.5-0.7: Interesting links (idea expansion)
+        • 0.3-0.5: Creative leaps (brainstorming, innovation)
+        • 0.1-0.3: Surprising connections (artistic thinking)
+        
+        Strategy: Start with 0.6, lower for creative exploration
+        Example: similarity_threshold=0.5 for broader ideation""",
+        examples=[0.6, 0.5, 0.7]
+    )] = 0.6
 ) -> Dict[str, Any]:
     """Discover semantic associations for a specific memory"""
     try:
