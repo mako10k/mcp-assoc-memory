@@ -1,6 +1,6 @@
 """
-設定管理モジュール
-環境変数とデフォルト値を管理
+Configuration management module
+Manages environment variables and default values
 """
 
 import json
@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DatabaseConfig:
-    """データベース設定"""
+    """Database configuration"""
     type: str = "sqlite"  # sqlite, postgresql
-    path: str = "data/memory.db"  # SQLiteの場合
-    host: str = "localhost"  # PostgreSQLの場合
+    path: str = "data/memory.db"  # For SQLite
+    host: str = "localhost"  # For PostgreSQL
     port: int = 5432
     database: str = "mcp_memory"
     username: str = ""
@@ -28,7 +28,7 @@ class DatabaseConfig:
 
 @dataclass
 class EmbeddingConfig:
-    """埋め込み設定"""
+    """Embedding configuration"""
     provider: str = "openai"  # openai, sentence_transformers, local
     model: str = "text-embedding-3-small"
     api_key: str = ""
@@ -38,7 +38,7 @@ class EmbeddingConfig:
 
 @dataclass
 class StorageConfig:
-    """ストレージ設定"""
+    """Storage configuration"""
     data_dir: str = "data"
     vector_store_type: str = "chromadb"  # chromadb, faiss, local
     graph_store_type: str = "networkx"  # networkx, neo4j
@@ -48,7 +48,7 @@ class StorageConfig:
 
 @dataclass
 class SecurityConfig:
-    """セキュリティ設定"""
+    """Security configuration"""
     auth_enabled: bool = False
     api_key_required: bool = False
     jwt_secret: str = ""
@@ -58,7 +58,7 @@ class SecurityConfig:
 
 @dataclass
 class TransportConfig:
-    """トランスポート設定"""
+    """Transport configuration"""
     stdio_enabled: bool = True
     http_enabled: bool = True
     sse_enabled: bool = True
@@ -71,7 +71,7 @@ class TransportConfig:
 
 @dataclass
 class Config:
-    """メイン設定クラス"""
+    """Main configuration class"""
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
@@ -88,25 +88,25 @@ class Config:
         cli_args: Optional[dict] = None
     ) -> "Config":
         """
-        設定を読み込み（CLI > 環境変数 > config.json > デフォルト）
-        仕様:
-          1. CLI引数で--config指定があればそのパスを優先
-          2. 指定がなければ ./config.json を自動探索
-          3. なければ環境変数/デフォルト
+        Load configuration (CLI > environment variables > config.json > defaults)
+        Specification:
+          1. If CLI args specify --config, prioritize that path
+          2. If not specified, auto-discover ./config.json
+          3. If not found, use environment variables/defaults
         """
         config = cls()
 
-        # 環境変数から設定を読み込み
+        # Load from environment variables
         config._load_from_env()
 
-        # 設定ファイルパス決定
+        # Determine config file path
         config_file = None
         if config_path:
-            # CLIで明示指定
+            # Explicitly specified by CLI
             if Path(config_path).exists():
                 config_file = config_path
         else:
-            # カレントディレクトリと親ディレクトリのconfig.jsonを自動探索
+            # Auto-discover config.json in current and parent directories
             default_path = Path.cwd() / "config.json"
             parent_path = Path.cwd().parent / "config.json"
             if default_path.exists():
@@ -118,9 +118,9 @@ class Config:
         if config_file:
             config._load_from_file(config_file)
 
-        # CLI引数で上書き
+        # Override with CLI arguments
         if cli_args:
-            # transport, port, host, log_level などを反映
+            # Reflect transport, port, host, log_level, etc.
             if "log_level" in cli_args and cli_args["log_level"]:
                 config.log_level = cli_args["log_level"]
             if "host" in cli_args and cli_args["host"]:
@@ -128,20 +128,20 @@ class Config:
             if "port" in cli_args and cli_args["port"]:
                 config.transport.http_port = cli_args["port"]
             if "transport" in cli_args and cli_args["transport"]:
-                # 有効なトランスポートのみTrueに
+                # Only enable valid transports to True
                 t = cli_args["transport"]
                 config.transport.stdio_enabled = t == "stdio"
                 config.transport.http_enabled = t == "http"
                 config.transport.sse_enabled = t == "sse"
 
-        # バリデーション
+        # Validation
         config._validate()
 
         return config
 
     def _load_from_env(self):
-        """環境変数から設定を読み込み"""
-        # データベース設定
+        """Load configuration from environment variables"""
+        # Database configuration
         self.database.type = os.getenv("DB_TYPE", self.database.type)
         self.database.path = os.getenv("DB_PATH", self.database.path)
         self.database.host = os.getenv("DB_HOST", self.database.host)
@@ -151,7 +151,7 @@ class Config:
         self.database.password = os.getenv(
             "DB_PASSWORD", self.database.password)
 
-        # 埋め込み設定
+        # Embedding configuration
         self.embedding.provider = os.getenv(
             "EMBEDDING_PROVIDER", self.embedding.provider)
         self.embedding.model = os.getenv(
@@ -159,10 +159,10 @@ class Config:
         self.embedding.api_key = os.getenv(
             "OPENAI_API_KEY", self.embedding.api_key)
 
-        # ストレージ設定
+        # Storage configuration
         self.storage.data_dir = os.getenv("DATA_DIR", self.storage.data_dir)
 
-        # セキュリティ設定
+        # Security configuration
         self.security.auth_enabled = os.getenv(
             "AUTH_ENABLED", "false").lower() == "true"
         self.security.api_key_required = os.getenv(
@@ -170,7 +170,7 @@ class Config:
         self.security.jwt_secret = os.getenv(
             "JWT_SECRET", self.security.jwt_secret)
 
-        # トランスポート設定
+        # Transport configuration
         self.transport.http_host = os.getenv(
             "HTTP_HOST", self.transport.http_host)
         self.transport.http_port = int(
@@ -184,30 +184,30 @@ class Config:
                 "SSE_PORT", str(
                     self.transport.sse_port)))
 
-        # その他
+        # Other settings
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
         self.debug_mode = os.getenv("DEBUG", "false").lower() == "true"
 
     def _load_from_file(self, config_path: str):
-        """設定ファイルから読み込み"""
+        """Load configuration from file"""
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
 
             print(f"[DEBUG] config.json loaded: {config_data}")
-            # 設定をマージ（ファイルが優先）
+            # Merge configuration (file takes priority)
             self._merge_config(config_data)
             print(f"[DEBUG] after merge: http_host={self.transport.http_host}, http_port={self.transport.http_port}, http_enabled={getattr(self.transport, 'http_enabled', None)}")
 
         except Exception as e:
-            logger.warning(f"設定ファイルの読み込みに失敗: {e}")
+            logger.warning(f"Failed to load configuration file: {e}")
 
     def _merge_config(self, config_data: Dict[str, Any]):
-        """設定データをマージ（transportはdataclass再生成で厳密に反映）"""
+        """Merge configuration data (transport uses dataclass regeneration for strict reflection)"""
         print(f"[DEBUG] _merge_config input: {config_data}")
         for section, values in config_data.items():
             if section == "transport" and isinstance(values, dict):
-                # TransportConfigのみdict→dataclass再生成
+                # TransportConfig only: dict → dataclass regeneration
                 self.transport = TransportConfig(**values)
                 print(f"[DEBUG] after TransportConfig dataclass: {self.transport}")
             elif hasattr(self, section) and isinstance(values, dict):
@@ -217,19 +217,19 @@ class Config:
                         setattr(section_obj, key, value)
 
     def _validate(self):
-        """設定値のバリデーション"""
-        # データディレクトリの作成
+        """Validate configuration values"""
+        # Create data directory
         Path(self.storage.data_dir).mkdir(parents=True, exist_ok=True)
 
-        # 必須設定のチェック
+        # Check required settings
         if self.embedding.provider == "openai" and not self.embedding.api_key:
-            logger.warning("OpenAI API keyが設定されていません")
+            logger.warning("OpenAI API key is not configured")
 
         if self.security.auth_enabled and not self.security.jwt_secret:
-            raise ValueError("認証が有効ですがJWT secretが設定されていません")
+            raise ValueError("Authentication is enabled but JWT secret is not configured")
 
     def to_dict(self) -> Dict[str, Any]:
-        """設定を辞書形式で取得"""
+        """Get configuration in dictionary format"""
         return {
             "database": self.database.__dict__,
             "embedding": self.embedding.__dict__,
@@ -241,12 +241,12 @@ class Config:
         }
 
 
-# グローバル設定インスタンス
+# Global configuration instance
 _global_config = None
 
 
 def get_config() -> Dict[str, Any]:
-    """グローバル設定を取得"""
+    """Get global configuration"""
     global _global_config
     if _global_config is None:
         _global_config = Config.load()
@@ -254,6 +254,6 @@ def get_config() -> Dict[str, Any]:
 
 
 def set_config(config: Config) -> None:
-    """グローバル設定を設定"""
+    """Set global configuration"""
     global _global_config
     _global_config = config

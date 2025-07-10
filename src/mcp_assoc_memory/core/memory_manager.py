@@ -1,6 +1,6 @@
 """
-コア記憶管理エンジン実装
-記憶の保存、検索、関連性管理の中核機能
+Core memory management engine implementation
+Core functionality for memory storage, search, and relationship management
 """
 
 import asyncio
@@ -21,9 +21,9 @@ logger = get_memory_logger(__name__)
 
 
 class MemoryManager:
-    # --- 可視化・統計・管理系メソッド ---
+    # --- Visualization, statistics, and management methods ---
     async def memory_map(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
-        """記憶マップ（可視化用データ）を取得"""
+        """Get memory map (visualization data)"""
         try:
             memories = await self.metadata_store.get_memories_by_domain(domain)
             nodes = [
@@ -38,20 +38,20 @@ class MemoryManager:
             edges = await self.graph_store.get_all_association_edges(domain)
             return {"nodes": nodes, "edges": edges}
         except Exception as e:
-            logger.error(f"memory_map生成エラー: {e}")
+            logger.error(f"memory_map generation error: {e}")
             return {"error": str(e)}
 
     async def domain_graph(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
-        """ドメイングラフ構造を取得"""
+        """Get domain graph structure"""
         try:
             graph = await self.graph_store.export_graph(domain)
             return graph
         except Exception as e:
-            logger.error(f"domain_graph生成エラー: {e}")
+            logger.error(f"domain_graph generation error: {e}")
             return {"error": str(e)}
 
     async def timeline(self, domain: Optional[MemoryDomain] = None, limit: int = 100) -> List[Dict[str, Any]]:
-        """記憶のタイムラインデータを取得"""
+        """Get memory timeline data"""
         try:
             memories = await self.metadata_store.get_memories_by_domain(domain, limit=limit, order_by="created_at DESC")
             return [
@@ -64,31 +64,31 @@ class MemoryManager:
                 for m in memories
             ]
         except Exception as e:
-            logger.error(f"timeline生成エラー: {e}")
+            logger.error(f"Timeline generation error: {e}")
             return []
 
     async def category_chart(self, domain: Optional[MemoryDomain] = None) -> Dict[str, int]:
-        """カテゴリ別件数チャートデータ"""
+        """Get category-wise count chart data"""
         try:
             stats = await self.metadata_store.get_memory_stats(domain)
             return stats.get("by_category", {})
         except Exception as e:
-            logger.error(f"category_chart生成エラー: {e}")
+            logger.error(f"Category chart generation error: {e}")
             return {}
 
     async def stats_dashboard(self) -> Dict[str, Any]:
-        """統計ダッシュボードデータ"""
+        """Get statistics dashboard data"""
         try:
             stats = await self.get_memory_stats()
             sys_stats = await self.get_statistics()
             return {"memory_stats": stats, "system_stats": sys_stats}
         except Exception as e:
-            logger.error(f"stats_dashboard生成エラー: {e}")
+            logger.error(f"Stats dashboard generation error: {e}")
             return {"error": str(e)}
 
-    # --- パフォーマンス・運用・拡張用メソッド ---
+    # --- Performance, operations, and extension methods ---
     async def get_performance_metrics(self) -> Dict[str, Any]:
-        """パフォーマンスメトリクス取得（Phase 4用）"""
+        """Get performance metrics (for Phase 4)"""
         try:
             import psutil
             mem = psutil.virtual_memory()
@@ -101,11 +101,11 @@ class MemoryManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
-            logger.error(f"パフォーマンスメトリクス取得エラー: {e}")
+            logger.error(f"Performance metrics acquisition error: {e}")
             return {"error": str(e)}
 
     async def move_memories_to_domain(self, source_domain: MemoryDomain, target_domain: MemoryDomain) -> int:
-        """記憶を別ドメインへ一括移動（運用/管理用）"""
+        """Bulk move memories to another domain (for operations/management)"""
         try:
             memories = await self.metadata_store.get_memories_by_domain(source_domain)
             moved = 0
@@ -116,14 +116,14 @@ class MemoryManager:
                 if success:
                     self.memory_cache.set(m.id, m)
                     moved += 1
-            logger.info(f"{moved}件を{str(source_domain)}→{str(target_domain)}へ移動")
+            logger.info(f"Moved {moved} items from {str(source_domain)} to {str(target_domain)}")
             return moved
         except Exception as e:
-            logger.error(f"ドメイン一括移動エラー: {e}")
+            logger.error(f"Domain bulk move error: {e}")
             return 0
 
     async def batch_update_memories(self, domain: MemoryDomain, update_fields: Dict[str, Any]) -> int:
-        """記憶を一括更新（管理・最適化用）"""
+        """Bulk update memories (for management and optimization)"""
         try:
             memories = await self.metadata_store.get_memories_by_domain(domain)
             updated = 0
@@ -136,19 +136,19 @@ class MemoryManager:
                 if success:
                     self.memory_cache.set(m.id, m)
                     updated += 1
-            logger.info(f"{updated}件を一括更新({str(domain)})")
+            logger.info(f"Bulk updated {updated} items ({str(domain)})")
             return updated
         except Exception as e:
-            logger.error(f"一括更新エラー: {e}")
+            logger.error(f"Bulk update error: {e}")
             return 0
 
-    # --- 今後の拡張・最適化用メソッドスタブ ---
-    # 例: async def reindex_all(self): ...
-    # 例: async def backup_database(self): ...
-    # 例: async def restore_database(self, backup_path: str): ...
-    # 例: async def detect_memory_leaks(self): ...
-    # 必要に応じて随時追加
-    """記憶管理エンジン"""
+    # --- Future extension and optimization method stubs ---
+    # Example: async def reindex_all(self): ...
+    # Example: async def backup_database(self): ...
+    # Example: async def restore_database(self, backup_path: str): ...
+    # Example: async def detect_memory_leaks(self): ...
+    # Add as needed
+    """Memory management engine"""
 
     def __init__(
         self,
@@ -166,15 +166,15 @@ class MemoryManager:
             similarity_calculator or SimilarityCalculator()
         )
 
-        # キャッシュ
+        # Cache
         self.memory_cache = LRUCache(max_size=1000)
         self.association_cache = LRUCache(max_size=500)
 
-        # 管理用ロック
+        # Management lock
         self.operation_lock = asyncio.Lock()
 
     async def initialize(self) -> None:
-        """システム初期化"""
+        """System initialization"""
         try:
             await asyncio.gather(
                 self.vector_store.initialize(),
@@ -193,7 +193,7 @@ class MemoryManager:
             raise
 
     async def close(self) -> None:
-        """システムクリーンアップ"""
+        """System cleanup"""
         try:
             await asyncio.gather(
                 self.vector_store.close(),
@@ -221,12 +221,12 @@ class MemoryManager:
         project_id: Optional[str] = None,
         session_id: Optional[str] = None,
         auto_associate: bool = True,
-        allow_duplicates: bool = False,  # 新しいパラメータ
-        similarity_threshold: float = 0.95  # 重複判定の閾値
+        allow_duplicates: bool = False,  # New parameter
+        similarity_threshold: float = 0.95  # Duplicate detection threshold
     ) -> Optional[Memory]:
-        """記憶を保存"""
+        """Store memory"""
         try:
-            # 重複チェック（allow_duplicatesがFalseの場合）
+            # Duplicate check (when allow_duplicates is False)
             if not allow_duplicates:
                 existing_memory = await self.check_content_duplicate(
                     content, 
@@ -243,7 +243,7 @@ class MemoryManager:
                     )
                     return existing_memory
             
-            # 記憶オブジェクト作成
+            # Create memory object
             memory = Memory(
                 domain=domain,
                 content=content,
@@ -255,7 +255,7 @@ class MemoryManager:
                 session_id=session_id
             )
 
-            # 埋め込みベクトル生成
+            # Generate embedding vector
             embedding = await self.embedding_service.get_embedding(content)
             if embedding is None:
                 logger.warning(
@@ -264,7 +264,7 @@ class MemoryManager:
                 )
 
             async with self.operation_lock:
-                # ベクトルストアに保存
+                # Store in vector store
                 if embedding is not None:
                     success = await self.vector_store.store_embedding(
                         memory.id,
@@ -277,7 +277,7 @@ class MemoryManager:
                             extra_data={"memory_id": memory.id}
                         )
 
-                # メタデータストアに保存
+                # Store in metadata store
                 metadata_id = await self.metadata_store.store_memory(memory)
                 if not metadata_id:
                     logger.error(
@@ -287,7 +287,7 @@ class MemoryManager:
                     )
                     return None
 
-                # グラフストアに記憶ノード追加
+                # Add memory node to graph store
                 graph_success = await self.graph_store.add_memory_node(memory)
                 if not graph_success:
                     logger.warning(
@@ -295,10 +295,10 @@ class MemoryManager:
                         extra_data={"memory_id": memory.id}
                     )
 
-                # キャッシュに保存
+                # Store in cache
                 self.memory_cache.set(memory.id, memory)
 
-                # 自動関連付け
+                # Auto-association
                 if auto_associate and embedding is not None:
                     await self._auto_associate_memory(memory, embedding)
 
@@ -335,23 +335,23 @@ class MemoryManager:
             return None
 
     async def get_memory(self, memory_id: str) -> Optional[Memory]:
-        """記憶を取得"""
+        """Get memory"""
         try:
-            # キャッシュから確認
+            # Check cache
             cached_memory = self.memory_cache.get(memory_id)
             if cached_memory:
-                # アクセス回数を更新
+                # Update access count
                 cached_memory.access_count += 1
                 cached_memory.accessed_at = datetime.utcnow()
                 return cached_memory
 
-            # メタデータストアから取得
+            # Get from metadata store
             memory = await self.metadata_store.get_memory(memory_id)
             if memory:
-                # キャッシュに保存
+                # Store in cache
                 self.memory_cache.set(memory_id, memory)
 
-                # アクセス統計を更新
+                # Update access statistics
                 await self.metadata_store.update_access_stats(
                     memory_id,
                     memory.access_count + 1
@@ -385,7 +385,7 @@ class MemoryManager:
         similarity_threshold: float = 0.7,
         min_score: Optional[float] = None
     ) -> List[Dict[str, Any]]:
-        """記憶を検索"""
+        """Search memories"""
         try:
             # domainsは必ずList[MemoryDomain] or Noneで来る前提
             if domains is not None:
@@ -394,13 +394,13 @@ class MemoryManager:
             if min_score is not None:
                 similarity_threshold = min_score
             logger.info(f"[DEBUG] search_memories called with similarity_threshold={similarity_threshold!r} (min_score={min_score!r})")
-            # クエリの埋め込みベクトル生成
+            # Generate query embedding vector
             query_embedding = await self.embedding_service.get_embedding(query)
             if query_embedding is None:
                 logger.warning("Failed to generate query embedding")
                 return []
 
-            # フィルタ条件構築
+            # Build filter conditions
             filters = {}
             if domains:
                 # ChromaDBのwhere句は単一値のみ許容
@@ -414,8 +414,8 @@ class MemoryManager:
             if tags:
                 filters["tags"] = tags
 
-            # ベクトル検索実行
-            # 1次元リスト化
+            # Execute vector search
+            # Convert to 1D list
             if hasattr(query_embedding, 'flatten'):
                 embedding_list = query_embedding.flatten().tolist()
             elif hasattr(query_embedding, 'tolist'):
@@ -425,7 +425,7 @@ class MemoryManager:
             # search_similar expects MemoryDomain, not str
             if "domain" in filters:
                 try:
-                    # domain_valueはstrを返すのでMemoryDomainに変換
+                    # domain_value returns str so convert to MemoryDomain
                     domain_for_search = MemoryDomain(str(filters["domain"]))
                 except Exception:
                     domain_for_search = MemoryDomain.USER
@@ -438,19 +438,19 @@ class MemoryManager:
                 limit=limit * 2,
                 filters=filters
             )
-            # DEBUG→INFO一時昇格（後で戻せるようコメントアウトしやすく）
+            # DEBUG→INFO temporary upgrade (can be easily commented out later)
             logger.info(
                 f"[DEBUG] vector_results: {[{'id': r.get('id'), 'memory_id': r.get('memory_id'), 'similarity': r.get('similarity')} for r in vector_results]}"
             )
 
-            # 類似度フィルタリング
+            # Filter by similarity
             filtered_results = []
             for result in vector_results:
                 logger.info(f"[DEBUG] result dump: {result!r}")
                 logger.info(f"[DEBUG] similarity={result.get('similarity')!r} threshold={similarity_threshold!r}")
                 if result["similarity"] >= similarity_threshold:
                     memory_id = result.get("id") or result.get("memory_id")
-                    # memory_idの値を必ずダンプ
+                    # Dump memory_id value
                     logger.info(f"[DEBUG] memory_id before check: {memory_id!r} type={type(memory_id)}")
                     if not memory_id:
                         logger.info(f"[DEBUG] Skipping result with no id: {result}")
@@ -466,7 +466,7 @@ class MemoryManager:
                         "score": result.get("score", result["similarity"])
                     })
 
-            # 結果を制限
+            # Limit results
             filtered_results = filtered_results[:limit]
 
             logger.info(
@@ -492,7 +492,7 @@ class MemoryManager:
             )
             return []
 
-    # --- グラフベースの get_related_memories は削除（find_similar_memories/semantic_searchで統一） ---
+    # --- Graph-based get_related_memories removed (unified with find_similar_memories/semantic_search) ---
 
     async def update_memory(
         self,
@@ -501,9 +501,9 @@ class MemoryManager:
         metadata: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None
     ) -> bool:
-        """記憶を更新"""
+        """Update memory"""
         try:
-            # 既存記憶を取得
+            # Get existing memory
             memory = await self.get_memory(memory_id)
             if not memory:
                 logger.warning(
@@ -512,13 +512,13 @@ class MemoryManager:
                 )
                 return False
 
-            # 更新内容を適用
+            # Apply updates
             updated = False
             if content is not None and content != memory.content:
                 memory.content = content
                 updated = True
 
-                # 新しい埋め込みベクトル生成
+                # Generate new embedding vector
                 embedding = await self.embedding_service.get_embedding(content)
                 if embedding is not None:
                     await self.vector_store.store_embedding(
@@ -539,7 +539,7 @@ class MemoryManager:
                 memory.updated_at = datetime.utcnow()
 
                 async with self.operation_lock:
-                    # メタデータストア更新
+                    # Update metadata store
                     success = await self.metadata_store.update_memory(memory)
                     if not success:
                         logger.error(
@@ -549,7 +549,7 @@ class MemoryManager:
                         )
                         return False
 
-                    # キャッシュ更新
+                    # Update cache
                     self.memory_cache.set(memory_id, memory)
 
                     logger.info(
@@ -569,10 +569,10 @@ class MemoryManager:
             return False
 
     async def delete_memory(self, memory_id: str) -> bool:
-        """記憶を削除"""
+        """Delete memory"""
         try:
             async with self.operation_lock:
-                # 関連するエッジを削除
+                # Delete related edges
                 associations = await self.metadata_store.get_memory_associations(
                     memory_id
                 )
@@ -580,14 +580,14 @@ class MemoryManager:
                     await self.graph_store.remove_association_edge(assoc.id)
                     await self.metadata_store.delete_association(assoc.id)
 
-                # ストレージから削除
+                # Delete from storage
                 await asyncio.gather(
                     self.vector_store.delete_embedding(memory_id),
                     self.metadata_store.delete_memory(memory_id),
                     self.graph_store.remove_memory_node(memory_id)
                 )
 
-                # キャッシュから削除
+                # Delete from cache
                 self.memory_cache.delete(memory_id)
 
                 logger.info(
@@ -611,9 +611,9 @@ class MemoryManager:
         memory: Memory,
         embedding: np.ndarray
     ) -> None:
-        """記憶の自動関連付け"""
+        """Auto-associate memory"""
         try:
-            # 類似記憶を検索
+            # Search for similar memories
             if hasattr(embedding, 'flatten'):
                 emb_list = embedding.flatten().tolist()
             elif hasattr(embedding, 'tolist'):
@@ -626,14 +626,14 @@ class MemoryManager:
                 limit=10
             )
 
-            # 関連性を作成
+            # Create relationships
             for result in similar_results:
-                # vector_store.search_similarの返り値は{"memory_id": ..., ...}
+                # vector_store.search_similar returns {"memory_id": ..., ...}
                 if result["memory_id"] == memory.id:
-                    continue  # 自己関連を除外
+                    continue  # Exclude self-reference
 
                 similarity_score = result["similarity"]
-                if similarity_score >= 0.7:  # 高い類似度のみ
+                if similarity_score >= 0.7:  # Only high similarity
                     association = Association(
                         source_memory_id=memory.id,
                         target_memory_id=result["memory_id"],
@@ -642,10 +642,10 @@ class MemoryManager:
                         auto_generated=True
                     )
 
-                    # 関連性を保存
+                    # Store relationship
                     await self._store_association(association)
 
-            # DEBUG→INFO一時昇格
+            # DEBUG→INFO temporary upgrade
             logger.info(
                 "Auto-association completed",
                 extra_data={
@@ -663,21 +663,21 @@ class MemoryManager:
             )
 
     async def _store_association(self, association: Association) -> bool:
-        """関連性を保存"""
+        """Store relationship"""
         try:
-            # メタデータストアに保存
+            # Store in metadata store
             assoc_id = await self.metadata_store.store_association(association)
             if not assoc_id:
                 return False
 
-            # グラフストアに保存
+            # Store in graph store
             success = await self.graph_store.add_association_edge(association)
             if not success:
-                # ロールバック
+                # Rollback
                 await self.metadata_store.delete_association(association.id)
                 return False
 
-            # キャッシュに保存
+            # Store in cache
             self.association_cache.set(association.id, association)
 
             return True
@@ -692,16 +692,16 @@ class MemoryManager:
             return False
 
     async def get_statistics(self) -> Dict[str, Any]:
-        """システム統計を取得"""
+        """Get system statistics"""
         try:
-            # 並列でヘルスチェック実行
+            # Execute health checks in parallel
             vector_health, metadata_health, graph_health = await asyncio.gather(
                 self.vector_store.health_check(),
                 self.metadata_store.health_check(),
                 self.graph_store.health_check()
             )
 
-            # キャッシュ統計
+            # Cache statistics
             cache_stats = {
                 "memory_cache": {
                     "size": len(self.memory_cache.cache),
@@ -731,7 +731,7 @@ class MemoryManager:
             return {}
 
     async def get_memory_stats(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
-        """記憶統計を取得"""
+        """Get memory statistics"""
         try:
             stats = await self.metadata_store.get_memory_stats(domain)
             cache_stats = self.memory_cache.get_stats()
@@ -747,7 +747,7 @@ class MemoryManager:
                 'last_updated': datetime.utcnow().isoformat()
             }
         except Exception as e:
-            logger.error(f"統計取得エラー: {e}")
+            logger.error(f"Statistics acquisition error: {e}")
             return {'error': str(e)}
 
     async def export_memories(
@@ -755,7 +755,7 @@ class MemoryManager:
         domain: Optional[MemoryDomain] = None,
         format_type: str = 'json'
     ) -> Dict[str, Any]:
-        """記憶をエクスポート"""
+        """Export memories"""
         try:
             memories = await self.metadata_store.get_memories_by_domain(domain)
 
@@ -771,7 +771,7 @@ class MemoryManager:
                 'exported_at': datetime.utcnow().isoformat()
             }
         except Exception as e:
-            logger.error(f"エクスポートエラー: {e}")
+            logger.error(f"Export error: {e}")
             return {'error': str(e)}
 
     async def import_memories(
@@ -780,7 +780,7 @@ class MemoryManager:
         domain: MemoryDomain,
         overwrite: bool = False
     ) -> Dict[str, Any]:
-        """記憶をインポート"""
+        """Import memories"""
         imported_count = 0
         skipped_count = 0
         error_count = 0
@@ -788,14 +788,14 @@ class MemoryManager:
         try:
             for item in data:
                 try:
-                    # 既存チェック
+                    # Check existing
                     if 'id' in item and not overwrite:
                         existing = await self.get_memory(item['id'])
                         if existing:
                             skipped_count += 1
                             continue
 
-                    # 記憶を作成・保存
+                    # Create and store memory
                     memory = await self.store_memory(
                         domain=domain,
                         content=item.get('content', ''),
@@ -810,7 +810,7 @@ class MemoryManager:
                         error_count += 1
 
                 except Exception as e:
-                    logger.error(f"インポートアイテムエラー: {e}")
+                    logger.error(f"Import item error: {e}")
                     error_count += 1
 
             return {
@@ -819,7 +819,7 @@ class MemoryManager:
                 'error_count': error_count
             }
         except Exception as e:
-            logger.error(f"インポートエラー: {e}")
+            logger.error(f"Import error: {e}")
             return {'error': str(e)}
 
     async def change_memory_domain(
@@ -827,7 +827,7 @@ class MemoryManager:
         memory_id: str,
         new_domain: MemoryDomain
     ) -> bool:
-        """記憶のドメインを変更"""
+        """Change memory domain"""
         try:
             memory = await self.get_memory(memory_id)
             if not memory:
@@ -838,27 +838,27 @@ class MemoryManager:
 
             success = await self.metadata_store.update_memory(memory)
             if success:
-                # キャッシュを更新
+                # Update cache
                 self.memory_cache.set(memory_id, memory)
-                logger.info(f"記憶ドメイン変更: {memory_id} -> {str(new_domain)}")
+                logger.info(f"Memory domain changed: {memory_id} -> {str(new_domain)}")
 
             return success
         except Exception as e:
-            logger.error(f"ドメイン変更エラー: {e}")
+            logger.error(f"Domain change error: {e}")
             return False
 
     async def batch_delete_memories(self, criteria: Dict[str, Any]) -> int:
-        """記憶を一括削除"""
+        """Bulk delete memories"""
         try:
             deleted_count = await self.metadata_store.batch_delete_memories(criteria)
 
-            # キャッシュからも削除（簡易実装）
+            # Also delete from cache (simple implementation)
             self.memory_cache.clear()
 
-            logger.info(f"一括削除完了: {deleted_count}件")
+            logger.info(f"Bulk deletion completed: {deleted_count} items")
             return deleted_count
         except Exception as e:
-            logger.error(f"一括削除エラー: {e}")
+            logger.error(f"Bulk deletion error: {e}")
             return 0
 
     async def cleanup_database(
@@ -867,7 +867,7 @@ class MemoryManager:
         reindex: bool = False,
         vacuum: bool = False
     ) -> Dict[str, Any]:
-        """データベースクリーンアップ"""
+        """Database cleanup"""
         try:
             result = {
                 'cleanup_orphans': 0,
@@ -888,7 +888,7 @@ class MemoryManager:
 
             return result
         except Exception as e:
-            logger.error(f"クリーンアップエラー: {e}")
+            logger.error(f"Cleanup error: {e}")
             return {'error': str(e)}
 
     async def semantic_search(
@@ -898,13 +898,13 @@ class MemoryManager:
         limit: int = 10,
         min_score: float = 0.7
     ) -> List[Tuple[Memory, float]]:
-        """意味的検索"""
+        """Semantic search"""
         try:
             embedding = await self.embedding_service.get_embedding(query)
             if not embedding:
                 return []
 
-            # ベクトル検索
+            # Vector search
             results = await self.vector_store.search(
                 embedding,
                 str(domain),
@@ -912,7 +912,7 @@ class MemoryManager:
                 min_score
             )
 
-            # 記憶オブジェクトに変換
+            # Convert to memory objects
             memories_with_scores = []
             for memory_id, score in results:
                 memory = await self.get_memory(memory_id)
@@ -921,7 +921,7 @@ class MemoryManager:
 
             return memories_with_scores
         except Exception as e:
-            logger.error(f"意味的検索エラー: {e}")
+            logger.error(f"Semantic search error: {e}")
             return []
 
     async def search_by_tags(
@@ -931,13 +931,13 @@ class MemoryManager:
         match_all: bool = False,
         limit: int = 10
     ) -> List[Memory]:
-        """タグ検索"""
+        """Tag search"""
         try:
             return await self.metadata_store.search_by_tags(
                 tags, domain, match_all, limit
             )
         except Exception as e:
-            logger.error(f"タグ検索エラー: {e}")
+            logger.error(f"Tag search error: {e}")
             return []
 
     async def search_by_timerange(
@@ -947,7 +947,7 @@ class MemoryManager:
         domain: MemoryDomain,
         limit: int = 10
     ) -> List[Memory]:
-        """時間範囲検索"""
+        """Time range search"""
         try:
             return await self.metadata_store.search_by_timerange(
                 start_date, end_date, domain, limit

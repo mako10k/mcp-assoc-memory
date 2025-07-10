@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mcp-assoc-memory"
 version = "0.1.0"
-description = "LLM向け連想記憶MCPサーバ - 記憶ドメイン（グローバル/ユーザ/プロジェクト/セッション）を考慮した知識管理システム"
+description = "Associative Memory MCP Server for LLMs - Knowledge management system with memory domains (global/user/project/session)"
 authors = [
     {name = "mako10k", email = "your.email@example.com"}
 ]

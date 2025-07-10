@@ -425,7 +425,7 @@ Stores your content as a searchable memory, automatically discovers connections 
 
 ➡️ What's next: Use memory_discover_associations to explore new connections""",
     annotations={
-        "title": "記憶保存と自動連想",
+        "title": "Memory Storage with Auto-Association",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False
@@ -544,7 +544,7 @@ Converts your query to semantic embeddings and searches the vector space for con
 
 ➡️ What's next: Use memory_get for details, memory_discover_associations for deeper exploration""",
     annotations={
-        "title": "意味的記憶検索",
+        "title": "Semantic Memory Search",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -684,7 +684,7 @@ Fetches the complete memory record including content, metadata, tags, and option
 
 ➡️ What's next: Use memory_discover_associations for deeper exploration, memory_store for new insights""",
     annotations={
-        "title": "記憶詳細取得",
+        "title": "Memory Detail Retrieval",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -778,7 +778,7 @@ Permanently removes the specified memory from storage. This action cannot be und
 
 ➡️ What's next: Use scope_list to verify organization, memory_store to add corrected content""",
     annotations={
-        "title": "記憶削除",
+        "title": "Memory Deletion",
         "readOnlyHint": False,
         "destructiveHint": True,
         "idempotentHint": True
@@ -830,7 +830,7 @@ Retrieves all stored memories with pagination support, providing a complete over
 
 ➡️ What's next: Use memory_search for specific content, scope_list for organization overview""",
     annotations={
-        "title": "全記憶一覧",
+        "title": "All Memories List",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -1106,7 +1106,7 @@ Displays the hierarchical structure of all scopes with memory counts, helping yo
 
 ➡️ What's next: Use scope_suggest for new content placement, memory_search for specific scope exploration""",
     annotations={
-        "title": "スコープ階層一覧",
+        "title": "Scope Hierarchy List",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -1196,7 +1196,7 @@ Analyzes your content using keyword detection and context patterns to recommend 
 
 ➡️ What's next: Use memory_store with suggested scope, scope_list to verify organization""",
     annotations={
-        "title": "スコープ推奨",
+        "title": "Scope Recommendation",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -1292,7 +1292,7 @@ Moves specified memories from their current scopes to a new target scope, preser
 
 ➡️ What's next: Use scope_list to verify new organization, memory_search in new scope to confirm placement""",
     annotations={
-        "title": "記憶移動",
+        "title": "Memory Move",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False
@@ -1372,7 +1372,7 @@ Provides complete session lifecycle management including creation, listing, and 
 
 ➡️ What's next: Use memory_store with session scope, memory_search within sessions""",
     annotations={
-        "title": "セッション管理",
+        "title": "Session Management",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False
@@ -1514,7 +1514,7 @@ Takes a specific memory as starting point and finds semantically related memorie
 
 ➡️ What's next: Use memory_get for details, memory_store for new insights""",
     annotations={
-        "title": "記憶連想発見",
+        "title": "Memory Association Discovery",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True

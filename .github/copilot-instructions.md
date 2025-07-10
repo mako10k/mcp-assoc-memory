@@ -41,6 +41,8 @@ Copilot should follow the rules below when generating or modifying code in this 
 
 - 🧪 Tests: Use Jest or the built-in test framework. Organize in `tests/unit/` or `tests/integration/`.
 - 🧾 Typing: Use strict, JSON-compatible types. Avoid `any` unless explicitly required.
+- 🌐 **Code Language**: All source code should be in English (comments, docstrings, variable names, error messages).
+- 🔄 **Internationalization**: When modifying code, convert any encountered Japanese text to English.
 - 📁 Directory structure:
   ```
   src/
@@ -319,5 +321,46 @@ For ongoing skill development:
 ```
 
 **Remember**: The associative memory system is designed to augment your development workflow. Use it actively to build institutional knowledge, find connections between concepts, and accelerate problem-solving through accumulated wisdom.
+
+---
+
+## 🌐 Internationalization Guidelines
+
+**This project follows international coding standards with English as the primary language.**
+
+### Code Language Standards
+- **Source Code**: All code must be written in English
+  - Variable names, function names, class names
+  - Comments and docstrings
+  - Error messages and log messages
+  - Constants and configuration values
+
+### During Development
+- **🔄 Active Conversion**: When modifying any file, convert encountered Japanese text to English
+- **📝 Documentation**: Prioritize English documentation for international accessibility
+- **🚫 No Mixed Languages**: Avoid mixing Japanese and English within the same file/module
+
+### Conversion Priority
+1. **High Priority**: Source code (`.py`, `.js`, `.ts` files)
+2. **Medium Priority**: Configuration files (`config.py`, `pyproject.toml`)
+3. **Low Priority**: Documentation files (can be translated gradually)
+
+### Examples of Required Changes
+```python
+# ❌ Avoid (Japanese)
+def 記憶を保存(content: str) -> Memory:
+    """記憶をストレージに保存する"""
+    logger.error(f"保存エラー: {e}")
+
+# ✅ Preferred (English)
+def store_memory(content: str) -> Memory:
+    """Store memory to storage"""
+    logger.error(f"Storage error: {e}")
+```
+
+### Exception Cases
+- **Legacy Documentation**: Existing Japanese documentation can be preserved temporarily
+- **User-Facing Content**: Content specifically intended for Japanese users
+- **Test Data**: Sample content in tests may remain in Japanese if testing internationalization
 
 ---
