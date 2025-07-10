@@ -87,6 +87,9 @@ Practical usage patterns for developers, teams, and organizations.
 ### 🆘 **[Troubleshooting Guide](docs/troubleshooting/README.md)**
 Solutions for common issues and system maintenance procedures.
 
+### 📊 **[Sample Data](examples/sample-data/README.md)**
+Ready-to-import memory dataset with 28 curated memories demonstrating system capabilities.
+
 ## 🚀 **[Complete Documentation →](docs/README.md)**
 
 ## Architecture
