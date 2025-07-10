@@ -499,44 +499,33 @@ await visualize({type: "memory_map", center_memory_id: "mem_123", depth: 3, form
 await visualize({type: "stats_dashboard", target_domain: "project", project_id: "proj_789"})
 ```
 
-## 3. 技術仕様
+## 3. Technical Specifications
 
 ```python
-from enum import Enum
 from typing import Optional
-
-class MemoryDomain(Enum):
-    GLOBAL = "global"    # 全ユーザー参照可能
-    USER = "user"        # ユーザー個人専用
-    PROJECT = "project"  # プロジェクト参加者
-    SESSION = "session"  # セッション内限定
-
-class ProjectRole(Enum):
-    EDITOR = "editor"    # 読み書き可能
-    VIEWER = "viewer"    # 読み取りのみ
 
 class Memory:
     id: str                    # UUID
-    content: str              # 記憶内容
-    embedding: List[float]    # ベクトル埋め込み
-    tags: List[str]          # タグリスト
-    category: str            # カテゴリ
-    importance: float        # 重要度 (0-1)
-    created_at: datetime     # 作成日時
-    updated_at: datetime     # 更新日時
-    access_count: int        # アクセス回数
-    metadata: Dict[str, Any] # 追加メタデータ
+    content: str              # Memory content
+    embedding: List[float]    # Vector embedding
+    tags: List[str]          # Tag list
+    category: str            # Category
+    importance: float        # Importance (0-1)
+    created_at: datetime     # Creation time
+    updated_at: datetime     # Update time
+    access_count: int        # Access count
+    metadata: Dict[str, Any] # Additional metadata
     
-    # ドメイン関連フィールド
-    domain: MemoryDomain     # 記憶ドメイン
-    user_id: Optional[str]   # ユーザーID（userドメイン用）
-    project_id: Optional[str] # プロジェクトID（projectドメイン用）
-    session_id: Optional[str] # セッションID（sessionドメイン用）
-    author_id: str           # 作成者ID
-    expires_at: Optional[datetime] # 有効期限（sessionドメイン用）
+    # Scope-related fields
+    scope: str               # Memory scope (hierarchical string)
+    user_id: Optional[str]   # User ID
+    project_id: Optional[str] # Project ID
+    session_id: Optional[str] # Session ID
+    author_id: str           # Author ID
+    expires_at: Optional[datetime] # Expiration time (for session scopes)
 ```
 
-### 3.2 関連性データ構造
+### 3.2 Relationship Data Structure
 
 ```python
 class Association:

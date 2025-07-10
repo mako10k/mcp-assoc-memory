@@ -1,5 +1,7 @@
 # アーキテクチャ設計書
 
+> **Note**: This document contains legacy architecture that references the old "domain" concept. Current implementation uses hierarchical "scope" system instead of domains. Please refer to MEMORY_SCOPES.md for current scope-based design and ARCHITECTURE_FASTMCP.md for the updated FastMCP architecture.
+
 ## 1. システム全体構成（マルチトランスポート対応）
 
 ```

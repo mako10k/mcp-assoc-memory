@@ -81,10 +81,10 @@ class EmbeddingCache(LRUCache):
 
 
 class SearchCache(LRUCache):
-    def set_search_result(self, query: str, domain: str, filters: dict, results: list) -> None:
-        key = (query, domain, frozenset(filters.items()) if filters else None)
+    def set_search_result(self, query: str, scope: str, filters: dict, results: list) -> None:
+        key = (query, scope, frozenset(filters.items()) if filters else None)
         self.set(key, results)
 
-    def get_search_result(self, query: str, domain: str, filters: dict) -> Optional[list]:
-        key = (query, domain, frozenset(filters.items()) if filters else None)
+    def get_search_result(self, query: str, scope: str, filters: dict) -> Optional[list]:
+        key = (query, scope, frozenset(filters.items()) if filters else None)
         return self.get(key)

@@ -1,53 +1,44 @@
 """
-記憶モデル定義
+Memory model definitions
 """
 
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from typing import Any, Dict, List, Optional
-
-
-class MemoryDomain(Enum):
-    """記憶ドメイン"""
-    GLOBAL = "global"      # システム全体で共有
-    USER = "user"          # ユーザー固有
-    PROJECT = "project"    # プロジェクト固有
-    SESSION = "session"    # セッション固有
 
 
 @dataclass
 class Memory:
-    """記憶レコード"""
+    """Memory record with scope-based organization"""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    domain: MemoryDomain = MemoryDomain.USER
+    scope: str = "user/default"  # Hierarchical scope (replaces domain)
     content: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
     tags: List[str] = field(default_factory=list)
     embedding: Optional[List[float]] = None
 
-    # アクセス制御
+    # Access control
     user_id: Optional[str] = None
     project_id: Optional[str] = None
     session_id: Optional[str] = None
 
-    # カテゴリ
+    # Category
     category: Optional[str] = None
 
-    # タイムスタンプ
+    # Timestamps
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     accessed_at: Optional[datetime] = field(default_factory=datetime.utcnow)
 
-    # 統計情報
+    # Statistics
     access_count: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
-        """辞書形式に変換"""
+        """Convert to dictionary format"""
         return {
             "id": self.id,
-            "domain": self.domain.value,
+            "scope": self.scope,
             "content": self.content,
             "metadata": self.metadata,
             "tags": self.tags,
@@ -63,13 +54,14 @@ class Memory:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Memory":
-        """辞書から復元"""
+        """Restore from dictionary"""
         return cls(
             id=data["id"],
-            domain=MemoryDomain(data["domain"]),
+            scope=data.get("scope", "user/default"),
             content=data["content"],
             metadata=data.get("metadata", {}),
             tags=data.get("tags", []),
+            category=data.get("category"),
             user_id=data.get("user_id"),
             project_id=data.get("project_id"),
             session_id=data.get("session_id"),
@@ -87,7 +79,7 @@ class Memory:
 
 @dataclass
 class MemorySearchResult:
-    """記憶検索結果"""
+    """Memory search result"""
     memory: Memory
     similarity_score: float
     match_type: str  # "semantic", "keyword", "tag"
@@ -96,9 +88,9 @@ class MemorySearchResult:
 
 @dataclass
 class MemoryStats:
-    """記憶統計情報"""
+    """Memory statistics"""
     total_count: int = 0
-    domain_counts: Dict[str, int] = field(default_factory=dict)
+    scope_counts: Dict[str, int] = field(default_factory=dict)  # Changed from domain_counts
     tag_counts: Dict[str, int] = field(default_factory=dict)
     recent_activity: List[Dict[str, Any]] = field(default_factory=list)
     storage_size_mb: float = 0.0

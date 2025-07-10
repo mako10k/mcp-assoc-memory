@@ -62,7 +62,7 @@ interface MemoryTool {
   memory_id?: string;
   content?: string;
   query?: string;
-  domain?: MemoryDomain;
+  scope?: string;
   // ...other parameters
 }
 

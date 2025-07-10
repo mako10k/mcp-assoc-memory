@@ -14,8 +14,8 @@ def validate_required_fields(data: Dict[str, Any], required_fields: list[str]) -
             raise ValidationError(f"Missing required field: {field}")
 
 
-def domain_value(domain):
-    """MemoryDomain Enum または str を一貫して str に変換"""
-    if hasattr(domain, "value"):
-        return str(domain.value)
-    return str(domain)
+def scope_value(scope):
+    """Convert scope to consistent string format"""
+    if scope is None:
+        return "user/default"
+    return str(scope)

@@ -25,7 +25,6 @@ from .core.similarity import SimilarityCalculator
 from .storage.vector_store import ChromaVectorStore
 from .storage.metadata_store import SQLiteMetadataStore
 from .storage.graph_store import NetworkXGraphStore
-from .models.memory import MemoryDomain
 from .config import get_config
 from .simple_persistence import get_persistent_storage
 
@@ -610,27 +609,12 @@ async def memory_store(
         await ensure_initialized()
         await ctx.info(f"Storing memory in scope '{request.scope}': {request.content[:50]}...")
         
-        # Convert scope to domain (scope is more flexible than the old domain enum)
-        # Map scope to domain for backward compatibility
-        domain = MemoryDomain.USER
-        if request.scope.startswith("work/"):
-            domain = MemoryDomain.PROJECT  # Use PROJECT for work-related memories
-        elif request.scope.startswith("personal/"):
-            domain = MemoryDomain.USER
-        elif request.scope.startswith("project/"):
-            domain = MemoryDomain.PROJECT
-        elif request.scope.startswith("session/"):
-            domain = MemoryDomain.SESSION
-        
-        # Store using the full memory manager
+        # Store using the full memory manager with scope-based organization
         original_memory_id = None
         memory = await memory_manager.store_memory(
-            domain=domain,
+            scope=request.scope,  # Hierarchical scope for organization
             content=request.content,
-            metadata={
-                **(request.metadata or {}),
-                "scope": request.scope  # Preserve the flexible scope in metadata
-            },
+            metadata=request.metadata or {},
             tags=request.tags or [],
             category=request.category,
             auto_associate=request.auto_associate,
@@ -731,22 +715,10 @@ async def memory_search(
         child_info = " (including child scopes)" if request.include_child_scopes else ""
         await ctx.info(f"Searching memories: '{request.query}'{scope_info}{child_info} (similarity >= {request.similarity_threshold})")
         
-        # Map scope to domains for search
-        domains = None
-        if request.scope:
-            if request.scope.startswith("work/") or request.scope.startswith("project/"):
-                domains = [MemoryDomain.PROJECT]
-            elif request.scope.startswith("personal/"):
-                domains = [MemoryDomain.USER]
-            elif request.scope.startswith("session/"):
-                domains = [MemoryDomain.SESSION]
-            else:
-                domains = [MemoryDomain.USER]
-        
-        # Perform semantic search using memory manager
+        # Perform semantic search using memory manager with scope
         search_results = await memory_manager.search_memories(
             query=request.query,
-            domains=domains,
+            scope=request.scope,  # Hierarchical scope for organization
             limit=request.limit,
             similarity_threshold=request.similarity_threshold
         )
@@ -758,7 +730,7 @@ async def memory_search(
             similarity = result["similarity"]
             
             # Check scope filtering if needed
-            memory_scope = memory.metadata.get("scope", f"{memory.domain.value}/default")
+            memory_scope = memory.metadata.get("scope", memory.scope)
             if request.scope:
                 if request.include_child_scopes:
                     # Include if memory scope starts with request scope (hierarchical match)
@@ -775,7 +747,7 @@ async def memory_search(
                 try:
                     assoc_results = await memory_manager.search_memories(
                         query=memory.content,
-                        domains=domains,
+                        scope=request.scope,
                         limit=5,
                         similarity_threshold=0.8
                     )
@@ -888,7 +860,7 @@ async def memory_get(
                 except Exception as e:
                     await ctx.warning(f"Failed to get associations: {e}")
             
-            memory_scope = memory.metadata.get("scope", f"{memory.domain.value}/default")
+            memory_scope = memory.metadata.get("scope", memory.scope)
             
             await ctx.info(f"Memory retrieved with {len(associations)} associations: {memory_id}")
             
@@ -1052,7 +1024,7 @@ async def memory_update(
                 
                 persistence.save_memories(memory_storage)
             
-            memory_scope = new_metadata.get("scope", f"{memory.domain.value}/default")
+            memory_scope = new_metadata.get("scope", memory.scope)
             
             await ctx.info(f"Memory updated successfully: {request.memory_id}")
             
@@ -1906,7 +1878,7 @@ async def memory_discover_associations(
                 continue
             seen_content.add(content_hash)
             
-            memory_scope = assoc_memory.metadata.get("scope", f"{assoc_memory.domain.value}/default")
+            memory_scope = assoc_memory.metadata.get("scope", assoc_memory.scope)
             
             associations.append({
                 "memory_id": assoc_memory.id,

@@ -31,7 +31,7 @@ Located in: `src/mcp_assoc_memory/core/memory_manager.py`
 async def check_content_duplicate(
     self,
     content: str,
-    domain: Optional[MemoryDomain] = None,
+    scope: Optional[str] = None,
     similarity_threshold: float = 0.95
 ) -> Optional[Memory]:
 ```

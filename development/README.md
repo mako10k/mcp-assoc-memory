@@ -18,7 +18,7 @@ Technical specifications and API definitions.
 - **[SPECIFICATION.md](specifications/SPECIFICATION.md)** - Original system specification
 - **[SPECIFICATION_FASTMCP.md](specifications/SPECIFICATION_FASTMCP.md)** - Current FastMCP specification
 - **[CONFIG_SPEC.md](specifications/CONFIG_SPEC.md)** - Configuration specification
-- **[MEMORY_DOMAINS.md](specifications/MEMORY_DOMAINS.md)** - Memory domain specifications
+- **[MEMORY_SCOPES.md](specifications/MEMORY_SCOPES.md)** - Memory scope specifications
 
 ### 🔧 **[Technical](technical/)**
 Technical considerations and implementation details.

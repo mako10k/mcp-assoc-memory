@@ -361,7 +361,7 @@ Export alignment memories for cross-team documentation
 **Scenario**: Organization building institutional knowledge base
 
 **Setup**:
-- Scope: `company/knowledge/[domain]`
+- Scope: `company/knowledge/[category]`
 - Best practices and lessons learned sharing
 
 **Usage Pattern**:
@@ -474,7 +474,7 @@ Weekly: Export project knowledge, share team insights
 #### Large Organization
 ```bash
 # Enterprise setup
-Scopes: [department]/[team]/[project], company/knowledge/[domain]
+Scopes: [department]/[team]/[project], company/knowledge/[category]
 Daily: Store specialized knowledge, cross-reference decisions
 Monthly: Export for documentation, analyze knowledge patterns
 ```

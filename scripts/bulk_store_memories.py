@@ -3,7 +3,7 @@ import time
 
 import requests
 
-MCP_URL = "http://localhost:3006/mcp"
+MCP_URL = "http://localhost:8000/mcp/"
 
 # テスト用記憶データリスト
 memories = [
@@ -19,17 +19,28 @@ memories = [
 
 results = []
 for i, mem in enumerate(memories):
+    # FastMCP JSON-RPC format
     store_request = {
-        "tool": "memory",
-        "action": "store",
+        "jsonrpc": "2.0",
+        "id": i + 1,
+        "method": "tools/call",
         "params": {
-            "domain": "user",
-            "content": mem["content"],
-            "metadata": mem["metadata"]
+            "name": "memory_store",
+            "arguments": {
+                "request": {
+                    "content": mem["content"],
+                    "scope": "user/test",
+                    "metadata": mem["metadata"]
+                }
+            }
         }
     }
     print(f"[{i + 1}/{len(memories)}] POST {MCP_URL} : {mem['content']}")
-    response = requests.post(MCP_URL, json=store_request, timeout=10)
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream"
+    }
+    response = requests.post(MCP_URL, json=store_request, headers=headers, timeout=10)
     try:
         resp_json = response.json()
         print(json.dumps(resp_json, indent=2, ensure_ascii=False))
@@ -40,5 +51,7 @@ for i, mem in enumerate(memories):
 
 print("\n保存されたmemory_id一覧:")
 for r in results:
-    if r.get("success") and r.get("data"):
-        print(r["data"].get("memory_id"))
+    if r.get("result") and r.get("result", {}).get("success"):
+        memory_id = r.get("result", {}).get("data", {}).get("memory_id")
+        if memory_id:
+            print(memory_id)

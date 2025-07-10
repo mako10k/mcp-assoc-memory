@@ -14,7 +14,7 @@ async def reindex_all_embeddings():
     embedding_service = create_embedding_service(config.embedding.__dict__)
 
     print("全記憶のembedding再計算・ベクトルストア再投入を開始します...")
-    memories = await metadata_store.get_memories_by_domain(None)
+    memories = await metadata_store.get_memories_by_scope(None)
     print(f"対象件数: {len(memories)}")
     updated = 0
     for mem in memories:

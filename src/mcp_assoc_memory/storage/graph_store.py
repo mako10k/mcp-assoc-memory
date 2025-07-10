@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 import networkx as nx
 
 from ..models.association import Association
-from ..models.memory import Memory, MemoryDomain
+from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
 from .base import BaseGraphStore
 
@@ -20,12 +20,12 @@ logger = get_memory_logger(__name__)
 
 
 class NetworkXGraphStore(BaseGraphStore):
-    async def get_all_association_edges(self, domain: Optional[MemoryDomain] = None) -> List[Dict[str, Any]]:
+    async def get_all_association_edges(self, scope: Optional[str] = None) -> List[Dict[str, Any]]:
         """全関連エッジ取得（可視化用）"""
         try:
             edges = []
             for u, v, key, data in self.graph.edges(keys=True, data=True):
-                if domain is None or self.graph.nodes[u].get('domain') == domain.value or self.graph.nodes[v].get('domain') == domain.value:
+                if scope is None or self.graph.nodes[u].get('scope') == scope or self.graph.nodes[v].get('scope') == scope:
                     edge_info = {
                         "source": u,
                         "target": v,
@@ -44,14 +44,14 @@ class NetworkXGraphStore(BaseGraphStore):
             logger.error("Failed to get all association edges", error=str(e))
             return []
 
-    async def export_graph(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
+    async def export_graph(self, scope: Optional[str] = None) -> Dict[str, Any]:
         """グラフ構造エクスポート（可視化用）"""
         try:
             nodes = []
             for node_id, data in self.graph.nodes(data=True):
-                if domain is None or data.get('domain') == domain.value:
+                if scope is None or data.get('scope') == scope:
                     nodes.append({"id": node_id, **data})
-            edges = await self.get_all_association_edges(domain)
+            edges = await self.get_all_association_edges(scope)
             return {"nodes": nodes, "edges": edges}
         except Exception as e:
             logger.error("Failed to export graph", error=str(e))
@@ -215,16 +215,22 @@ class NetworkXGraphStore(BaseGraphStore):
                 "timestamp": datetime.utcnow().isoformat()
             }
 
-            # ドメイン別統計
-            domain_stats = {}
-            for domain in MemoryDomain:
+            # スコープ別統計
+            scope_stats = {}
+            # 既存のスコープを動的に収集
+            existing_scopes = set()
+            for node_id, data in self.graph.nodes(data=True):
+                node_scope = data.get('scope', 'unknown')
+                existing_scopes.add(node_scope)
+            
+            for scope in existing_scopes:
                 nodes = [
                     n for n, d in self.graph.nodes(data=True)
-                    if d.get('domain') == domain.value
+                    if d.get('scope') == scope
                 ]
-                domain_stats[domain.value] = len(nodes)
+                scope_stats[scope] = len(nodes)
 
-            stats["domain_stats"] = domain_stats
+            stats["scope_stats"] = scope_stats
 
             # グラフの連結性チェック
             if self.graph.number_of_nodes() > 0:
@@ -258,7 +264,7 @@ class NetworkXGraphStore(BaseGraphStore):
         try:
             async with self.graph_lock:
                 node_attributes = {
-                    "domain": memory.domain.value,
+                    "scope": memory.scope,
                     "content": memory.content,
                     "metadata": memory.metadata,
                     "tags": memory.tags,
@@ -278,7 +284,7 @@ class NetworkXGraphStore(BaseGraphStore):
                 "Memory node added",
                 extra_data={
                     "memory_id": memory.id,
-                    "domain": memory.domain.value
+                    "scope": memory.scope
                 }
             )
 

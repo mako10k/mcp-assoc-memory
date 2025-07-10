@@ -1,14 +1,13 @@
 """
-データモデル
+Data models
 """
 
 from .association import Association, AssociationGraph
-from .memory import Memory, MemoryDomain, MemorySearchResult, MemoryStats
+from .memory import Memory, MemorySearchResult, MemoryStats
 from .project import Project, ProjectMember, ProjectRole, UserSession
 
 __all__ = [
     "Memory",
-    "MemoryDomain",
     "MemorySearchResult",
     "MemoryStats",
     "Association",

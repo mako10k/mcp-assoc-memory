@@ -3,7 +3,7 @@
     {
       "id": "mem-001",
       "content": "機械学習の基本概念について学習しました。教師あり学習、教師なし学習、強化学習の3つの主要なカテゴリがあります。",
-      "domain": "user",
+      "scope": "learning/ai/basics",
       "tags": ["machine-learning", "ai", "basics"],
       "metadata": {
         "category": "learning",
@@ -19,7 +19,7 @@
     {
       "id": "mem-002", 
       "content": "Pythonでの非同期プログラミングにはasyncioライブラリを使用します。async/await構文でコルーチンを定義できます。",
-      "domain": "project",
+      "scope": "learning/programming/python",
       "tags": ["python", "asyncio", "programming"],
       "metadata": {
         "category": "programming",
@@ -35,7 +35,7 @@
     {
       "id": "mem-003",
       "content": "REST APIの設計原則：リソース指向、ステートレス、統一インターフェース、階層化システム、キャッシュ可能、オンデマンドコード（オプション）",
-      "domain": "global",
+      "scope": "work/architecture/api-design",
       "tags": ["rest-api", "web-development", "architecture"],
       "metadata": {
         "category": "architecture",

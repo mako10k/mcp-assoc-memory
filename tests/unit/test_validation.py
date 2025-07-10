@@ -1,58 +1,56 @@
 """
-バリデーションのテスト
+Validation tests
 """
 
 import pytest
 
-from mcp_assoc_memory.models.memory import MemoryDomain
 from mcp_assoc_memory.models.project import ProjectRole
 from mcp_assoc_memory.utils.validation import ValidationError, Validator
 
 
 class TestValidator:
-    """バリデーターのテスト"""
+    """Validator tests"""
 
     def test_validate_memory_content_valid(self):
-        """有効な記憶内容のテスト"""
-        content = "これは有効な記憶内容です"
+        """Test valid memory content"""
+        content = "This is valid memory content"
         result = Validator.validate_memory_content(content)
         assert result == content
 
     def test_validate_memory_content_invalid(self):
-        """無効な記憶内容のテスト"""
-        # 空文字列
+        """Test invalid memory content"""
+        # Empty string
         with pytest.raises(ValidationError) as exc_info:
             Validator.validate_memory_content("")
         assert "cannot be empty" in str(exc_info.value)
 
-        # 非文字列
+        # Non-string
         with pytest.raises(ValidationError):
             Validator.validate_memory_content(123)
 
-        # 長すぎる内容
+        # Too long content
         long_content = "a" * 60000
         with pytest.raises(ValidationError) as exc_info:
             Validator.validate_memory_content(long_content)
         assert "too long" in str(exc_info.value)
 
-    def test_validate_memory_domain_valid(self):
-        """有効な記憶ドメインのテスト"""
-        # 文字列から
-        result = Validator.validate_memory_domain("user")
-        assert result == MemoryDomain.USER
+    def test_validate_scope_valid(self):
+        """Test valid memory scope"""
+        # Valid scope strings
+        result = Validator.validate_scope("user/default")
+        assert result == "user/default"
+        
+        result = Validator.validate_scope("work/project/alpha")
+        assert result == "work/project/alpha"
 
-        # 列挙型から
-        result = Validator.validate_memory_domain(MemoryDomain.PROJECT)
-        assert result == MemoryDomain.PROJECT
-
-    def test_validate_memory_domain_invalid(self):
-        """無効な記憶ドメインのテスト"""
+    def test_validate_scope_invalid(self):
+        """Test invalid memory scope"""
         with pytest.raises(ValidationError) as exc_info:
-            Validator.validate_memory_domain("invalid")
-        assert "Invalid domain" in str(exc_info.value)
+            Validator.validate_scope("")
+        assert "cannot be empty" in str(exc_info.value)
 
         with pytest.raises(ValidationError):
-            Validator.validate_memory_domain(123)
+            Validator.validate_scope(123)
 
     def test_validate_tags_valid(self):
         """有効なタグのテスト"""

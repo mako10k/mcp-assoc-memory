@@ -3,7 +3,7 @@
 ## ✅ Overview
 
 This project implements a memory-centered LLM assistant system using the Model Context Protocol (MCP).  
-Tools, memory management, and domain-aware knowledge access are key parts of the architecture.
+Tools, memory management, and scope-aware knowledge access are key parts of the architecture.
 
 Copilot should follow the rules below when generating or modifying code in this repository.
 

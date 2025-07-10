@@ -40,7 +40,6 @@ class TestServerFunctionality:
         from mcp_assoc_memory.storage.graph_store import NetworkXGraphStore
         from mcp_assoc_memory.core.embedding_service import SentenceTransformerEmbeddingService
         from mcp_assoc_memory.core.memory_manager import MemoryManager
-        from mcp_assoc_memory.models.memory import MemoryDomain
         
         # Initialize with default parameters
         vector_store = ChromaVectorStore()
@@ -59,7 +58,7 @@ class TestServerFunctionality:
         try:
             # Store a memory
             memory = await manager.store_memory(
-                domain=MemoryDomain.USER,
+                scope="user/integration-test",
                 content="Integration test memory for server validation",
                 category="test",
                 tags=["integration", "test", "server"],
@@ -73,7 +72,7 @@ class TestServerFunctionality:
             # Search for the memory
             results = await manager.search_memories(
                 query="integration test server validation",
-                domains=[MemoryDomain.USER],
+                scope="user/integration-test",
                 limit=5,
                 similarity_threshold=0.1
             )
@@ -83,7 +82,7 @@ class TestServerFunctionality:
             assert retrieved is not None
             assert retrieved.id == memory.id
             assert retrieved.content == memory.content
-            assert retrieved.domain == MemoryDomain.USER
+            assert retrieved.scope == "user/integration-test"
             
             # Note: Search results may vary due to embedding similarity
             print(f"Search returned {len(results)} results")
@@ -96,7 +95,6 @@ class TestServerFunctionality:
     async def test_server_global_initialization(self):
         """Test global server initialization and memory operations."""
         from mcp_assoc_memory.server import ensure_initialized, memory_manager
-        from mcp_assoc_memory.models.memory import MemoryDomain
         
         # Initialize the global memory manager
         await ensure_initialized()
@@ -104,7 +102,7 @@ class TestServerFunctionality:
         try:
             # Test basic operations through global manager
             memory = await memory_manager.store_memory(
-                domain=MemoryDomain.USER,
+                scope="user/global-test",
                 content="Global manager test memory",
                 category="test",
                 tags=["global", "test"],
@@ -116,7 +114,7 @@ class TestServerFunctionality:
             # Search
             results = await memory_manager.search_memories(
                 query="global manager test",
-                domains=[MemoryDomain.USER],
+                scope="user/global-test",
                 limit=5,
                 similarity_threshold=0.1  # Lower threshold for more permissive search
             )
@@ -125,7 +123,7 @@ class TestServerFunctionality:
             if len(results) == 0:
                 results = await memory_manager.search_memories(
                     query="test memory",
-                    domains=[MemoryDomain.USER],
+                    scope="user/global-test",
                     limit=10,
                     similarity_threshold=0.0
                 )

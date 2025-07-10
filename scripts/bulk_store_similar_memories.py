@@ -3,16 +3,16 @@ import time
 
 import requests
 
-MCP_URL = "http://localhost:8000/mcp"
+MCP_URL = "http://localhost:8000/mcp/"
 
 # Test data with similar content for bulk storage
 memories = [
-    {"content": "Test memory A", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "Test memory A variant", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "Test memory A details", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "Test memory A supplementary info", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "Test memory A related information", "domain": "user", "metadata": {"tag": "similar_test"}},
-    {"content": "Test memory A additional info", "domain": "user", "metadata": {"tag": "similar_test"}}
+    {"content": "Test memory A", "scope": "user/test", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A variant", "scope": "user/test", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A details", "scope": "user/test", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A supplementary info", "scope": "user/test", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A related information", "scope": "user/test", "metadata": {"tag": "similar_test"}},
+    {"content": "Test memory A additional info", "scope": "user/test", "metadata": {"tag": "similar_test"}}
 ]
 
 results = []

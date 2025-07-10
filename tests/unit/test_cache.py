@@ -130,15 +130,15 @@ class TestSearchCache:
         cache = SearchCache(max_size=10)
 
         query = "検索クエリ"
-        domain = "user"
+        scope = "user/test"
         filters = {"tag": "test"}
         results = [{"id": "1", "content": "結果1"}]
 
-        cache.set_search_result(query, domain, filters, results)
-        cached_results = cache.get_search_result(query, domain, filters)
+        cache.set_search_result(query, scope, filters, results)
+        cached_results = cache.get_search_result(query, scope, filters)
 
         assert cached_results == results
 
         # 異なるフィルターでは取得できない
         other_filters = {"tag": "other"}
-        assert cache.get_search_result(query, domain, other_filters) is None
+        assert cache.get_search_result(query, scope, other_filters) is None

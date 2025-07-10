@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 import aiosqlite
 
 from ..models.association import Association
-from ..models.memory import Memory, MemoryDomain
+from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
 from .base import BaseMetadataStore
 
@@ -20,14 +20,14 @@ class SQLiteMetadataStore(BaseMetadataStore):
     async def search_by_tags(
         self,
         tags: List[str],
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         match_all: bool = False,
         limit: int = 10
     ) -> List[Memory]:
-        """タグ検索"""
+        """Tag search"""
         try:
-            where_conditions = ["domain = ?"]
-            params = [domain.value]
+            where_conditions = ["JSON_EXTRACT(metadata, '$.scope') = ?"]
+            params = [scope]
             if tags:
                 tag_conditions = []
                 for tag in tags:
@@ -57,18 +57,18 @@ class SQLiteMetadataStore(BaseMetadataStore):
         self,
         start_date: datetime,
         end_date: datetime,
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         limit: int = 10
     ) -> List[Memory]:
-        """時間範囲検索"""
+        """Time range search"""
         try:
             sql = '''
                 SELECT * FROM memories
-                WHERE domain = ? AND created_at >= ? AND created_at <= ?
+                WHERE JSON_EXTRACT(metadata, '$.scope') = ? AND created_at >= ? AND created_at <= ?
                 ORDER BY created_at DESC
                 LIMIT ?
             '''
-            params = [domain.value, start_date.isoformat(), end_date.isoformat(), str(limit)]
+            params = [scope, start_date.isoformat(), end_date.isoformat(), str(limit)]
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(sql, params) as cursor:
                     rows = await cursor.fetchall()
@@ -80,17 +80,17 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
     async def advanced_search(
         self,
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         tags: Optional[List[str]] = None,
         category: Optional[str] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         limit: int = 30
     ) -> List[Memory]:
-        """高度検索（複合条件）"""
+        """Advanced search (complex conditions)"""
         try:
-            where_conditions = ["domain = ?"]
-            params = [domain.value]
+            where_conditions = ["JSON_EXTRACT(metadata, '$.scope') = ?"]
+            params = [scope]
             if tags:
                 tag_conditions = []
                 for tag in tags:
@@ -184,7 +184,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
     async def cleanup_orphans(self) -> int:
         try:
-            # 孤立した記憶（関連性がないもの）を削除
+            # Delete orphaned memories (those without associations)
             sql = '''
                 DELETE FROM memories
                 WHERE id NOT IN (
@@ -223,12 +223,18 @@ class SQLiteMetadataStore(BaseMetadataStore):
         if not row:
             return None
         try:
-            # 明示的に各引数を渡す（embedding, categoryはNoneでOK）
+            # Parse metadata to get scope, with fallback for backward compatibility
+            metadata = json.loads(row[3]) if row[3] else {}
+            scope = metadata.get("scope")
+            if not scope:
+                # Fallback to legacy scope field for backward compatibility
+                scope = str(row[1]) if row[1] else "user/default"
+            
             return Memory(
                 id=str(row[0]),
-                domain=MemoryDomain(row[1]),
+                scope=scope,
                 content=str(row[2]),
-                metadata=json.loads(row[3]) if row[3] else {},
+                metadata=metadata,
                 tags=json.loads(row[4]) if row[4] else [],
                 embedding=None,
                 user_id=str(row[5]) if row[5] is not None else None,
@@ -249,14 +255,15 @@ class SQLiteMetadataStore(BaseMetadataStore):
             )
             return None
 
-    async def get_memories_by_domain(self, domain: Optional[MemoryDomain], limit: int = 1000, order_by: Optional[str] = None) -> List[Memory]:
-        """指定ドメインの記憶一覧を取得"""
+    async def get_memories_by_scope(self, scope: Optional[str] = None, limit: int = 1000, order_by: Optional[str] = None) -> List[Memory]:
+        """Get memories by scope"""
         async with aiosqlite.connect(self.database_path) as db:
             query = "SELECT * FROM memories WHERE 1=1"
             params = []
-            if domain:
-                query += " AND domain = ?"
-                params.append(domain.value if hasattr(domain, 'value') else str(domain))
+            if scope:
+                # Filter by scope stored in metadata
+                query += " AND JSON_EXTRACT(metadata, '$.scope') = ?"
+                params.append(scope)
             if order_by:
                 query += f" ORDER BY {order_by}"
             else:
@@ -272,15 +279,18 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     memories.append(memory)
             return memories
 
-    async def get_memory_stats(self, domain: Optional[MemoryDomain] = None) -> Dict[str, Any]:
-        """ドメイン別・カテゴリ別件数など統計情報を返す"""
+    async def get_memory_stats(self, scope: Optional[str] = None) -> Dict[str, Any]:
+        """Get memory statistics by scope and category"""
         stats: Dict[str, Any] = {"total": 0, "by_category": {}}
         async with aiosqlite.connect(self.database_path) as db:
             query = "SELECT metadata, COUNT(*) as cnt FROM memories WHERE 1=1"
             params: List[Any] = []
-            if domain:
-                query += " AND domain = ?"
-                params.append(domain.value if hasattr(domain, 'value') else str(domain))
+            if scope:
+                query += " AND JSON_EXTRACT(metadata, '$.scope') = ?"
+                params.append(scope)
+            if scope:
+                query += " AND JSON_EXTRACT(metadata, '$.scope') = ?"
+                params.append(scope)
             query += " GROUP BY metadata"
             async with db.execute(query, params) as cursor:
                 rows = await cursor.fetchall()
@@ -294,24 +304,24 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 stats["by_category"][category] = row[1]
                 stats["total"] += row[1]
         return stats
-    """SQLite実装のメタデータストア"""
+    """SQLite implementation of metadata store"""
 
     def __init__(self, database_path: str = "./data/memory.db"):
         self.database_path = database_path
         self.db_lock = asyncio.Lock()
 
-        # データベースディレクトリを作成
+        # Create database directory
         Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self) -> None:
-        """データベースとテーブルを初期化"""
+        """Initialize database and tables"""
         try:
             async with aiosqlite.connect(self.database_path) as db:
-                # 記憶テーブル
+                # Memories table
                 await db.execute('''
                     CREATE TABLE IF NOT EXISTS memories (
                         id TEXT PRIMARY KEY,
-                        domain TEXT NOT NULL,
+                        scope TEXT NOT NULL,
                         content TEXT NOT NULL,
                         metadata TEXT,
                         tags TEXT,
@@ -325,7 +335,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     )
                 ''')
 
-                # 関連性テーブル
+                # Associations table
                 await db.execute('''
                     CREATE TABLE IF NOT EXISTS associations (
                         id TEXT PRIMARY KEY,
@@ -345,10 +355,10 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     )
                 ''')
 
-                # インデックス作成
+                # Create indexes
                 await db.execute('''
-                    CREATE INDEX IF NOT EXISTS idx_memories_domain
-                    ON memories (domain)
+                    CREATE INDEX IF NOT EXISTS idx_memories_scope
+                    ON memories (scope)
                 ''')
                 await db.execute('''
                     CREATE INDEX IF NOT EXISTS idx_memories_user_project
@@ -383,45 +393,52 @@ class SQLiteMetadataStore(BaseMetadataStore):
             raise
 
     async def close(self) -> None:
-        """データベース接続を閉じる"""
+        """Close database connection"""
         # aiosqliteは自動でクローズされる
         logger.info("SQLite metadata store closed")
 
     async def health_check(self) -> Dict[str, Any]:
-        """ヘルスチェック"""
+        """Health check"""
         try:
             async with aiosqlite.connect(self.database_path) as db:
-                # 記憶数を取得
+                # Get memory count
                 async with db.execute(
                     "SELECT COUNT(*) FROM memories"
                 ) as cursor:
                     row = await cursor.fetchone()
                     memory_count = row[0] if row and row[0] is not None else 0
 
-                # 関連性数を取得
+                # Get association count
                 async with db.execute(
                     "SELECT COUNT(*) FROM associations"
                 ) as cursor:
                     row = await cursor.fetchone()
                     association_count = row[0] if row and row[0] is not None else 0
 
-                # ドメイン別統計
-                domain_stats = {}
-                for domain in MemoryDomain:
+                # スコープ別統計
+                scope_stats = {}
+                # 既存のスコープを動的に取得
+                async with db.execute(
+                    "SELECT DISTINCT JSON_EXTRACT(metadata, '$.scope') as scope FROM memories WHERE scope IS NOT NULL"
+                ) as cursor:
+                    scope_rows = await cursor.fetchall()
+                
+                for scope_row in scope_rows:
+                    scope = scope_row[0] if scope_row[0] else 'unknown'
                     async with db.execute(
-                        "SELECT COUNT(*) FROM memories WHERE domain = ?",
-                        (domain.value,)
+                        "SELECT COUNT(*) FROM memories WHERE JSON_EXTRACT(metadata, '$.scope') = ?",
+                        (scope,)
                     ) as cursor:
                         row = await cursor.fetchone()
                         count = row[0] if row and row[0] is not None else 0
-                        domain_stats[domain.value] = count
+                        scope_stats[scope] = count
 
                 return {
                     "status": "healthy",
                     "database_path": self.database_path,
                     "total_memories": memory_count,
                     "total_associations": association_count,
-                    "domain_stats": domain_stats,
+                    "scope_stats": scope_stats,
                     "timestamp": datetime.utcnow().isoformat()
                 }
 
@@ -434,19 +451,19 @@ class SQLiteMetadataStore(BaseMetadataStore):
             }
 
     async def store_memory(self, memory: Memory) -> str:
-        """記憶を保存"""
+        """Store memory with scope information"""
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
                     await db.execute('''
                         INSERT OR REPLACE INTO memories (
-                            id, domain, content, metadata, tags, user_id,
+                            id, scope, content, metadata, tags, user_id,
                             project_id, session_id, created_at, updated_at,
                             accessed_at, access_count
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         memory.id,
-                        memory.domain.value,
+                        memory.scope,
                         memory.content,
                         json.dumps(memory.metadata),
                         json.dumps(memory.tags),
@@ -465,7 +482,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 "Memory stored",
                 extra_data={
                     "memory_id": memory.id,
-                    "domain": memory.domain.value
+                    "scope": memory.scope
                 }
             )
 
@@ -481,7 +498,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
             raise
 
     async def get_memory(self, memory_id: str) -> Optional[Memory]:
-        """記憶を取得"""
+        """Get memory"""
         try:
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(
@@ -500,7 +517,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
             return None
 
     async def update_memory(self, memory: Memory) -> bool:
-        """記憶を更新"""
+        """Update memory"""
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
@@ -537,17 +554,17 @@ class SQLiteMetadataStore(BaseMetadataStore):
             return False
 
     async def delete_memory(self, memory_id: str) -> bool:
-        """記憶を削除"""
+        """Delete memory"""
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
-                    # 関連する関連性も削除
+                    # Also delete related associations
                     await db.execute('''
                         DELETE FROM associations
                         WHERE source_memory_id = ? OR target_memory_id = ?
                     ''', (memory_id, memory_id))
 
-                    # 記憶を削除
+                    # Delete memory
                     await db.execute(
                         "DELETE FROM memories WHERE id = ?",
                         (memory_id,)
@@ -573,7 +590,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
     async def search_memories(
         self,
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         query: Optional[str] = None,
         tags: Optional[List[str]] = None,
         user_id: Optional[str] = None,
@@ -584,12 +601,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
         limit: int = 50,
         offset: int = 0
     ) -> List[Memory]:
-        """記憶を検索"""
+        """Search memories"""
         try:
-            where_conditions = ["domain = ?"]
-            params = [domain.value]
+            where_conditions = ["JSON_EXTRACT(metadata, '$.scope') = ?"]
+            params = [scope]
 
-            # 条件を構築
+            # Build conditions
             if query:
                 where_conditions.append("content LIKE ?")
                 params.append(f"%{query}%")
@@ -614,7 +631,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 where_conditions.append("created_at <= ?")
                 params.append(date_to.isoformat())
 
-            # タグ検索
+            # Tag search
             if tags:
                 tag_conditions = []
                 for tag in tags:
@@ -644,7 +661,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     logger.info(
                         "Memory search completed",
                         extra_data={
-                            "domain": domain.value,
+                            "scope": scope,
                             "result_count": len(memories),
                             "query": query
                         }
@@ -656,21 +673,21 @@ class SQLiteMetadataStore(BaseMetadataStore):
             logger.error(
                 "Failed to search memories",
                 error_code="MEMORY_SEARCH_ERROR",
-                domain=domain.value,
+                scope=scope,
                 error=str(e)
             )
             return []
 
     async def get_memory_count(
         self,
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         user_id: Optional[str] = None,
         project_id: Optional[str] = None
     ) -> int:
-        """記憶数を取得"""
+        """Get memory count"""
         try:
-            where_conditions: List[str] = ["domain = ?"]
-            params: List[Any] = [domain.value]
+            where_conditions: List[str] = ["JSON_EXTRACT(metadata, '$.scope') = ?"]
+            params: List[Any] = [scope]
 
             if user_id:
                 where_conditions.append("user_id = ?")
@@ -697,13 +714,13 @@ class SQLiteMetadataStore(BaseMetadataStore):
             logger.error(
                 "Failed to get memory count",
                 error_code="MEMORY_COUNT_ERROR",
-                domain=domain.value,
+                scope=scope,
                 error=str(e)
             )
             return 0
 
     async def store_association(self, association: Association) -> str:
-        """関連性を保存"""
+        """Store association"""
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
@@ -748,7 +765,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         memory_id: str,
         direction: Optional[str] = None
     ) -> List[Association]:
-        """関連性を取得"""
+        """Get associations"""
         try:
             if direction == "incoming":
                 where_clause = "target_memory_id = ?"
@@ -796,7 +813,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
             return []
 
     async def delete_association(self, association_id: str) -> bool:
-        """関連性を削除"""
+        """Delete association"""
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:

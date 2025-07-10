@@ -23,7 +23,7 @@ Built with **FastMCP 2.0** for modern LLM integration, optimized for **GitHub Co
 
 ### 🔍 **Advanced Discovery**
 - **Top-K Search**: Optimized threshold (0.1) with LLM-guided relevance judgment
-- **Cross-Scope Associations**: Find connections across different knowledge domains
+- **Cross-Scope Associations**: Find connections across different knowledge scopes
 - **Similarity Scoring**: Transparent relevance metrics for intelligent filtering
 - **Creative Connections**: Discover unexpected relationships for innovation
 

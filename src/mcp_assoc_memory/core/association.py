@@ -11,7 +11,7 @@ import numpy as np
 
 from ..core.similarity import SimilarityCalculator, SimilarityMetric
 from ..models.association import Association
-from ..models.memory import Memory, MemoryDomain
+from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
 
 logger = get_memory_logger(__name__)
@@ -112,10 +112,10 @@ class AssociationEngine:
             if candidate_memory.id == target_memory.id:
                 continue
 
-            # ドメイン適合性チェック
-            if not self._is_domain_compatible(
-                target_memory.domain,
-                candidate_memory.domain
+            # Scope compatibility check
+            if not self._is_scope_compatible(
+                target_memory.scope,
+                candidate_memory.scope
             ):
                 continue
 
@@ -267,12 +267,12 @@ class AssociationEngine:
         )
         strength += metadata_similarity * 0.3
 
-        # ドメイン関連性
-        domain_strength = self._calculate_domain_strength(
-            memory1.domain,
-            memory2.domain
+        # Scope relationship
+        scope_strength = self._calculate_scope_strength(
+            memory1.scope,
+            memory2.scope
         )
-        strength += domain_strength * 0.2
+        strength += scope_strength * 0.2
 
         return min(1.0, strength)
 
@@ -324,48 +324,51 @@ class AssociationEngine:
 
         return matches / len(common_keys)
 
-    def _calculate_domain_strength(
+    def _calculate_scope_strength(
         self,
-        domain1: MemoryDomain,
-        domain2: MemoryDomain
+        scope1: str,
+        scope2: str
     ) -> float:
-        """ドメイン間関連強度を計算"""
-        if domain1 == domain2:
+        """Calculate scope relationship strength"""
+        if scope1 == scope2:
             return 1.0
 
-        # ドメイン階層による関連度
-        domain_hierarchy = {
-            MemoryDomain.SESSION: 0,
-            MemoryDomain.PROJECT: 1,
-            MemoryDomain.USER: 2,
-            MemoryDomain.GLOBAL: 3
-        }
+        # Split scopes into parts for hierarchical comparison
+        parts1 = scope1.split('/')
+        parts2 = scope2.split('/')
+        
+        # Calculate common prefix length
+        common_length = 0
+        min_length = min(len(parts1), len(parts2))
+        
+        for i in range(min_length):
+            if parts1[i] == parts2[i]:
+                common_length += 1
+            else:
+                break
+        
+        # Calculate strength based on common hierarchy depth
+        max_depth = max(len(parts1), len(parts2))
+        if max_depth == 0:
+            return 0.0
+            
+        strength = common_length / max_depth
+        return max(0.0, min(1.0, strength))
 
-        level1 = domain_hierarchy.get(domain1, 0)
-        level2 = domain_hierarchy.get(domain2, 0)
-
-        # レベル差が小さいほど関連が強い
-        level_diff = abs(level1 - level2)
-        strength = 1.0 - (level_diff / 3.0)
-
-        return max(0.0, strength)
-
-    def _is_domain_compatible(
+    def _is_scope_compatible(
         self,
-        domain1: MemoryDomain,
-        domain2: MemoryDomain
+        scope1: str,
+        scope2: str
     ) -> bool:
-        """ドメイン間の互換性チェック"""
-        # セッションドメインは同一セッション内のみ関連可能
-        # （実際の実装では session_id も確認する必要がある）
-        incompatible_pairs = [
-            (MemoryDomain.SESSION, MemoryDomain.GLOBAL),
-        ]
-
-        for d1, d2 in incompatible_pairs:
-            if (domain1 == d1 and domain2 == d2) or \
-               (domain1 == d2 and domain2 == d1):
-                return False
+        """Check scope compatibility"""
+        # Session scopes are only compatible with same session
+        if scope1.startswith('session/') and scope2.startswith('session/'):
+            return scope1 == scope2
+        
+        # Session scopes are not compatible with global scopes
+        if (scope1.startswith('session/') and scope2 == 'global') or \
+           (scope2.startswith('session/') and scope1 == 'global'):
+            return False
 
         return True
 

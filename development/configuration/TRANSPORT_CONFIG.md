@@ -1,5 +1,7 @@
 # マルチトランスポート設定例
 
+> **Note**: This document contains legacy examples that reference the old "domain" concept. Current implementation uses hierarchical "scope" system instead of domains. Please refer to MEMORY_SCOPES.md for current scope-based design.
+
 ## development.json（開発環境）
 
 ```json

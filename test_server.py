@@ -32,34 +32,31 @@ def test_server_initialization():
             # Initialize the global memory manager
             await ensure_initialized()
             print("✅ Global memory manager initialized")
-            
-            # Test basic async memory operations
-            from mcp_assoc_memory.models.memory import MemoryDomain
-            
+             # Test basic async memory operations
             memory = await memory_manager.store_memory(
-                domain=MemoryDomain.USER,
+                scope="user/test",
                 content="Test memory for server initialization verification",
                 category="test",
                 tags=["test", "server", "initialization"],
                 metadata={"test": True}
             )
             print(f"✅ Memory stored via memory manager with ID: {memory.id}")
-            
+
             # Test search
             results = await memory_manager.search_memories(
                 query="test server initialization",
-                domains=[MemoryDomain.USER],
+                scope="user/test",
                 limit=5,
                 similarity_threshold=0.1
             )
             print(f"✅ Search returned {len(results)} results")
-            
+
             # Test retrieval
             retrieved_memory = await memory_manager.get_memory(memory.id)
             if retrieved_memory:
                 print("✅ Memory retrieved successfully")
                 print(f"   Content: {retrieved_memory.content[:50]}...")
-                print(f"   Domain: {retrieved_memory.domain}")
+                print(f"   Scope: {retrieved_memory.scope}")
                 print(f"   Tags: {retrieved_memory.tags}")
             else:
                 print("❌ Failed to retrieve memory")

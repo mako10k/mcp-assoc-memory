@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..models.association import Association
-from ..models.memory import Memory, MemoryDomain
+from ..models.memory import Memory
 
 
 class BaseStorage(ABC):
@@ -60,7 +60,7 @@ class BaseVectorStore(BaseStorage):
     async def search(
         self,
         embedding: Any,
-        domain: str,
+        scope: str,
         limit: int = 10,
         min_score: float = 0.7
     ) -> List["Tuple[str, float]"]:
@@ -82,12 +82,12 @@ class BaseVectorStore(BaseStorage):
     async def search_similar(
         self,
         query_embedding: List[float],
-        domain: MemoryDomain,
+        scope: Optional[str] = None,  # Changed from domain to scope
         limit: int = 10,
         min_similarity: float = 0.0,
         filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        """類似ベクトルを検索"""
+        """Search similar vectors"""
         pass
 
     @abstractmethod
@@ -106,7 +106,7 @@ class BaseVectorStore(BaseStorage):
 
     @abstractmethod
     async def get_collection_stats(
-        self, domain: MemoryDomain
+        self, scope: Optional[str] = None
     ) -> Dict[str, Any]:
         """コレクション統計を取得"""
         pass
@@ -114,19 +114,19 @@ class BaseVectorStore(BaseStorage):
 
 class BaseMetadataStore(BaseStorage):
     @abstractmethod
-    async def get_memories_by_domain(
+    async def get_memories_by_scope(
         self,
-        domain: Optional[MemoryDomain] = None,
+        scope: Optional[str] = None,
         limit: int = 1000,
         order_by: Optional[str] = None
     ) -> List[Memory]:
-        """ドメインごとの記憶一覧取得"""
+        """スコープごとの記憶一覧取得"""
         pass
 
     @abstractmethod
     async def get_memory_stats(
         self,
-        domain: Optional[MemoryDomain] = None
+        scope: Optional[str] = None
     ) -> Dict[str, Any]:
         """記憶統計取得"""
         pass
@@ -135,7 +135,7 @@ class BaseMetadataStore(BaseStorage):
     async def search_by_tags(
         self,
         tags: List[str],
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         match_all: bool = False,
         limit: int = 10
     ) -> List[Memory]:
@@ -147,7 +147,7 @@ class BaseMetadataStore(BaseStorage):
         self,
         start_date: datetime,
         end_date: datetime,
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         limit: int = 10
     ) -> List[Memory]:
         """時間範囲検索"""
@@ -156,7 +156,7 @@ class BaseMetadataStore(BaseStorage):
     @abstractmethod
     async def advanced_search(
         self,
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         tags: Optional[List[str]] = None,
         category: Optional[str] = None,
         start_date: Optional[datetime] = None,
@@ -230,7 +230,7 @@ class BaseMetadataStore(BaseStorage):
     @abstractmethod
     async def search_memories(
         self,
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         query: Optional[str] = None,
         tags: Optional[List[str]] = None,
         user_id: Optional[str] = None,
@@ -247,7 +247,7 @@ class BaseMetadataStore(BaseStorage):
     @abstractmethod
     async def get_memory_count(
         self,
-        domain: MemoryDomain,
+        scope: Optional[str] = None,
         user_id: Optional[str] = None,
         project_id: Optional[str] = None
     ) -> int:
@@ -278,7 +278,7 @@ class BaseGraphStore(BaseStorage):
     @abstractmethod
     async def get_all_association_edges(
         self,
-        domain: Optional[MemoryDomain] = None
+        scope: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """全関連エッジ取得（可視化用）"""
         pass
@@ -286,7 +286,7 @@ class BaseGraphStore(BaseStorage):
     @abstractmethod
     async def export_graph(
         self,
-        domain: Optional[MemoryDomain] = None
+        scope: Optional[str] = None
     ) -> Dict[str, Any]:
         """グラフ構造エクスポート（可視化用）"""
         pass
