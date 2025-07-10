@@ -44,6 +44,13 @@ class StorageConfig:
     graph_store_type: str = "networkx"  # networkx, neo4j
     backup_enabled: bool = True
     backup_interval_hours: int = 24
+    
+    # File sync configuration
+    export_dir: str = "exports"  # Directory for memory exports
+    import_dir: str = "imports"  # Directory for memory imports
+    allow_absolute_paths: bool = False  # Allow absolute file paths
+    max_export_size_mb: int = 100  # Maximum export file size
+    max_import_size_mb: int = 100  # Maximum import file size
 
 
 @dataclass
@@ -161,6 +168,11 @@ class Config:
 
         # Storage configuration
         self.storage.data_dir = os.getenv("DATA_DIR", self.storage.data_dir)
+        self.storage.export_dir = os.getenv("EXPORT_DIR", self.storage.export_dir)
+        self.storage.import_dir = os.getenv("IMPORT_DIR", self.storage.import_dir)
+        self.storage.allow_absolute_paths = os.getenv("ALLOW_ABSOLUTE_PATHS", "false").lower() == "true"
+        self.storage.max_export_size_mb = int(os.getenv("MAX_EXPORT_SIZE_MB", str(self.storage.max_export_size_mb)))
+        self.storage.max_import_size_mb = int(os.getenv("MAX_IMPORT_SIZE_MB", str(self.storage.max_import_size_mb)))
 
         # Security configuration
         self.security.auth_enabled = os.getenv(

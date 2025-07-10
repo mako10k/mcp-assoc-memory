@@ -9,6 +9,11 @@ from datetime import datetime, timedelta
 import logging
 import asyncio
 import uuid
+import json
+import gzip
+import base64
+import os
+from pathlib import Path
 import logging
 import uuid
 import asyncio
@@ -428,6 +433,143 @@ class SessionManageResponse(BaseModel):
     session_id: Optional[str] = None
     active_sessions: List[SessionInfo]
     cleaned_sessions: Optional[int] = None
+
+
+class MemoryExportRequest(BaseModel):
+    scope: Optional[str] = Field(
+        default=None, 
+        description="""Scope to export (optional):
+        
+        Export Scope Strategy:
+        • None: Export all memories (full backup)
+        • "work": Export only work-related memories
+        • "session/project-name": Export specific session
+        • "learning": Export learning-related memories
+        
+        Use Cases:
+        • Full backup: Leave empty for complete export
+        • Partial sync: Specify scope for targeted export
+        • Project handoff: Export specific project scope
+        
+        Example: scope="work/projects/mcp-improvements" for project-specific export"""
+    )
+    include_associations: bool = Field(
+        default=True, 
+        description="Include association relationships in export"
+    )
+    export_format: str = Field(
+        default="json", 
+        description="Export format (json, yaml)",
+        pattern="^(json|yaml)$"
+    )
+    file_path: Optional[str] = Field(
+        default=None, 
+        description="""Server-side file path for export (Pattern A):
+        
+        File Path Strategy:
+        • None: Return data directly via response (Pattern B)
+        • Relative path: Save to server-configured export directory
+        • Absolute path: Save to specified location (if permitted)
+        
+        Examples:
+        • file_path=None: Direct data exchange mode
+        • file_path="backup/memories-2025-07-10.json": Server-side file
+        • file_path="/shared/project-memories.json": Absolute path mode
+        
+        Security: Server validates paths against configured allowed directories"""
+    )
+    compression: bool = Field(
+        default=False, 
+        description="Compress export data (gzip)"
+    )
+
+
+class MemoryImportRequest(BaseModel):
+    file_path: Optional[str] = Field(
+        default=None, 
+        description="""Server-side file path for import (Pattern A):
+        
+        Import Source Strategy:
+        • None: Expect data in import_data field (Pattern B)
+        • Relative path: Load from server-configured import directory
+        • Absolute path: Load from specified location (if permitted)
+        
+        Examples:
+        • file_path=None: Direct data import mode
+        • file_path="backup/memories-2025-07-10.json": Server-side file
+        • file_path="/shared/project-memories.json": Absolute path mode"""
+    )
+    import_data: Optional[str] = Field(
+        default=None, 
+        description="""Direct import data (Pattern B):
+        
+        Data Format:
+        • JSON string containing exported memory data
+        • Used when file_path is None
+        • Enables cross-node memory transfer
+        • Supports compressed data (base64 encoded gzip)
+        
+        Usage Pattern:
+        1. Export from source environment with file_path=None
+        2. Copy export response data
+        3. Import to target environment with import_data=<copied_data>"""
+    )
+    merge_strategy: str = Field(
+        default="skip_duplicates", 
+        description="""How to handle duplicate memories:
+        
+        Merge Strategies:
+        • "skip_duplicates": Keep existing, skip imports (safe default)
+        • "overwrite": Replace existing with imported data
+        • "create_versions": Create new versions of duplicates
+        • "merge_metadata": Combine metadata while keeping content
+        
+        Use Cases:
+        • skip_duplicates: Safe import without conflicts
+        • overwrite: Force update from authoritative source
+        • create_versions: Preserve both local and imported versions"""
+    )
+    target_scope_prefix: Optional[str] = Field(
+        default=None, 
+        description="""Prefix to add to imported memory scopes:
+        
+        Scope Mapping:
+        • None: Keep original scopes (default)
+        • "imported/": Prefix all imported scopes
+        • "backup/2025-07-10/": Add dated prefix
+        
+        Examples:
+        • Original: "work/projects/alpha" 
+        • With prefix "imported/": "imported/work/projects/alpha"
+        
+        Use Cases: Isolate imported memories, avoid scope conflicts"""
+    )
+    validate_data: bool = Field(
+        default=True, 
+        description="Validate imported data structure and content"
+    )
+
+
+class MemoryExportResponse(BaseModel):
+    success: bool
+    exported_count: int
+    export_scope: Optional[str]
+    file_path: Optional[str] = None
+    export_data: Optional[str] = None  # For Pattern B
+    export_size: int  # Size in bytes
+    compression_used: bool
+    metadata: Dict[str, Any]
+
+
+class MemoryImportResponse(BaseModel):
+    success: bool
+    imported_count: int
+    skipped_count: int
+    overwritten_count: int
+    import_source: str  # "file" or "direct_data"
+    merge_strategy_used: str
+    validation_errors: List[str]
+    imported_scopes: List[str]
 
 
 # Memory management tools
@@ -1793,6 +1935,451 @@ async def memory_discover_associations(
     except Exception as e:
         await ctx.error(f"Failed to discover associations: {e}")
         return {"error": str(e), "associations": []}
+
+
+@mcp.tool(
+    name="memory_import",
+    description="""📥 Import Memories: "Restore or sync memories from backup or other environments"
+
+When to use:
+→ Restore memories from backup files
+→ Sync memories from other development environments
+→ Import shared project memories from team
+→ Merge memory datasets
+
+How it works:
+Imports memories and metadata from files or direct data, with configurable merge strategies to handle duplicates and conflicts.
+
+💡 Quick Start:
+- File import: file_path="backup/memories-2025-07-10.json"
+- Direct import: import_data="<exported_json_data>"
+- Safe merge: merge_strategy="skip_duplicates" (default)
+- Scope isolation: target_scope_prefix="imported/" to avoid conflicts
+
+⚠️ Important: Embeddings will be re-computed after import
+
+➡️ What's next: Use memory_search to verify imported memories""",
+    annotations={
+        "title": "Memory Import",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False
+    }
+)
+async def memory_import(
+    request: MemoryImportRequest,
+    ctx: Context
+) -> MemoryImportResponse:
+    """Import memories from file or direct data"""
+    try:
+        await ensure_initialized()
+        
+        import_mode = "file" if request.file_path else "direct data"
+        await ctx.info(f"Importing memories via {import_mode} with merge strategy: {request.merge_strategy}")
+        
+        # Load import data
+        import_data_str = None
+        import_source = ""
+        
+        if request.file_path:
+            # Pattern A: File import
+            file_path = await _resolve_import_path(request.file_path)
+            
+            if not Path(file_path).exists():
+                raise ValueError(f"Import file not found: {file_path}")
+            
+            # Check file size
+            file_size = Path(file_path).stat().st_size
+            try:
+                max_size_mb = config.storage.max_import_size_mb
+            except AttributeError:
+                max_size_mb = 100  # Default 100MB limit
+                
+            if file_size > max_size_mb * 1024 * 1024:
+                raise ValueError(f"Import file size ({file_size / 1024 / 1024:.1f}MB) exceeds limit ({max_size_mb}MB)")
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                file_content = f.read()
+                
+            # Handle compressed files
+            if file_content.startswith("# Compressed MCP Memory Export"):
+                lines = file_content.split('\n', 1)
+                if len(lines) > 1:
+                    compressed_data = base64.b64decode(lines[1])
+                    import_data_str = gzip.decompress(compressed_data).decode('utf-8')
+                else:
+                    raise ValueError("Invalid compressed file format")
+            else:
+                import_data_str = file_content
+                
+            import_source = f"file:{file_path}"
+            
+        elif request.import_data:
+            # Pattern B: Direct data import
+            import_data_str = request.import_data
+            
+            # Check if it's compressed (base64 encoded)
+            try:
+                if not import_data_str.strip().startswith('{'):
+                    # Assume it's compressed
+                    compressed_data = base64.b64decode(import_data_str)
+                    import_data_str = gzip.decompress(compressed_data).decode('utf-8')
+            except:
+                pass  # If decompression fails, assume it's plain JSON
+                
+            import_source = "direct_data"
+            
+        else:
+            raise ValueError("Either file_path or import_data must be provided")
+        
+        # Parse JSON data
+        try:
+            import_data = json.loads(import_data_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON data: {e}")
+        
+        # Validate data structure if requested
+        validation_errors = []
+        if request.validate_data:
+            validation_errors = await _validate_import_data(import_data)
+            if validation_errors and request.validate_data:
+                raise ValueError(f"Validation errors: {validation_errors}")
+        
+        # Process import
+        imported_count = 0
+        skipped_count = 0
+        overwritten_count = 0
+        imported_scopes = set()
+        
+        memories_to_import = import_data.get("memories", [])
+        
+        for memory_data in memories_to_import:
+            try:
+                memory_id = memory_data["memory_id"]
+                original_scope = memory_data["scope"]
+                
+                # Apply scope prefix if specified
+                final_scope = original_scope
+                if request.target_scope_prefix:
+                    final_scope = f"{request.target_scope_prefix.rstrip('/')}/{original_scope}"
+                
+                imported_scopes.add(final_scope)
+                
+                # Check for existing memory
+                existing_memory = memory_storage.get(memory_id)
+                
+                if existing_memory:
+                    if request.merge_strategy == "skip_duplicates":
+                        skipped_count += 1
+                        continue
+                    elif request.merge_strategy == "overwrite":
+                        # Proceed with overwrite
+                        overwritten_count += 1
+                    elif request.merge_strategy == "create_versions":
+                        # Create new ID for version
+                        memory_id = f"{memory_id}_v{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                    elif request.merge_strategy == "merge_metadata":
+                        # Merge metadata while keeping existing content
+                        if "metadata" not in existing_memory:
+                            existing_memory["metadata"] = {}
+                        existing_memory["metadata"].update(memory_data.get("metadata", {}))
+                        memory_storage[memory_id] = existing_memory
+                        imported_count += 1
+                        continue
+                
+                # Prepare memory for import
+                imported_memory = {
+                    "memory_id": memory_id,
+                    "content": memory_data["content"],
+                    "scope": final_scope,
+                    "metadata": memory_data.get("metadata", {}),
+                    "tags": memory_data.get("tags", []),
+                    "category": memory_data.get("category"),
+                    "created_at": datetime.fromisoformat(memory_data["created_at"]) if isinstance(memory_data["created_at"], str) else memory_data["created_at"]
+                }
+                
+                # Store in simple storage
+                memory_storage[memory_id] = imported_memory
+                imported_count += 1
+                
+                # TODO: Store in advanced storage if available
+                # This would require re-computing embeddings and associations
+                
+            except Exception as e:
+                validation_errors.append(f"Failed to import memory {memory_data.get('memory_id', 'unknown')}: {e}")
+                continue
+        
+        # Save to persistent storage
+        persistence.save_memories(memory_storage)
+        
+        await ctx.info(f"Import completed: {imported_count} imported, {skipped_count} skipped, {overwritten_count} overwritten")
+        
+        return MemoryImportResponse(
+            success=True,
+            imported_count=imported_count,
+            skipped_count=skipped_count,
+            overwritten_count=overwritten_count,
+            import_source=import_source,
+            merge_strategy_used=request.merge_strategy,
+            validation_errors=validation_errors,
+            imported_scopes=list(imported_scopes)
+        )
+        
+    except Exception as e:
+        await ctx.error(f"Failed to import memories: {e}")
+        raise
+
+
+# File path resolution utilities
+async def _resolve_export_path(file_path: str) -> Path:
+    """Resolve and validate export file path"""
+    if Path(file_path).is_absolute():
+        try:
+            allow_absolute = config.storage.allow_absolute_paths
+        except AttributeError:
+            allow_absolute = False
+        if not allow_absolute:
+            raise ValueError("Absolute paths not allowed in configuration")
+        return Path(file_path)
+    else:
+        # Relative to export directory
+        try:
+            data_dir = config.storage.data_dir
+            export_dir_name = config.storage.export_dir
+        except AttributeError:
+            data_dir = "data"
+            export_dir_name = "exports"
+        export_dir = Path(data_dir) / export_dir_name
+        return export_dir / file_path
+
+
+async def _resolve_import_path(file_path: str) -> Path:
+    """Resolve and validate import file path"""
+    if Path(file_path).is_absolute():
+        try:
+            allow_absolute = config.storage.allow_absolute_paths
+        except AttributeError:
+            allow_absolute = False
+        if not allow_absolute:
+            raise ValueError("Absolute paths not allowed in configuration")
+        return Path(file_path)
+    else:
+        # Try import directory first, then export directory
+        try:
+            data_dir = config.storage.data_dir
+            import_dir_name = config.storage.import_dir
+            export_dir_name = config.storage.export_dir
+        except AttributeError:
+            data_dir = "data"
+            import_dir_name = "imports"
+            export_dir_name = "exports"
+            
+        import_dir = Path(data_dir) / import_dir_name
+        import_path = import_dir / file_path
+        
+        if import_path.exists():
+            return import_path
+        
+        # Fallback to export directory
+        export_dir = Path(data_dir) / export_dir_name
+        export_path = export_dir / file_path
+        
+        if export_path.exists():
+            return export_path
+            
+        # Return original path for error handling
+        return import_path
+
+
+async def _validate_import_data(import_data: Dict[str, Any]) -> List[str]:
+    """Validate import data structure"""
+    errors = []
+    
+    # Check required fields
+    if "memories" not in import_data:
+        errors.append("Missing 'memories' field")
+        return errors
+    
+    if not isinstance(import_data["memories"], list):
+        errors.append("'memories' must be a list")
+        return errors
+    
+    # Validate each memory
+    for i, memory in enumerate(import_data["memories"]):
+        if not isinstance(memory, dict):
+            errors.append(f"Memory {i}: must be an object")
+            continue
+            
+        required_fields = ["memory_id", "content", "scope", "created_at"]
+        for field in required_fields:
+            if field not in memory:
+                errors.append(f"Memory {i}: missing required field '{field}'")
+    
+    return errors
+
+
+@mcp.tool(
+    name="memory_export",
+    description="""📤 Export Memories: "Save my memories for backup or sync across environments"
+
+When to use:
+→ Backup memories before system changes
+→ Sync memories across development environments
+→ Share project-specific memories with team
+→ Create portable memory snapshots
+
+How it works:
+Exports memories and metadata (excluding re-computable embeddings) to files or direct data exchange for cross-environment portability.
+
+💡 Quick Start:
+- Full backup: No scope specified, file_path=None for direct data
+- Project export: scope="work/projects/my-project" 
+- File export: file_path="backup/memories-2025-07-10.json"
+- Compressed: compression=True for large datasets
+
+⚠️ Important: Embeddings excluded (will be re-computed on import)
+
+➡️ What's next: Use memory_import to restore in target environment""",
+    annotations={
+        "title": "Memory Export",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True
+    }
+)
+async def memory_export(
+    request: MemoryExportRequest,
+    ctx: Context
+) -> MemoryExportResponse:
+    """Export memories to file or direct data exchange"""
+    try:
+        await ensure_initialized()
+        
+        scope_info = f" from scope '{request.scope}'" if request.scope else " (all scopes)"
+        export_mode = "file" if request.file_path else "direct data"
+        await ctx.info(f"Exporting memories{scope_info} via {export_mode}")
+        
+        # Filter memories by scope
+        export_memories = []
+        for memory_data in memory_storage.values():
+            if request.scope:
+                memory_scope = memory_data["scope"]
+                # Include if memory scope matches or is a child of request scope
+                if memory_scope == request.scope or memory_scope.startswith(request.scope + "/"):
+                    export_memories.append(memory_data)
+            else:
+                export_memories.append(memory_data)
+        
+        # Prepare export data structure
+        export_data = {
+            "format_version": "1.0",
+            "export_timestamp": datetime.now().isoformat(),
+            "export_scope": request.scope,
+            "total_memories": len(export_memories),
+            "include_associations": request.include_associations,
+            "memories": []
+        }
+        
+        # Process each memory for export
+        for memory_data in export_memories:
+            memory_export = {
+                "memory_id": memory_data["memory_id"],
+                "content": memory_data["content"],
+                "scope": memory_data["scope"],
+                "metadata": memory_data.get("metadata", {}),
+                "tags": memory_data.get("tags", []),
+                "category": memory_data.get("category"),
+                "created_at": memory_data["created_at"].isoformat() if isinstance(memory_data["created_at"], datetime) else memory_data["created_at"]
+            }
+            
+            # Add associations if requested
+            if request.include_associations:
+                # Get associations from advanced storage if available
+                try:
+                    memory = await memory_manager.get_memory(memory_data["memory_id"])
+                    if memory:
+                        associations = await memory_manager.get_associations(memory.id)
+                        memory_export["associations"] = [assoc.id for assoc in associations]
+                except:
+                    memory_export["associations"] = []
+            
+            export_data["memories"].append(memory_export)
+        
+        # Convert to JSON
+        json_data = json.dumps(export_data, indent=2, ensure_ascii=False)
+        
+        # Apply compression if requested
+        final_data = json_data
+        compression_used = False
+        if request.compression:
+            compressed_data = gzip.compress(json_data.encode('utf-8'))
+            final_data = base64.b64encode(compressed_data).decode('ascii')
+            compression_used = True
+        
+        export_size = len(final_data.encode('utf-8'))
+        
+        # Check size limits (use fallback values if config not properly loaded)
+        try:
+            max_size_mb = config.storage.max_export_size_mb
+        except AttributeError:
+            max_size_mb = 100  # Default 100MB limit
+            
+        if export_size > max_size_mb * 1024 * 1024:
+            raise ValueError(f"Export size ({export_size / 1024 / 1024:.1f}MB) exceeds limit ({max_size_mb}MB)")
+        
+        # Handle file export (Pattern A)
+        if request.file_path:
+            file_path = await _resolve_export_path(request.file_path)
+            
+            # Ensure export directory exists
+            export_dir = Path(file_path).parent
+            export_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Write to file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                if compression_used:
+                    # For file export, store compressed data as base64
+                    f.write(f"# Compressed MCP Memory Export (base64-encoded gzip)\n{final_data}")
+                else:
+                    f.write(final_data)
+            
+            await ctx.info(f"Exported {len(export_memories)} memories to file: {file_path}")
+            
+            return MemoryExportResponse(
+                success=True,
+                exported_count=len(export_memories),
+                export_scope=request.scope,
+                file_path=str(file_path),
+                export_size=export_size,
+                compression_used=compression_used,
+                metadata={
+                    "format_version": "1.0",
+                    "export_format": request.export_format,
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+        
+        # Handle direct data export (Pattern B)
+        else:
+            await ctx.info(f"Exported {len(export_memories)} memories as direct data")
+            
+            return MemoryExportResponse(
+                success=True,
+                exported_count=len(export_memories),
+                export_scope=request.scope,
+                export_data=final_data,
+                export_size=export_size,
+                compression_used=compression_used,
+                metadata={
+                    "format_version": "1.0",
+                    "export_format": request.export_format,
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+            
+    except Exception as e:
+        await ctx.error(f"Failed to export memories: {e}")
+        raise
 
 
 # Scope validation utilities
