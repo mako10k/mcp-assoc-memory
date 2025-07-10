@@ -176,24 +176,173 @@ class MemorySearchRequest(BaseModel):
 
 
 class ScopeListRequest(BaseModel):
-    parent_scope: Optional[str] = Field(default=None, description="Parent scope to list children from")
-    include_memory_counts: bool = Field(default=True, description="Include memory counts for each scope")
+    parent_scope: Optional[str] = Field(
+        default=None, 
+        description="""Parent scope to filter hierarchy view:
+        
+        Navigation Strategy:
+        • None: Show complete scope hierarchy (full overview)
+        • "work": Show work/* scopes only (focused view)
+        • "learning/programming": Show programming sub-scopes
+        • "session": Show all session scopes
+        
+        Use Cases:
+        • Complete overview: Leave empty for all scopes
+        • Focused exploration: Specify parent for specific area
+        • Hierarchical browsing: Navigate from general to specific
+        
+        Example: parent_scope="work" to explore work-related organization""",
+        examples=[None, "work", "learning", "session"]
+    )
+    include_memory_counts: bool = Field(
+        default=True, 
+        description="""Include memory count statistics:
+        
+        Performance Trade-off:
+        • True: Complete information with memory counts (slower but informative)
+        • False: Structure-only view (faster, focuses on organization)
+        
+        Use Cases:
+        • Planning storage: True to understand distribution
+        • Quick navigation: False for faster hierarchy browsing
+        • System monitoring: True for usage analytics
+        
+        Example: include_memory_counts=False for rapid scope exploration"""
+    )
 
 
 class ScopeSuggestRequest(BaseModel):
-    content: str = Field(description="Content to suggest scope for")
-    current_scope: Optional[str] = Field(default=None, description="Current scope for context")
+    content: str = Field(
+        description="""Content to analyze for scope recommendation:
+        
+        Content Analysis:
+        • Include full text for best categorization accuracy
+        • Keywords are automatically detected (technical, meeting, personal)
+        • Context matters: related concepts help determine scope
+        • Language support: Both English and Japanese content
+        
+        Examples:
+        • "Meeting notes from standup discussion" → work/meetings
+        • "Python FastMCP implementation details" → learning/programming
+        • "Personal reminder to call dentist" → personal/tasks
+        
+        Strategy: Provide complete content rather than truncated text"""
+    )
+    current_scope: Optional[str] = Field(
+        default=None, 
+        description="""Current scope context for enhanced recommendations:
+        
+        Context Enhancement:
+        • Helps suggest related scopes in same hierarchy
+        • Improves accuracy for similar content types
+        • Enables contextual sub-scope suggestions
+        • None: Analyze content independently
+        
+        Use Cases:
+        • Related content: Include current scope for similar items
+        • Independent analysis: Leave empty for fresh categorization
+        • Contextual refinement: Help system understand work flow
+        
+        Example: current_scope="work/projects" for project-related content""",
+        examples=[None, "work/projects", "learning", "personal"]
+    )
 
 
 class MemoryMoveRequest(BaseModel):
-    memory_ids: List[str] = Field(description="List of memory IDs to move")
-    target_scope: str = Field(description="Target scope to move memories to")
+    memory_ids: List[str] = Field(
+        description="""List of memory IDs to move to new scope:
+        
+        Operation Types:
+        • Single memory: ["memory-id-123"] for individual moves
+        • Bulk operation: ["id1", "id2", "id3"] for batch reorganization
+        • Related memories: Move memories discovered via associations
+        
+        Source Identification:
+        • Use memory_search to find target memories
+        • Use memory_list_all for bulk scope changes
+        • Use memory_discover_associations for related content
+        
+        Safety Notes:
+        • All memory IDs must exist (operation validates)
+        • Invalid IDs are skipped with warnings
+        • Move preserves all content and metadata
+        
+        Example: ["mem-001", "mem-002"] to move two related memories"""
+    )
+    target_scope: str = Field(
+        description="""Target scope for moved memories:
+        
+        Scope Validation:
+        • Must follow valid scope format (letters, numbers, _, -, /)
+        • Maximum 10 levels deep in hierarchy
+        • Cannot use reserved patterns (., ..)
+        • Automatically validated before move operation
+        
+        Organization Patterns:
+        • work/projects/new-feature (hierarchical organization)
+        • learning/programming/python (topical organization)
+        • personal/archive (lifecycle organization)
+        
+        Best Practices:
+        • Use consistent naming conventions
+        • Follow existing hierarchy patterns
+        • Consider future organization needs
+        
+        Example: target_scope="work/projects/mcp-improvements" for project reorganization"""
+    )
 
 
 class SessionManageRequest(BaseModel):
-    action: str = Field(description="Session action: 'create', 'list', 'cleanup', 'archive'")
-    session_id: Optional[str] = Field(default=None, description="Session ID for specific actions")
-    max_age_days: Optional[int] = Field(default=7, description="Maximum age for cleanup operations")
+    action: str = Field(
+        description="""Session management action to perform:
+        
+        Available Actions:
+        • "create": Create new session scope (auto-generates ID if not provided)
+        • "list": List all active sessions with statistics
+        • "cleanup": Remove old sessions based on max_age_days
+        • "archive": (Future) Archive sessions before cleanup
+        
+        Workflow Patterns:
+        • Project sessions: create → work in session → cleanup when done
+        • Conversation sessions: create → store context → auto-cleanup
+        • Temporary workspaces: create → experiment → cleanup
+        
+        Example: action="create" to start new isolated working session"""
+    )
+    session_id: Optional[str] = Field(
+        default=None, 
+        description="""Custom session identifier:
+        
+        ID Generation:
+        • None: Auto-generate with timestamp format (session-YYYYMMDD-HHMMSS)
+        • Custom: Use meaningful names for important sessions
+        • Format: alphanumeric, hyphens, underscores allowed
+        
+        Use Cases:
+        • Auto-generated: Quick temporary sessions
+        • Named sessions: "project-alpha", "meeting-notes-Q1"
+        • Systematic naming: Follow team conventions
+        
+        Example: session_id="mcp-development-session" for project work""",
+        examples=[None, "project-alpha", "meeting-notes", "experiment-001"]
+    )
+    max_age_days: Optional[int] = Field(
+        default=7, 
+        description="""Maximum age for cleanup operations (days):
+        
+        Cleanup Strategy:
+        • 1-3 days: Aggressive cleanup for short-term sessions
+        • 7 days (default): Balanced retention for weekly workflows
+        • 30+ days: Conservative cleanup for important sessions
+        
+        Use Cases:
+        • Daily sessions: max_age_days=1 for fresh starts
+        • Project sessions: max_age_days=30 for longer work
+        • Archive before cleanup: Use higher values with periodic review
+        
+        Example: max_age_days=14 for bi-weekly session cleanup""",
+        examples=[1, 7, 14, 30]
+    )
 
 
 class ScopeInfo(BaseModel):
@@ -516,9 +665,26 @@ async def memory_search(
 
 @mcp.tool(
     name="memory_get",
-    description="Retrieve a memory by its ID with associations",
+    description="""📄 Retrieve Memory Details: Get complete information about a specific memory
+
+When to use:
+→ After finding a memory ID from search results
+→ When you need full content and metadata
+→ To explore related memories through associations
+
+How it works:
+Fetches the complete memory record including content, metadata, tags, and optionally finds related memories for deeper exploration.
+
+💡 Quick Start:
+- Include associations: include_associations=True (default) for rich context
+- Skip associations: include_associations=False for faster retrieval
+- Use with search: memory_search → memory_get → explore details
+
+⚠️ Important: Requires valid memory_id from previous search or storage
+
+➡️ What's next: Use memory_discover_associations for deeper exploration, memory_store for new insights""",
     annotations={
-        "title": "Get Memory",
+        "title": "記憶詳細取得",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -593,9 +759,26 @@ async def memory_get(
 
 @mcp.tool(
     name="memory_delete",
-    description="Delete a specified memory",
+    description="""🗑️ Delete Memory: Permanently remove unwanted or incorrect memories
+
+When to use:
+→ Remove duplicate or incorrect information
+→ Clean up outdated or irrelevant memories
+→ Maintain clean and organized memory space
+
+How it works:
+Permanently removes the specified memory from storage. This action cannot be undone, so use with caution.
+
+💡 Quick Start:
+- Double-check: Use memory_get first to confirm content
+- Safety first: Consider memory_move to archive instead of delete
+- Bulk cleanup: Use memory_list_all to find candidates for deletion
+
+⚠️ Important: This is a destructive operation - deleted memories cannot be recovered
+
+➡️ What's next: Use scope_list to verify organization, memory_store to add corrected content""",
     annotations={
-        "title": "Delete Memory",
+        "title": "記憶削除",
         "readOnlyHint": False,
         "destructiveHint": True,
         "idempotentHint": True
@@ -626,9 +809,28 @@ async def memory_delete(
 
 @mcp.tool(
     name="memory_list_all",
-    description="List all memories with pagination (for debugging purposes)",
+    description="""📋 Browse All Memories: "Show me everything I've stored"
+
+When to use:
+→ Initial exploration of your memory collection
+→ Content auditing and organization review
+→ Debug data consistency issues
+→ System administration and bulk operations
+
+How it works:
+Retrieves all stored memories with pagination support, providing a complete overview of your knowledge base for management and debugging purposes.
+
+💡 Quick Start:
+- Start small: page=1, per_page=10 for initial overview
+- Browse efficiently: Use pagination to avoid overwhelming results
+- System check: per_page=50+ for bulk data validation
+- Monitor growth: Regular checks to understand storage patterns
+
+⚠️ Important: Large collections may take time to load; prefer memory_search for targeted access
+
+➡️ What's next: Use memory_search for specific content, scope_list for organization overview""",
     annotations={
-        "title": "List All Memories",
+        "title": "全記憶一覧",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -636,8 +838,35 @@ async def memory_delete(
 )
 async def memory_list_all(
     ctx: Context,
-    page: Annotated[int, Field(default=1, ge=1, description="Page number")] = 1,
-    per_page: Annotated[int, Field(default=10, ge=1, le=100, description="Items per page")] = 10
+    page: Annotated[int, Field(
+        default=1, 
+        ge=1, 
+        description="""Page number for pagination:
+        
+        Navigation Strategy:
+        • Start with page=1 for initial overview
+        • Use pagination.has_next to continue browsing
+        • Jump to specific pages for targeted access
+        • Monitor total_pages to understand collection size
+        
+        Example: page=1 for first overview, page=3 for deeper exploration""",
+        examples=[1, 2, 3]
+    )] = 1,
+    per_page: Annotated[int, Field(
+        default=10, 
+        ge=1, 
+        le=100, 
+        description="""Items per page (1-100):
+        
+        Values & Use Cases:
+        • 5-10: Quick overview (manageable chunks) ← RECOMMENDED
+        • 20-50: Efficient browsing (bulk review)
+        • 50-100: System analysis (comprehensive data check)
+        
+        Strategy: Start with 10, increase for bulk operations
+        Example: per_page=25 for efficient content review""",
+        examples=[10, 25, 50]
+    )] = 10
 ) -> Dict[str, Any]:
     """List all memories with pagination (for debugging)"""
     try:
@@ -856,9 +1085,28 @@ Please provide the summary in the following format:
 
 @mcp.tool(
     name="scope_list",
-    description="List available scopes with hierarchy and memory counts",
+    description="""🗂️ Browse Scope Hierarchy: "Show me how my memories are organized"
+
+When to use:
+→ Understand your memory organization structure
+→ Plan new memory storage locations
+→ Review memory distribution across topics
+→ Navigate hierarchical knowledge organization
+
+How it works:
+Displays the hierarchical structure of all scopes with memory counts, helping you understand and navigate your knowledge organization.
+
+💡 Quick Start:
+- Full overview: No parent_scope (shows everything)
+- Focused view: parent_scope="work" (shows work/* hierarchy)
+- Quick counts: include_memory_counts=True (default, shows distribution)
+- Structure only: include_memory_counts=False (faster, organization focus)
+
+⚠️ Important: Large scope hierarchies may have many entries
+
+➡️ What's next: Use scope_suggest for new content placement, memory_search for specific scope exploration""",
     annotations={
-        "title": "List Scopes",
+        "title": "スコープ階層一覧",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -927,9 +1175,28 @@ async def scope_list(
 
 @mcp.tool(
     name="scope_suggest",
-    description="Suggest appropriate scope based on content analysis",
+    description="""🎯 Smart Scope Recommendation: "Where should I store this content?"
+
+When to use:
+→ Before storing new memories (optimal organization)
+→ When unsure about content categorization
+→ To maintain consistent organization patterns
+→ For automatic content classification workflows
+
+How it works:
+Analyzes your content using keyword detection and context patterns to recommend the most appropriate scope, with confidence scores and alternative suggestions.
+
+💡 Quick Start:
+- Auto-categorize: Provide content, get scope recommendation
+- Context-aware: Include current_scope for related content placement
+- Multiple options: Review alternatives array for flexibility
+- High confidence: confidence >0.8 indicates strong recommendation
+
+⚠️ Important: Suggestions are based on keyword patterns; review recommendations for accuracy
+
+➡️ What's next: Use memory_store with suggested scope, scope_list to verify organization""",
     annotations={
-        "title": "Suggest Scope",
+        "title": "スコープ推奨",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
@@ -1004,9 +1271,28 @@ async def scope_suggest(
 
 @mcp.tool(
     name="memory_move",
-    description="Move memories to different scope",
+    description="""📦 Reorganize Memories: "Move these memories to better organize my knowledge"
+
+When to use:
+→ Reorganizing content after learning better categorization
+→ Consolidating scattered memories into unified scopes
+→ Correcting initial storage mistakes
+→ Refactoring knowledge structure as it grows
+
+How it works:
+Moves specified memories from their current scopes to a new target scope, preserving all content and metadata while updating organization.
+
+💡 Quick Start:
+- Single memory: memory_ids=["id1"], target_scope="new/location"
+- Bulk operation: memory_ids=["id1","id2","id3"] for efficient reorganization
+- Scope validation: System validates target_scope format automatically
+- Safe operation: All content and metadata preserved during move
+
+⚠️ Important: Cannot undo moves; verify target_scope before execution
+
+➡️ What's next: Use scope_list to verify new organization, memory_search in new scope to confirm placement""",
     annotations={
-        "title": "Move Memories",
+        "title": "記憶移動",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False
@@ -1065,9 +1351,28 @@ async def memory_move(
 
 @mcp.tool(
     name="session_manage",
-    description="Manage session scopes and lifecycle",
+    description="""⏱️ Session Lifecycle Management: "Manage temporary memory sessions"
+
+When to use:
+→ Creating isolated working sessions for projects
+→ Organizing temporary memories that may be cleaned up
+→ Managing conversation or task-specific memory scopes
+→ Cleaning up old session data to maintain system performance
+
+How it works:
+Provides complete session lifecycle management including creation, listing, and automated cleanup of session-scoped memories based on age.
+
+💡 Quick Start:
+- New session: action="create" (auto-generates session ID)
+- Custom session: action="create", session_id="my-project-session"
+- View sessions: action="list" (shows all active sessions)
+- Auto cleanup: action="cleanup", max_age_days=7 (removes old sessions)
+
+⚠️ Important: Cleanup is permanent; archive important session data before cleanup
+
+➡️ What's next: Use memory_store with session scope, memory_search within sessions""",
     annotations={
-        "title": "Manage Sessions",
+        "title": "セッション管理",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False
