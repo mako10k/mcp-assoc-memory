@@ -127,3 +127,197 @@ This section was added to consolidate user-provided instructions. All relevant g
 For detailed developer guidelines including knowledge management workflow, library-first approach, and log file maintenance, see:
 - **[docs/DEVELOPER_GUIDELINES.md](../docs/DEVELOPER_GUIDELINES.md)** - Developer workflow and best practices
 - **[docs/knowledges/diversified-search-algorithm.md](../docs/knowledges/diversified-search-algorithm.md)** - Future search algorithm enhancements
+
+---
+
+## 🧠 MCP Associative Memory Integration (#AssocMemory)
+
+**This project provides a complete associative memory system via MCP tools. Use these tools to enhance development workflow, knowledge management, and problem-solving.**
+
+### 📚 Available Memory Tools
+
+#### Core Memory Operations
+- **#mcp_assocmemory_memory_store**: Store insights, learnings, and important information
+- **#mcp_assocmemory_memory_search**: Find related memories using semantic search
+- **#mcp_assocmemory_memory_get**: Retrieve detailed memory information
+- **#mcp_assocmemory_memory_discover_associations**: Explore memory connections
+
+#### Organization & Management
+- **#mcp_assocmemory_scope_list**: Browse memory organization structure
+- **#mcp_assocmemory_scope_suggest**: Get scope recommendations for content
+- **#mcp_assocmemory_memory_move**: Reorganize memories into better categories
+- **#mcp_assocmemory_session_manage**: Manage temporary working sessions
+
+#### Utility Operations
+- **#mcp_assocmemory_memory_list_all**: Browse complete memory collection
+- **#mcp_assocmemory_memory_delete**: Remove unwanted memories
+
+### 🎯 Integration Strategies
+
+#### 1. Development Workflow Enhancement
+```instructions
+When implementing features or fixing bugs:
+- Store problem analysis: Use #mcp_assocmemory_memory_store with scope "work/problems"
+- Save solution patterns: Store successful approaches in "work/solutions" 
+- Document lessons learned: Use "learning/development/[technology]" scopes
+- Find similar issues: Use #mcp_assocmemory_memory_search before starting work
+```
+
+#### 2. Knowledge Management
+```instructions
+For building institutional knowledge:
+- Store architectural decisions in "work/architecture" scope
+- Document API patterns in "learning/api-design" scope  
+- Save debugging insights in "work/debugging/[component]" scope
+- Use #mcp_assocmemory_memory_discover_associations to connect related concepts
+```
+
+#### 3. Code Review & Documentation
+```instructions
+During code reviews and documentation:
+- Store code quality insights in "work/code-quality" scope
+- Document performance optimizations in "work/performance" scope
+- Save security considerations in "work/security" scope
+- Use #mcp_assocmemory_scope_suggest to categorize new insights automatically
+```
+
+#### 4. Project Context Management
+```instructions
+For project continuity:
+- Create session: #mcp_assocmemory_session_manage with action="create"
+- Store session context: Use "session/[project-name]" scope for temporary notes
+- Resume work: #mcp_assocmemory_memory_search within session scope
+- Cleanup: Use session_manage with action="cleanup" when project completes
+```
+
+### 💡 Best Practices for Memory Usage
+
+#### Content Storage Strategy
+- **Be specific**: Store concrete examples, not abstract concepts
+- **Include context**: Add metadata about when/why information was relevant
+- **Use consistent scoping**: Follow hierarchical patterns (e.g., "work/project/component")
+- **Store solutions AND problems**: Don't just save what worked, save what didn't
+
+#### Search Strategy
+- **Start broad**: Use high-level terms first, then narrow down
+- **Use semantic search**: The system understands concepts, not just keywords
+- **Explore associations**: Use discover_associations to find unexpected connections
+- **Iterate on scope**: Start with general scope, then focus on specific areas
+
+#### Organization Patterns
+```
+Recommended scope hierarchy:
+work/
+  ├── projects/[name]/
+  ├── architecture/
+  ├── debugging/
+  ├── code-review/
+  └── meetings/
+
+learning/
+  ├── [technology]/
+  ├── patterns/
+  ├── best-practices/
+  └── troubleshooting/
+
+personal/
+  ├── ideas/
+  ├── goals/
+  └── reflections/
+```
+
+### 🔄 Workflow Integration Examples
+
+#### Example 1: Bug Investigation Workflow
+```instructions
+1. Search existing knowledge: #mcp_assocmemory_memory_search query="[error-description]"
+2. Store investigation findings: #mcp_assocmemory_memory_store in "work/debugging/[component]"
+3. Find related issues: #mcp_assocmemory_memory_discover_associations on stored memory
+4. Document solution: Store resolution in "work/solutions/[component]"
+```
+
+#### Example 2: Feature Development Workflow
+```instructions
+1. Store requirements: #mcp_assocmemory_memory_store in "work/projects/[name]/requirements"
+2. Research similar features: #mcp_assocmemory_memory_search for related implementations
+3. Document design decisions: Store in "work/projects/[name]/design"
+4. Link implementation notes: Use associations to connect design with implementation
+```
+
+#### Example 3: Learning & Research Workflow
+```instructions
+1. Suggest scope: #mcp_assocmemory_scope_suggest for new learning content
+2. Store learning notes: Use suggested scope or "learning/[topic]"
+3. Connect concepts: #mcp_assocmemory_memory_discover_associations between topics
+4. Review knowledge: #mcp_assocmemory_memory_search to reinforce learning
+```
+
+### ⚠️ Memory Usage Guidelines
+
+#### Do Use Memory For:
+- ✅ Debugging insights and solution patterns
+- ✅ Architectural decisions and trade-offs
+- ✅ Performance optimization techniques
+- ✅ Security considerations and best practices
+- ✅ API design patterns and examples
+- ✅ Project-specific knowledge and context
+
+#### Don't Use Memory For:
+- ❌ Sensitive information (credentials, personal data)
+- ❌ Large code dumps (store patterns and insights instead)
+- ❌ Temporary debugging output (use session scope for these)
+- ❌ Version-specific details that quickly become outdated
+
+### 🚀 Advanced Usage Patterns
+
+#### Cross-Project Knowledge Transfer
+```instructions
+When starting similar projects:
+1. Search for patterns: #mcp_assocmemory_memory_search across "work/patterns"
+2. Find architectural decisions: Search "work/architecture" for similar challenges
+3. Discover connections: Use associations to find unexpected relevant knowledge
+```
+
+#### Collaborative Knowledge Building
+```instructions
+For team knowledge sharing:
+1. Store team insights in shared scope patterns
+2. Use consistent categorization via #mcp_assocmemory_scope_suggest
+3. Build knowledge graphs through association discovery
+4. Regular cleanup via #mcp_assocmemory_session_manage
+```
+
+#### Continuous Learning Integration
+```instructions
+For ongoing skill development:
+1. Store daily learnings in "learning/daily/[date]" scope
+2. Weekly review: Search and associate related learnings
+3. Monthly consolidation: Move valuable insights to permanent scopes
+4. Quarterly cleanup: Archive or reorganize outdated information
+```
+
+### 🎯 Quick Reference Commands
+
+```bash
+# Store important insight
+#mcp_assocmemory_memory_store with scope="work/insights" 
+
+# Find related knowledge
+#mcp_assocmemory_memory_search query="[your-question]"
+
+# Explore connections
+#mcp_assocmemory_memory_discover_associations memory_id="[found-memory-id]"
+
+# Get scope suggestion
+#mcp_assocmemory_scope_suggest content="[your-content]"
+
+# Browse organization
+#mcp_assocmemory_scope_list parent_scope="work"
+
+# Start project session
+#mcp_assocmemory_session_manage action="create" session_id="[project-name]"
+```
+
+**Remember**: The associative memory system is designed to augment your development workflow. Use it actively to build institutional knowledge, find connections between concepts, and accelerate problem-solving through accumulated wisdom.
+
+---
