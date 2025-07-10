@@ -8,6 +8,7 @@ PYTHON=python3
 PID_FILE="$APP_DIR/logs/mcp_server.pid"
 LOG_FILE="$APP_DIR/logs/mcp_server.log"
 
+export PYTHONPATH="$APP_DIR/src:$PYTHONPATH"
 start() {
     if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
         echo "MCPサーバは既に起動しています (PID: $(cat $PID_FILE))"

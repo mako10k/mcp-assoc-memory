@@ -1,9 +1,10 @@
 {
     "servers": {
+        "Google": {
+            "url": "http://localhost:3000/mcp"
+        },
         "AssocMemory": {
-            "command": "python",
-            "args": ["-m", "src.mcp_assoc_memory.server"],
-            "cwd": "/workspaces/mcp-assoc-memory"
+            "url": "http://localhost:8000/mcp"
         }
     }
 }
