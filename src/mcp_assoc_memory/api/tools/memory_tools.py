@@ -14,7 +14,8 @@ from pydantic import Field
 from ..models import (
     MemoryStoreRequest, MemorySearchRequest, DiversifiedSearchRequest, MemoryUpdateRequest,
     MemoryImportRequest, MemoryImportResponse,
-    MemoryResponse, PaginationInfo
+    MemoryResponse, PaginationInfo, UnifiedSearchRequest, MemoryManageRequest, MemorySyncRequest,
+    MemoryExportRequest
 )
 from ...core.memory_manager import MemoryManager
 from ...simple_persistence import get_persistent_storage
@@ -257,10 +258,12 @@ async def handle_memory_search(
                     associations = await memory_manager.metadata_store.get_memory_associations(memory.id)
                     formatted_memory["associations"] = [
                         {
-                            "memory_id": assoc.target_memory_id,
+                            "source_id": assoc.source_memory_id,
+                            "target_id": assoc.target_memory_id,
                             "association_type": assoc.association_type,
                             "strength": assoc.strength,
-                            "auto_generated": assoc.auto_generated
+                            "auto_generated": assoc.auto_generated,
+                            "created_at": assoc.created_at
                         }
                         for assoc in associations[:3]  # Limit to top 3 associations
                     ]
@@ -834,89 +837,154 @@ async def handle_memory_list_all(
         raise
 
 
-# File path resolution utilities
-async def _resolve_export_path(file_path: str) -> Path:
-    """Resolve and validate export file path"""
-    if Path(file_path).is_absolute():
-        try:
-            allow_absolute = config.storage.allow_absolute_paths
-        except AttributeError:
-            allow_absolute = False
-        if not allow_absolute:
-            raise ValueError("Absolute paths not allowed in configuration")
-        return Path(file_path)
-    else:
-        # Relative to export directory
-        try:
-            data_dir = config.storage.data_dir
-            export_dir_name = config.storage.export_dir
-        except AttributeError:
-            data_dir = "data"
-            export_dir_name = "exports"
-        export_dir = Path(data_dir) / export_dir_name
-        return export_dir / file_path
-
-
-async def _resolve_import_path(file_path: str) -> Path:
-    """Resolve and validate import file path"""
-    if Path(file_path).is_absolute():
-        try:
-            allow_absolute = config.storage.allow_absolute_paths
-        except AttributeError:
-            allow_absolute = False
-        if not allow_absolute:
-            raise ValueError("Absolute paths not allowed in configuration")
-        return Path(file_path)
-    else:
-        # Try import directory first, then export directory
-        try:
-            data_dir = config.storage.data_dir
-            import_dir_name = config.storage.import_dir
-            export_dir_name = config.storage.export_dir
-        except AttributeError:
-            data_dir = "data"
-            import_dir_name = "imports"
-            export_dir_name = "exports"
-            
-        import_dir = Path(data_dir) / import_dir_name
-        import_path = import_dir / file_path
+async def handle_unified_search(
+    request: UnifiedSearchRequest,
+    ctx: Context
+) -> Dict[str, Any]:
+    """Unified search handler supporting both standard and diversified search modes"""
+    try:
+        await ensure_initialized()
+        await ctx.info(f"Unified search: mode={request.mode}, query='{request.query[:50]}...', scope={request.scope}")
         
-        if import_path.exists():
-            return import_path
-        
-        # Fallback to export directory
-        export_dir = Path(data_dir) / export_dir_name
-        export_path = export_dir / file_path
-        
-        if export_path.exists():
-            return export_path
+        if request.mode == "standard":
+            # Use standard search
+            standard_request = MemorySearchRequest(
+                query=request.query,
+                scope=request.scope,
+                include_child_scopes=request.include_child_scopes,
+                limit=request.limit,
+                similarity_threshold=request.similarity_threshold,
+                include_associations=request.include_associations
+            )
+            return await handle_memory_search(standard_request, ctx)
             
-        # Return original path for error handling
-        return import_path
+        elif request.mode == "diversified":
+            # Use diversified search
+            diversified_request = DiversifiedSearchRequest(
+                query=request.query,
+                scope=request.scope,
+                include_associations=request.include_associations,
+                limit=request.limit,
+                min_score=request.min_score,
+                diversity_threshold=request.diversity_threshold,
+                expansion_factor=request.expansion_factor,
+                max_expansion_factor=request.max_expansion_factor
+            )
+            return await handle_diversified_search(diversified_request, ctx)
+            
+        else:
+            await ctx.error(f"Unknown search mode: {request.mode}")
+            return {
+                "error": f"Unknown search mode: {request.mode}. Supported modes: 'standard', 'diversified'",
+                "results": [],
+                "query": request.query,
+                "mode": request.mode,
+                "total": 0
+            }
+            
+    except Exception as e:
+        await ctx.error(f"Unified search failed: {e}")
+        return {
+            "error": f"Unified search failed: {str(e)}",
+            "results": [],
+            "query": request.query,
+            "mode": request.mode,
+            "total": 0
+        }
 
 
-async def _validate_import_data(import_data: Dict[str, Any]) -> List[str]:
-    """Validate import data structure"""
-    errors = []
-    
-    # Check required fields
-    if "memories" not in import_data:
-        errors.append("Missing 'memories' field")
-        return errors
-    
-    if not isinstance(import_data["memories"], list):
-        errors.append("'memories' must be a list")
-        return errors
-    
-    # Validate each memory
-    for i, memory in enumerate(import_data["memories"]):
-        if not isinstance(memory, dict):
-            errors.append(f"Memory {i}: must be an object")
-            continue
+async def handle_memory_manage(
+    request: MemoryManageRequest,
+    ctx: Context
+) -> Dict[str, Any]:
+    """Unified CRUD operations handler"""
+    try:
+        await ensure_initialized()
+        await ctx.info(f"Memory manage: operation={request.operation}, memory_id={request.memory_id}")
+        
+        if request.operation == "get":
+            # Delegate to existing get handler
+            return await handle_memory_get(request.memory_id, ctx, request.include_associations)
             
-        required_fields = ["memory_id", "content", "scope", "created_at"]
-        for field in required_fields:
-            if field not in memory:
-                errors.append(f"Memory {i}: missing required field '{field}'")
-    
-    return errors
+        elif request.operation == "update":
+            # Create update request from manage request
+            update_request = MemoryUpdateRequest(
+                memory_id=request.memory_id,
+                content=request.content,
+                scope=request.scope,
+                tags=request.tags,
+                category=request.category,
+                metadata=request.metadata,
+                preserve_associations=request.preserve_associations
+            )
+            return await handle_memory_update(update_request, ctx)
+            
+        elif request.operation == "delete":
+            # Delegate to existing delete handler
+            return await handle_memory_delete(request.memory_id, ctx)
+            
+        else:
+            await ctx.error(f"Unknown operation: {request.operation}")
+            return {
+                "error": f"Unknown operation: {request.operation}. Supported operations: 'get', 'update', 'delete'",
+                "operation": request.operation,
+                "memory_id": request.memory_id,
+                "success": False
+            }
+            
+    except Exception as e:
+        await ctx.error(f"Memory manage operation failed: {e}")
+        return {
+            "error": f"Memory manage operation failed: {str(e)}",
+            "operation": request.operation,
+            "memory_id": request.memory_id,
+            "success": False
+        }
+
+
+async def handle_memory_sync(
+    request: MemorySyncRequest,
+    ctx: Context
+) -> Dict[str, Any]:
+    """Unified import/export operations handler"""
+    try:
+        await ensure_initialized()
+        await ctx.info(f"Memory sync: operation={request.operation}, file_path={request.file_path}")
+        
+        if request.operation == "export":
+            # Create export request from sync request
+            export_request = MemoryExportRequest(
+                scope=request.scope,
+                file_path=request.file_path,
+                include_associations=request.include_associations,
+                compression=request.compression,
+                export_format=request.export_format
+            )
+            return await handle_memory_export(export_request, ctx)
+            
+        elif request.operation == "import":
+            # Create import request from sync request
+            import_request = MemoryImportRequest(
+                file_path=request.file_path,
+                import_data=request.import_data,
+                target_scope_prefix=request.scope,  # Use scope as target_scope_prefix for import
+                merge_strategy=request.merge_strategy,
+                validate_data=request.validate_data
+            )
+            return await handle_memory_import(import_request, ctx)
+            
+        else:
+            await ctx.error(f"Unknown sync operation: {request.operation}")
+            return {
+                "error": f"Unknown sync operation: {request.operation}. Supported operations: 'export', 'import'",
+                "operation": request.operation,
+                "success": False
+            }
+            
+    except Exception as e:
+        await ctx.error(f"Memory sync operation failed: {e}")
+        return {
+            "error": f"Memory sync operation failed: {str(e)}",
+            "operation": request.operation,
+            "success": False
+        }

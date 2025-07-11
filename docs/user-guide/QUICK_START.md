@@ -55,6 +55,15 @@ Show me memories related to web frameworks
 
 ## 🎯 Essential Commands (GitHub Copilot)
 
+### 🆕 **New Unified Tools (Sprint 2 - Recommended)**
+| What You Want | Tool Used | Say to Copilot |
+|---------------|-----------|----------------|
+| **Unified Search** | `memory_search_unified` | "Find memories about [topic]" *(standard mode)* |
+| **Creative Search** | `memory_search_unified` | "Find diverse memories about [topic]" *(diversified mode)* |
+| **Memory Management** | `memory_manage` | "Get/update/delete this memory" *(all CRUD operations)* |
+| **Data Sync** | `memory_sync` | "Export/import my memories" *(both sync operations)* |
+
+### Traditional Commands (Still Available)
 | What You Want | Say to Copilot |
 |---------------|----------------|
 | Store knowledge | "Remember this: [your content]" |
@@ -63,7 +72,13 @@ Show me memories related to web frameworks
 | Organize memories | "Move these memories to [category]" |
 | Export/backup | "Export my memories" |
 | Session work | "Create a session for [project]" |
-| Diversified search | "Find diverse memories about [topic]" |
+
+### 🔗 **Tool Consolidation Benefits**
+The new unified tools provide:
+- **Simplified API**: One tool for multiple operations
+- **Consistent parameters**: Same interface patterns
+- **Reduced complexity**: Fewer tools to learn
+- **Backward compatibility**: Old tools still work during transition
 
 ## 🗂️ Understanding Scopes
 
@@ -122,24 +137,36 @@ Sessions are perfect for:
 - **Conceptual**: "error handling patterns"
 - **Problem-based**: "database connection issues"
 
-### Advanced Search Options
+### Advanced Search Options with Unified Tool
 
-#### Diversified Search
-For creative exploration and avoiding echo chambers:
+#### 🆕 **Unified Search (memory_search_unified)**
+The new unified search tool provides both modes in one interface:
+
+**Standard Search** (default):
+```instructions
+Find memories about Python async patterns
+```
+
+**Diversified Search** (creative exploration):
 ```instructions
 Find diverse memories about machine learning optimization
 ```
 
-Benefits:
+#### Benefits of Unified Search:
+- **Single tool**: One interface for all search needs
+- **Mode parameter**: Switch between standard/diversified automatically
+- **Consistent API**: Same parameters across search modes
+- **Better UX**: Simplified user experience
+
+#### Traditional Search Tools (Still Available)
+- `memory_search` - Standard semantic search
+- `memory_diversified_search` - Creative exploration with diversity
+
+#### Diversified Search Benefits:
 - Prevents redundant similar results
 - Promotes creative thinking
 - Discovers unexpected connections
-
-#### Focused Search
-For specific information retrieval:
-```instructions
-Find memories about Python async patterns
-```
+- Breaks out of information silos
 
 ### Understanding Results
 - Results include similarity scores (0.0-1.0)
@@ -163,20 +190,27 @@ This reveals unexpected connections and helps with:
 
 ## 📤 Export & Backup
 
-### Quick Export
+### 🆕 **Unified Data Sync (memory_sync)**
+The new unified sync tool handles both import and export operations:
+
+#### Quick Export
 ```instructions
 Export my work memories to a file
 ```
 
-### Cross-Environment Sync
+#### Cross-Environment Sync
 ```instructions
 Export all memories for backup
 ```
 
-### Import from Backup
+#### Import from Backup
 ```instructions
 Import memories from backup file
 ```
+
+### Traditional Sync Tools (Still Available)
+- `memory_export` - Backup and sync memories
+- `memory_import` - Restore and merge memory data
 
 ### Advanced Export Options
 - **Scope-specific**: Export only work or learning memories

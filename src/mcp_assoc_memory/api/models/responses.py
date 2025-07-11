@@ -29,7 +29,9 @@ class Association(BaseModel):
     """Memory association"""
     source_id: str = Field(description="Source memory ID")
     target_id: str = Field(description="Target memory ID")
+    association_type: str = Field(description="Type of association (semantic, temporal, causal, similar)")
     strength: float = Field(description="Association strength (0.0-1.0)")
+    auto_generated: bool = Field(description="Whether association was auto-generated")
     created_at: datetime = Field(description="Association creation timestamp")
 
 
@@ -213,7 +215,7 @@ class MemoryResponse(BaseModel):
     category: Optional[str] = Field(default=None, description="Memory category")
     created_at: datetime = Field(description="Creation timestamp")
     similarity_score: Optional[float] = Field(default=None, description="Similarity score when from search")
-    associations: Optional[List[str]] = Field(default=None, description="Related memory IDs")
+    associations: Optional[List[Association]] = Field(default=None, description="Related associations")
     is_duplicate: bool = Field(default=False, description="Whether this was a duplicate detection")
     duplicate_of: Optional[str] = Field(default=None, description="Original memory ID if duplicate")
 

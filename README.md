@@ -47,15 +47,21 @@ Built with **FastMCP 2.0** for modern LLM integration, optimized for **GitHub Co
 
 ## 🎯 Complete MCP Tool Suite
 
+### 🆕 **Unified Tools (Recommended - Tool Consolidation Sprint 2)**
+- **`memory_search_unified`** - 🔍 Unified search with standard and diversified modes
+- **`memory_manage`** - 🛠️ Unified CRUD operations (get, update, delete)
+- **`memory_sync`** - 🔄 Unified data sync (import and export operations)
+
 ### Core Memory Operations
 - **`memory_store`** - Store insights with automatic association discovery
-- **`memory_search`** - Semantic search with configurable similarity thresholds
-- **`memory_get`** - Retrieve detailed memory information with associations
-- **`memory_update`** - Modify content, scope, tags, and metadata
-- **`memory_delete`** - Clean removal with association cleanup
+- **`memory_search`** - Semantic search with configurable similarity thresholds *(use unified version)*
+- **`memory_get`** - Retrieve detailed memory information with associations *(use unified version)*
+- **`memory_update`** - Modify content, scope, tags, and metadata *(use unified version)*
+- **`memory_delete`** - Clean removal with association cleanup *(use unified version)*
 
 ### Discovery and Analysis
 - **`memory_discover_associations`** - Find semantically related memories
+- **`memory_diversified_search`** - Creative exploration with diversity *(use unified version)*
 - **`memory_list_all`** - Browse complete memory collection with pagination
 
 ### Organization Management  
@@ -64,11 +70,14 @@ Built with **FastMCP 2.0** for modern LLM integration, optimized for **GitHub Co
 - **`memory_move`** - Reorganize memories into better categories
 
 ### Sync and Backup
-- **`memory_export`** - Export memories for backup or cross-environment sync
-- **`memory_import`** - Import memories with flexible merge strategies
+- **`memory_export`** - Export memories for backup or cross-environment sync *(use unified version)*
+- **`memory_import`** - Import memories with flexible merge strategies *(use unified version)*
 
 ### Session Management
 - **`session_manage`** - Create, list, and cleanup temporary working sessions
+
+### 🔗 **Migration Guide**
+New users should use the **unified tools** for simplified API experience. Existing tools remain available for backward compatibility during the transition period.
 
 ## 📚 Comprehensive Documentation
 

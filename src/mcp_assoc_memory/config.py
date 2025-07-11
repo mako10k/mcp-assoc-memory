@@ -113,13 +113,20 @@ class Config:
             if Path(config_path).exists():
                 config_file = config_path
         else:
-            # Auto-discover config.json in current and parent directories
-            default_path = Path.cwd() / "config.json"
-            parent_path = Path.cwd().parent / "config.json"
-            if default_path.exists():
-                config_file = str(default_path)
-            elif parent_path.exists():
-                config_file = str(parent_path)
+            # Check environment variable first (for test/alternate configs)
+            env_config = os.getenv("MCP_CONFIG_FILE")
+            print(f"[DEBUG] MCP_CONFIG_FILE env var: {env_config}")
+            if env_config and Path(env_config).exists():
+                config_file = env_config
+                print(f"[DEBUG] Using config from MCP_CONFIG_FILE: {config_file}")
+            else:
+                # Auto-discover config.json in current and parent directories
+                default_path = Path.cwd() / "config.json"
+                parent_path = Path.cwd().parent / "config.json"
+                if default_path.exists():
+                    config_file = str(default_path)
+                elif parent_path.exists():
+                    config_file = str(parent_path)
 
         print(f"[DEBUG] config_file resolved: {config_file}")
         if config_file:

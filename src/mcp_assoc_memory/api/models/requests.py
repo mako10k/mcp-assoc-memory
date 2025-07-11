@@ -508,3 +508,277 @@ class MemoryImportRequest(BaseModel):
         default=True, 
         description="Validate imported data structure and content"
     )
+
+
+class UnifiedSearchRequest(BaseModel):
+    """Unified search request supporting both standard and diversified search modes"""
+    query: str = Field(description="Search query")
+    mode: str = Field(
+        default="standard",
+        description="""Search mode:
+        
+        Modes:
+        • "standard": Standard semantic search (default)
+        • "diversified": Creative exploration with diversity filtering
+        
+        Strategy: Use 'standard' for targeted search, 'diversified' for brainstorming""",
+        examples=["standard", "diversified"]
+    )
+    scope: Optional[str] = Field(
+        default=None, 
+        description="""Target scope for search (supports hierarchy):
+        
+        Examples:
+        • learning/programming: Find programming-related memories
+        • work/current-project: Search current project context
+        • personal: Browse personal thoughts and ideas
+        • None: Search across all scopes
+        
+        Strategy: Start broad, narrow down if too many results""",
+        examples=["learning/programming", "work/project", None]
+    )
+    include_child_scopes: bool = Field(default=False, description="Include child scopes in search")
+    limit: int = Field(
+        default=10, 
+        ge=1, le=100, 
+        description="""Maximum number of memories to retrieve:
+        
+        Values & Use Cases:
+        • 5-10: Focused search (finding specific information) ← RECOMMENDED
+        • 10-20: Balanced exploration (general ideation, learning review)
+        • 20-50: Comprehensive discovery (brainstorming, research phase)
+        
+        Strategy: Start small (10), increase if you need broader context
+        Example: limit=15 for creative thinking sessions
+        
+        ⚠️ Performance: Higher values increase processing time""",
+        examples=[10, 15, 5]
+    )
+    similarity_threshold: float = Field(
+        default=0.1, 
+        ge=0.0, le=1.0, 
+        description="""Similarity threshold for memory matching:
+        
+        Values & Use Cases:
+        • 0.8-1.0: Near-identical content (duplicate detection, exact recall)
+        • 0.4-0.8: Clear relevance (general search, learning review)
+        • 0.2-0.4: Broader associations (idea expansion, new perspectives)
+        • 0.1-0.2: Creative connections (brainstorming, unexpected links) ← RECOMMENDED
+        
+        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
+        Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
+        examples=[0.1, 0.2, 0.4]
+    )
+    include_associations: bool = Field(default=True, description="Include related memories in results")
+    
+    # Diversified search specific parameters (only used when mode="diversified")
+    min_score: float = Field(
+        default=0.1,
+        ge=0.0, le=1.0,
+        description="""Minimum similarity threshold for candidates (diversified mode only):
+        
+        Values & Use Cases:
+        • 0.1-0.2: Broad exploration (creative connections) ← RECOMMENDED
+        • 0.2-0.4: Moderate relevance (balanced diversity)
+        • 0.4-0.8: Focused but diverse (specific domain exploration)
+        
+        Strategy: Lower values for more creative, unexpected connections
+        Example: min_score=0.1 for diverse brainstorming""",
+        examples=[0.1, 0.2, 0.4]
+    )
+    diversity_threshold: float = Field(
+        default=0.8,
+        ge=0.0, le=1.0,
+        description="""Similarity threshold for excluding similar items (diversified mode only):
+        
+        Values & Use Cases:
+        • 0.8-0.9: Moderate diversity (exclude very similar) ← RECOMMENDED
+        • 0.6-0.8: High diversity (exclude somewhat similar)
+        • 0.9-1.0: Low diversity (exclude only near-duplicates)
+        
+        Strategy: 0.8 provides good balance of relevance and diversity
+        Example: diversity_threshold=0.8 for balanced diverse results""",
+        examples=[0.8, 0.7, 0.9]
+    )
+    expansion_factor: float = Field(
+        default=2.5,
+        ge=1.0, le=10.0,
+        description="""Initial expansion multiplier for candidate search (diversified mode only):
+        
+        Values & Use Cases:
+        • 2.0-3.0: Balanced performance and diversity ← RECOMMENDED
+        • 3.0-5.0: Higher diversity, more processing time
+        • 1.5-2.0: Faster processing, less diversity
+        
+        Strategy: 2.5 provides good balance for most use cases
+        Example: expansion_factor=2.5 for standard diverse search""",
+        examples=[2.5, 3, 2]
+    )
+    max_expansion_factor: float = Field(
+        default=5,
+        ge=1.0, le=20.0,
+        description="""Maximum expansion when fallback is needed (diversified mode only):
+        
+        Values & Use Cases:
+        • 5.0-10.0: Good fallback coverage ← RECOMMENDED
+        • 10.0-20.0: Extensive fallback (slow but thorough)
+        • 2.0-5.0: Limited fallback (faster but less comprehensive)
+        
+        Strategy: 5.0 provides good fallback without excessive processing
+        Example: max_expansion_factor=5.0 for balanced fallback""",
+        examples=[5, 7, 3]
+    )
+
+
+class MemoryManageRequest(BaseModel):
+    """Unified CRUD operations request model"""
+    operation: str = Field(
+        description="""CRUD operation to perform:
+        
+        Operations:
+        • "get": Retrieve memory by ID
+        • "update": Modify existing memory content/metadata
+        • "delete": Remove memory permanently
+        
+        Strategy: Use 'get' for retrieval, 'update' for modifications, 'delete' for cleanup""",
+        examples=["get", "update", "delete"]
+    )
+    memory_id: str = Field(description="Memory ID for the operation")
+    
+    # Optional parameters for different operations
+    include_associations: bool = Field(
+        default=True, 
+        description="Include related memories (used for 'get' operation)"
+    )
+    
+    # Update operation parameters (optional, only used when operation="update")
+    content: Optional[str] = Field(
+        default=None,
+        description="New content for the memory (update operation only)"
+    )
+    scope: Optional[str] = Field(
+        default=None,
+        description="""New scope for the memory (update operation only):
+        
+        Scope Organization:
+        • learning/programming: Technical and programming content
+        • work/projects: Project-related memories
+        • personal/notes: Personal thoughts and reminders
+        • session/[name]: Temporary session-specific content
+        
+        Strategy: Use scope_suggest for recommendations if unsure
+        Example: scope="work/projects/mcp-improvements" for project organization"""
+    )
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="New tags for the memory (update operation only)"
+    )
+    category: Optional[str] = Field(
+        default=None,
+        description="New category for the memory (update operation only)"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="New metadata for the memory (update operation only)"
+    )
+    preserve_associations: bool = Field(
+        default=True,
+        description="Whether to preserve existing associations when updating content (update operation only)"
+    )
+
+
+class MemorySyncRequest(BaseModel):
+    """Unified import/export operations request model"""
+    operation: str = Field(
+        description="""Sync operation to perform:
+        
+        Operations:
+        • "export": Backup memories to file or get data directly
+        • "import": Restore memories from file or direct data
+        
+        Strategy: Use 'export' for backup/sharing, 'import' for restore/merge""",
+        examples=["export", "import"]
+    )
+    
+    # Common parameters
+    scope: Optional[str] = Field(
+        default=None,
+        description="""Scope to export/target scope prefix for import:
+        
+        Export Scope Strategy:
+        • None: Export all memories (full backup)
+        • "work": Export only work-related memories
+        • "session/project-name": Export specific session
+        • "learning": Export learning-related memories
+        
+        Import Strategy (as target_scope_prefix):
+        • None: Keep original scopes (default)
+        • "imported/": Prefix all imported scopes
+        • "backup/2025-07-10/": Add dated prefix
+        
+        Example: scope="work/projects/mcp-improvements" for project-specific sync"""
+    )
+    file_path: Optional[str] = Field(
+        default=None,
+        description="""File path for sync operation:
+        
+        File Path Strategy:
+        • None: Return/expect data directly via response/request
+        • Relative path: Save to/load from server-configured directory
+        • Absolute path: Save to/load from specified location (if permitted)
+        
+        Examples:
+        • file_path=None: Direct data exchange mode
+        • file_path="backup/memories-2025-07-11.json": Server-side file
+        • file_path="/shared/project-memories.json": Absolute path mode"""
+    )
+    
+    # Export-specific parameters
+    include_associations: bool = Field(
+        default=True,
+        description="Include association relationships in export (export operation only)"
+    )
+    compression: bool = Field(
+        default=False,
+        description="Compress export data with gzip (export operation only)"
+    )
+    export_format: str = Field(
+        default="json",
+        description="Export format: json or yaml (export operation only)"
+    )
+    
+    # Import-specific parameters
+    import_data: Optional[str] = Field(
+        default=None,
+        description="""Direct import data (import operation only):
+        
+        Data Format:
+        • JSON string containing exported memory data
+        • Used when file_path is None
+        • Enables cross-node memory transfer
+        • Supports compressed data (base64 encoded gzip)
+        
+        Usage Pattern:
+        1. Export from source environment with file_path=None
+        2. Copy export response data
+        3. Import to target environment with import_data=<copied_data>"""
+    )
+    merge_strategy: str = Field(
+        default="skip_duplicates",
+        description="""How to handle duplicate memories (import operation only):
+        
+        Merge Strategies:
+        • "skip_duplicates": Keep existing, skip imports (safe default)
+        • "overwrite": Replace existing with imported data
+        • "create_versions": Create new versions of duplicates
+        • "merge_metadata": Combine metadata while keeping content
+        
+        Use Cases:
+        • skip_duplicates: Safe import without conflicts
+        • overwrite: Force update from authoritative source
+        • create_versions: Preserve both local and imported versions"""
+    )
+    validate_data: bool = Field(
+        default=True,
+        description="Validate imported data structure and content (import operation only)"
+    )

@@ -1,0 +1,25 @@
+{
+  "embedding": {
+    "provider": "sentence_transformers",
+    "model": "all-MiniLM-L6-v2",
+    "cache_size": 100
+  },
+  "transport": {
+    "http_port": 8001,
+    "http_enabled": true,
+    "stdio_enabled": false,
+    "sse_enabled": false
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "data/test_memory.db"
+  },
+  "storage": {
+    "data_dir": "data/test",
+    "vector_store_type": "chromadb",
+    "export_dir": "exports/test",
+    "import_dir": "imports/test"
+  },
+  "log_level": "DEBUG",
+  "debug_mode": true
+}

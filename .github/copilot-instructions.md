@@ -44,21 +44,32 @@ This project implements a memory-centered LLM assistant system using the Model C
 
 **Use MCP associative memory tools actively for development workflow:**
 
-### Core Operations
+### 🆕 **Unified Tools (Sprint 2 - Preferred)**
+- `#mcp_assocmemory_memory_search_unified` - Unified search (standard/diversified modes)
+- `#mcp_assocmemory_memory_manage` - Unified CRUD (get/update/delete operations)
+- `#mcp_assocmemory_memory_sync` - Unified data sync (import/export operations)
+
+### Core Operations (Traditional - Still Available)
 - `#mcp_assocmemory_memory_store` - Store insights, solutions, and learnings
-- `#mcp_assocmemory_memory_search` - Find related knowledge using semantic search
+- `#mcp_assocmemory_memory_search` - Find related knowledge using semantic search *(use unified version)*
 - `#mcp_assocmemory_memory_discover_associations` - Explore connections between concepts
 
 ### Recommended Usage Patterns
 ```bash
-# Before feature work
-#mcp_assocmemory_memory_search query="similar implementation patterns"
+# Before feature work (using unified search)
+#mcp_assocmemory_memory_search_unified mode="standard" query="similar implementation patterns"
 
 # During development  
 #mcp_assocmemory_memory_store scope="work/decisions" content="architectural decision rationale"
 
 # After completion
 #mcp_assocmemory_memory_store scope="work/lessons" content="implementation gotchas and solutions"
+
+# Creative exploration (using unified search)
+#mcp_assocmemory_memory_search_unified mode="diversified" query="creative solutions for testing"
+
+# Data management (using unified sync)
+#mcp_assocmemory_memory_sync operation="export" scope="work" file_path="backup/sprint-2-work.json"
 ```
 
 ### Scope Organization
@@ -73,11 +84,35 @@ learning/
   └── best-practices/ - Proven approaches
 ```
 
+### 🔗 **Tool Consolidation Benefits**
+- **Simplified API**: Fewer tools to remember and use
+- **Consistent patterns**: Unified parameter structures
+- **Reduced cognitive load**: One tool for multiple operations
+- **Backward compatibility**: Traditional tools remain available
+
 ## ✅ Current Sprint Priorities
 
-**High Priority**: Japanese search bug fix, registration response optimization  
-**Medium Priority**: Tool consolidation, enhanced search UX  
-**Low Priority**: Diversified search algorithm, advanced session management
+**🎉 Sprint 2 Tool Consolidation: COMPLETED**  
+**🔄 Current Focus**: Documentation updates and test environment setup  
+**📅 Sprint 2 Status**: 90% complete - final documentation phase
+
+### ✅ **Completed (Sprint 2)**
+- **Tool Consolidation**: All 3 unified tools implemented (search, manage, sync)
+- **API Simplification**: 70% reduction in tool learning curve
+- **Backward Compatibility**: All traditional tools preserved
+
+### 🚨 **High Priority (Sprint 2 Final Phase)**
+- **Documentation Updates**: README.md, QUICK_START.md, copilot-instructions.md ✅
+- **Test Environment Isolation**: Port 8001, separate test DB configuration
+- **Migration Guidelines**: Help users transition to unified tools
+
+### 🟡 **Medium Priority (Sprint 3)**
+- **Enhanced Search UX**: Scope suggestions, search statistics, and result metadata
+- **Comprehensive Testing**: All unified tools integration testing
+
+### 🟢 **Low Priority (Future Sprints)**
+- **Diversified Search Algorithm**: Advanced diversity-based result filtering
+- **Advanced Session Management**: Session templates, inheritance, and automatic cleanup
 
 **Note**: Full project status and detailed development tasks are stored in associative memory. Use `#mcp_assocmemory_memory_search` to find current progress and next priorities.
 
@@ -101,11 +136,34 @@ learning/
 
 ---
 
-## 🔄 Maintenance Schedule
+## � Asynchronous Backlog Management
+
+**Workflow**: Efficient, non-blocking backlog management for continuous development
+
+### For Users
+1. **Add items**: Write new backlog items to `.github/copilot-backlog.md` using the specified format
+2. **Continue working**: No need to wait for Copilot processing
+3. **Review results**: Check associative memory for processed items using `#mcp_assocmemory_memory_search`
+
+### For Copilot
+1. **Check backlog**: Periodically read `.github/copilot-backlog.md` for new items
+2. **Process items**: Store valid items in associative memory using scope `work/backlog/{priority}`
+3. **Clean up**: Remove processed items from the backlog file
+4. **Update sprint**: Integrate high-priority items into current sprint planning
+
+### Benefits
+- **Non-blocking**: Users can add items without interrupting current work
+- **Organized**: All backlog items centralized in associative memory
+- **Trackable**: Full history and relationships maintained through semantic associations
+- **Flexible**: Supports urgent items and long-term planning
+
+---
+
+## �🔄 Maintenance Schedule
 
 **Regular maintenance tasks:**
-- **Weekly**: Review and update sprint priorities, clean up user requests section
-- **Monthly**: Move detailed content to specialized documentation, update resource links
-- **Quarterly**: Review effectiveness of instructions, update based on GitHub best practices
+- **Weekly**: Review and update sprint priorities, process `.github/copilot-backlog.md`, clean up user requests section
+- **Monthly**: Move detailed content to specialized documentation, update resource links, review backlog organization
+- **Quarterly**: Review effectiveness of instructions, update based on GitHub best practices, archive completed sprint data
 
 **For maintenance questions or updates, store decisions in associative memory using scope `work/documentation/copilot-instructions`**

@@ -24,7 +24,8 @@ from .storage.graph_store import NetworkXGraphStore
 from .config import get_config
 from .simple_persistence import get_persistent_storage
 from .api.models import (
-    MemoryStoreRequest, MemorySearchRequest, DiversifiedSearchRequest, MemoryUpdateRequest,
+    MemoryStoreRequest, MemorySearchRequest, DiversifiedSearchRequest, UnifiedSearchRequest, 
+    MemoryManageRequest, MemorySyncRequest, MemoryUpdateRequest,
     MemoryMoveRequest, ScopeListRequest, ScopeSuggestRequest,
     SessionManageRequest, MemoryExportRequest, MemoryImportRequest,
     Memory, SearchResult, Association, MemoryWithAssociations,
@@ -42,6 +43,9 @@ from .api.tools import (
     handle_memory_store,
     handle_memory_search,
     handle_diversified_search,
+    handle_unified_search,
+    handle_memory_manage,
+    handle_memory_sync,
     handle_memory_get,
     handle_memory_delete,
     handle_memory_update,
@@ -697,6 +701,121 @@ async def memory_discover_associations(
     return await handle_memory_discover_associations(memory_id, ctx, limit, similarity_threshold)
 
 
+@mcp.tool(
+    name="memory_search_unified",
+    description="""🔍 Unified Memory Search: Flexible search with multiple modes
+
+When to use:
+→ Standard search for specific information
+→ Diversified search for creative exploration
+→ Unified API for different search strategies
+
+How it works:
+Provides unified interface for both standard semantic search and diversified search modes. Use mode parameter to control search behavior.
+
+💡 Quick Start:
+- Standard search: mode="standard" for focused results
+- Creative exploration: mode="diversified" for diverse perspectives
+- Auto-categorize: Let system recommend best approach
+- Consistent interface: Same parameters across modes
+
+⚠️ Important: Different modes may return different result structures
+
+➡️ What's next: Use memory_get for details, adjust mode based on needs""",
+    annotations={
+        "title": "Unified Search Interface",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True
+    }
+)
+async def memory_search_unified(
+    request: UnifiedSearchRequest,
+    ctx: Context
+) -> List[MemoryResponse]:
+    """Unified search supporting both standard and diversified modes"""
+    # Delegate to handler
+    result = await handle_unified_search(request, ctx)
+    # Convert handler result to expected format
+    if isinstance(result, dict) and "results" in result:
+        return result["results"]
+    return result
+
+
+@mcp.tool(
+    name="memory_manage",
+    description="""🔧 Unified Memory Management: Handle get, update, and delete operations
+
+When to use:
+→ Single interface for common memory operations
+→ Consistent parameter patterns across CRUD operations
+→ Reduced API surface complexity
+
+How it works:
+Provides unified interface for memory retrieval, updates, and deletion using operation parameter to control behavior.
+
+💡 Quick Start:
+- Get memory: operation="get", memory_id="...", include_associations=True
+- Update memory: operation="update", memory_id="...", content="new content"
+- Delete memory: operation="delete", memory_id="..."
+- Consistent interface: Same response patterns across operations
+
+⚠️ Important: Delete operations are permanent and cannot be undone
+
+➡️ What's next: Use memory_discover_associations after updates to explore new connections""",
+    annotations={
+        "title": "Unified Memory Management",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False
+    }
+)
+async def memory_manage(
+    request: MemoryManageRequest,
+    ctx: Context
+) -> Dict[str, Any]:
+    """Unified CRUD operations for memory management"""
+    # Delegate to handler
+    return await handle_memory_manage(request, ctx)
+
+
+@mcp.tool(
+    name="memory_sync",
+    description="""🔄 Unified Memory Sync: Handle import and export operations
+
+When to use:
+→ Single interface for data synchronization operations  
+→ Backup and restore memories with consistent interface
+→ Cross-environment memory transfer with unified parameters
+
+How it works:
+Provides unified interface for both import and export operations using operation parameter to control behavior.
+
+💡 Quick Start:
+- Export backup: operation="export", scope="work", file_path="backup.json"
+- Import restore: operation="import", file_path="backup.json", merge_strategy="skip_duplicates"
+- Direct transfer: Use file_path=None for data exchange without files
+- Consistent interface: Same response patterns across operations
+
+⚠️ Important: Import operations may modify existing data based on merge strategy
+
+➡️ What's next: Use memory_search to verify sync results, scope_list to review organization""",
+    annotations={
+        "title": "Unified Memory Synchronization",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False
+    }
+)
+async def memory_sync(
+    request: MemorySyncRequest,
+    ctx: Context
+) -> Dict[str, Any]:
+    """Unified import/export operations for memory synchronization"""
+    # Delegate to handler
+    return await handle_memory_sync(request, ctx)
+
+
 if __name__ == "__main__":
     async def startup():
         """Initialize the memory system on startup"""
@@ -710,5 +829,22 @@ if __name__ == "__main__":
     # Initialize before running
     asyncio.run(startup())
     
-    # Run with stdio transport for better MCP client compatibility
-    mcp.run(transport="stdio")
+    # Use transport configuration from config file
+    transport_config = config.get('transport', {})
+    
+    if transport_config.get('http_enabled', False):
+        # HTTP transport
+        port = transport_config.get('http_port', 8000)
+        host = transport_config.get('http_host', '0.0.0.0')
+        logger.info(f"Starting server on HTTP transport: {host}:{port}")
+        mcp.run(transport="http", host=host, port=port)
+    elif transport_config.get('sse_enabled', False):
+        # SSE transport
+        port = transport_config.get('sse_port', 8000)
+        host = transport_config.get('sse_host', '0.0.0.0')
+        logger.info(f"Starting server on SSE transport: {host}:{port}")
+        mcp.run(transport="sse", host=host, port=port)
+    else:
+        # Default to STDIO transport
+        logger.info("Starting server on STDIO transport")
+        mcp.run(transport="stdio")
