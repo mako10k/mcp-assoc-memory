@@ -205,7 +205,7 @@ class ChromaVectorStore(BaseVectorStore):
                 None,
                 lambda: self.collection.query(
                     query_embeddings=[embedding],
-                    n_results=limit * 3 if include_child_scopes else limit,  # Get more results for filtering
+                    n_results=int(limit * 3) if include_child_scopes else int(limit),  # Ensure integers
                     where=where_clause,
                     include=["metadatas", "distances"]
                 )

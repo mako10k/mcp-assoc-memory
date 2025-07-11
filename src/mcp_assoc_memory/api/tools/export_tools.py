@@ -74,7 +74,7 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
                 try:
                     memory = await memory_manager.get_memory(memory_data["memory_id"])
                     if memory:
-                        associations = await memory_manager.get_related_memories(memory.id, limit=10)
+                        associations = await memory_manager.get_associations(memory.id, limit=10)
                         memory_export["associations"] = [assoc.id for assoc in associations]
                 except:
                     memory_export["associations"] = []

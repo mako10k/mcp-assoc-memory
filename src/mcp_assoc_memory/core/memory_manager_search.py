@@ -30,26 +30,29 @@ class MemoryManagerSearch:
 
             # Generate query embedding
             query_embedding = await self.embedding_service.get_embedding(query)
-            if not query_embedding:
+            if query_embedding is None:
                 logger.warning("Failed to generate embedding for search query")
+                return []
+            
+            # Check if embedding is empty using len() instead of size for numpy arrays
+            if hasattr(query_embedding, '__len__') and len(query_embedding) == 0:
+                logger.warning("Empty embedding for search query")
                 return []
 
             # Search in vector store
-            search_scope = scope
-            if include_child_scopes and scope:
-                # Include child scopes in search
-                search_scope = f"{scope}/*"
-
-            results = await self.vector_store.search(
+            results = await self.vector_store.search_similar(
                 query_embedding,
-                scope=search_scope,
+                scope=scope,
+                include_child_scopes=include_child_scopes,
                 limit=limit,
                 min_score=min_score
             )
 
             # Convert to memory objects with scores (dictionary format)
             memories_with_scores = []
-            for memory_id, score in results:
+            for result in results:
+                memory_id = result["memory_id"]
+                score = result["similarity"]
                 memory = await self.get_memory(memory_id)
                 if memory:
                     memories_with_scores.append({
@@ -97,23 +100,33 @@ class MemoryManagerSearch:
         """
         try:
             embedding = await self.embedding_service.get_embedding(query)
-            if not embedding:
+            if embedding is None:
+                return []
+            
+            # Check if embedding is empty using len() instead of size for numpy arrays    
+            if hasattr(embedding, '__len__') and len(embedding) == 0:
                 return []
 
             # Vector search
-            results = await self.vector_store.search(
+            results = await self.vector_store.search_similar(
                 embedding,
-                scope or "user/default",
-                limit,
-                min_score
+                scope=scope or "user/default", 
+                include_child_scopes=False,
+                limit=limit,
+                min_score=min_score
             )
 
-            # Convert to memory objects
+            # Convert to memory objects (dictionary format)
             memories_with_scores = []
-            for memory_id, score in results:
+            for result in results:
+                memory_id = result["memory_id"]
+                score = result["similarity"]
                 memory = await self.get_memory(memory_id)
                 if memory:
-                    memories_with_scores.append((memory, score))
+                    memories_with_scores.append({
+                        "memory": memory,
+                        "similarity": score
+                    })
 
             return memories_with_scores
         except Exception as e:
@@ -181,8 +194,12 @@ class MemoryManagerSearch:
 
             # Semantic similarity filtering
             query_embedding = await self.embedding_service.get_embedding(query)
-            if not query_embedding:
-                return [(memory, 1.0) for memory in memories[:limit]]
+            if query_embedding is None:
+                return [{"memory": memory, "similarity": 1.0} for memory in memories[:limit]]
+            
+            # Check if embedding is empty using len() instead of size for numpy arrays
+            if hasattr(query_embedding, '__len__') and len(query_embedding) == 0:
+                return [{"memory": memory, "similarity": 1.0} for memory in memories[:limit]]
 
             scored_memories = []
             for memory in memories:
@@ -222,24 +239,34 @@ class MemoryManagerSearch:
         try:
             # Get reference memory embedding
             reference_embedding = await self.vector_store.get_embedding(reference_id)
-            if not reference_embedding:
+            if reference_embedding is None:
+                return []
+            
+            # Check if embedding is empty using len() instead of size for numpy arrays
+            if hasattr(reference_embedding, '__len__') and len(reference_embedding) == 0:
                 return []
 
             # Similarity search
-            results = await self.vector_store.search(
+            results = await self.vector_store.search_similar(
                 reference_embedding,
-                scope or "user/default",
-                limit + 1,  # +1 to exclude self
-                min_score
+                scope=scope or "user/default",
+                include_child_scopes=False,
+                limit=limit + 1,  # +1 to exclude self
+                min_score=min_score
             )
 
             # Convert to memory objects (exclude reference memory)
             memories_with_scores = []
-            for memory_id, score in results:
+            for result in results:
+                memory_id = result["memory_id"]
+                score = result["similarity"]
                 if memory_id != reference_id:
                     memory = await self.get_memory(memory_id)
                     if memory:
-                        memories_with_scores.append((memory, score))
+                        memories_with_scores.append({
+                            "memory": memory,
+                            "similarity": score
+                        })
 
             return memories_with_scores[:limit]
         except Exception as e:

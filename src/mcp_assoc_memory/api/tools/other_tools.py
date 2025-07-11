@@ -57,7 +57,7 @@ async def handle_memory_discover_associations(
         await ctx.info(f"Discovering associations for memory: {memory_id}")
         
         # Use the memory manager to get related memories
-        associations = await memory_manager.get_related_memories(
+        associations = await memory_manager.get_associations(
             memory_id, 
             limit=limit
         )

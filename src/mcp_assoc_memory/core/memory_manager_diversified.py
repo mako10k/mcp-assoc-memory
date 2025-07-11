@@ -53,7 +53,7 @@ class MemoryManagerDiversified:
                 return []
             
             # Ensure embedding is valid
-            if hasattr(query_embedding, 'size') and query_embedding.size == 0:
+            if hasattr(query_embedding, '__len__') and len(query_embedding) == 0:
                 logger.warning("Empty query embedding generated for diversified search")
                 return []
 
@@ -132,6 +132,7 @@ class MemoryManagerDiversified:
             candidates = await self.vector_store.search_similar(
                 embedding_list,
                 scope=scope,
+                include_child_scopes=False,
                 limit=limit,
                 min_score=min_score
             )

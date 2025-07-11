@@ -414,18 +414,18 @@ async def handle_memory_get(
         # Include associations if requested
         if include_associations:
             try:
-                associations = await memory_manager.get_related_memories(memory_id, limit=10)
+                # Use get_associations instead of get_related_memories to avoid inheritance issues
+                associations_data = await memory_manager.get_associations(memory_id, limit=10)
                 result["associations"] = [
                     {
-                        "memory_id": assoc.id,
-                        "content": assoc.content[:100] + "..." if len(assoc.content) > 100 else assoc.content,
-                        "scope": assoc.metadata.get("scope", assoc.scope),
-                        "similarity_score": getattr(assoc, 'similarity_score', 0.0),
-                        "tags": assoc.tags,
-                        "category": assoc.category,
-                        "created_at": assoc.created_at
+                        "association_id": assoc.id if hasattr(assoc, 'id') else str(assoc),
+                        "source_id": assoc.source_memory_id if hasattr(assoc, 'source_memory_id') else memory_id,
+                        "target_id": assoc.target_memory_id if hasattr(assoc, 'target_memory_id') else 'unknown',
+                        "association_type": assoc.association_type if hasattr(assoc, 'association_type') else 'semantic',
+                        "strength": assoc.strength if hasattr(assoc, 'strength') else 0.0,
+                        "auto_generated": assoc.auto_generated if hasattr(assoc, 'auto_generated') else True
                     }
-                    for assoc in associations
+                    for assoc in associations_data[:3]  # Limit to top 3 associations
                 ]
             except Exception as e:
                 await ctx.warning(f"Failed to get associations: {e}")
@@ -820,7 +820,7 @@ async def handle_memory_list_all(
             total_items=total_items,
             total_pages=total_pages,
             has_next=page < total_pages,
-            has_prev=page > 1
+            has_previous=page > 1
         )
         
         if ctx:
