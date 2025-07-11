@@ -1,0 +1,409 @@
+"""
+Core memory management operations - CRUD functionality
+Handles memory storage, retrieval, updates, and deletion
+"""
+
+import asyncio
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from ..core.embedding_service import EmbeddingService
+from ..core.similarity import SimilarityCalculator
+from ..models.memory import Memory
+from ..storage.base import BaseGraphStore, BaseMetadataStore, BaseVectorStore
+from ..utils.cache import LRUCache
+from ..utils.logging import get_memory_logger
+
+logger = get_memory_logger(__name__)
+
+
+class MemoryManagerCore:
+    """Core memory management operations"""
+
+    def __init__(
+        self,
+        vector_store: BaseVectorStore,
+        metadata_store: BaseMetadataStore,
+        graph_store: BaseGraphStore,
+        embedding_service: EmbeddingService,
+        similarity_calculator: Optional[SimilarityCalculator] = None
+    ):
+        self.vector_store = vector_store
+        self.metadata_store = metadata_store
+        self.graph_store = graph_store
+        self.embedding_service = embedding_service
+        self.similarity_calculator = (
+            similarity_calculator or SimilarityCalculator()
+        )
+
+        # Cache
+        self.memory_cache = LRUCache(max_size=1000)
+        self.association_cache = LRUCache(max_size=500)
+
+        # Management lock
+        self.operation_lock = asyncio.Lock()
+
+    async def initialize(self) -> None:
+        """System initialization"""
+        try:
+            await asyncio.gather(
+                self.vector_store.initialize(),
+                self.metadata_store.initialize(),
+                self.graph_store.initialize()
+            )
+
+            logger.info("Memory manager initialized successfully")
+
+        except Exception as e:
+            logger.error(
+                "Failed to initialize memory manager: %s",
+                str(e),
+                extra={"error_code": "MEMORY_MANAGER_INIT_ERROR"}
+            )
+            raise
+
+    async def close(self) -> None:
+        """System cleanup"""
+        try:
+            await asyncio.gather(
+                self.vector_store.close(),
+                self.metadata_store.close(),
+                self.graph_store.close(),
+                return_exceptions=True
+            )
+
+            logger.info("Memory manager closed successfully")
+
+        except Exception as e:
+            logger.warning(
+                "Error during memory manager cleanup: %s",
+                str(e),
+                extra={"error_code": "MEMORY_MANAGER_CLOSE_ERROR"}
+            )
+
+    async def check_content_duplicate(
+        self,
+        content: str,
+        scope: Optional[str] = None,
+        similarity_threshold: float = 0.95
+    ) -> Optional[Memory]:
+        """Check for duplicate content in the specified scope"""
+        try:
+            if not content or not content.strip():
+                return None
+            
+            # Generate embedding for the content
+            content_embedding = await self.embedding_service.get_embedding(content)
+            if content_embedding is None:
+                logger.warning("Failed to generate embedding for duplicate check")
+                return None
+            
+            # Search for similar content in the same scope
+            similar_results = await self.vector_store.search(
+                content_embedding,
+                scope=scope,
+                limit=5,
+                min_score=similarity_threshold
+            )
+            
+            # Check each result for actual duplicate
+            for memory_id, similarity_score in similar_results:
+                existing_memory = await self.get_memory(memory_id)
+                if existing_memory and similarity_score >= similarity_threshold:
+                    logger.info(
+                        "Duplicate content found",
+                        extra={
+                            "existing_memory_id": existing_memory.id,
+                            "similarity_score": similarity_score,
+                            "content_length_diff": abs(len(content) - len(existing_memory.content))
+                        }
+                    )
+                    return existing_memory
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error checking for duplicates: {e}")
+            # Return None to allow storing if duplicate check fails
+            return None
+
+    async def store_memory(
+        self,
+        scope: str = "user/default",
+        content: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[List[str]] = None,
+        category: Optional[str] = None,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        auto_associate: bool = True,
+        allow_duplicates: bool = False,
+        similarity_threshold: float = 0.95
+    ) -> Optional[Memory]:
+        """Store memory with scope-based organization"""
+        try:
+            # Duplicate check (when allow_duplicates is False)
+            if not allow_duplicates:
+                existing_memory = await self.check_content_duplicate(
+                    content, 
+                    scope,
+                    similarity_threshold
+                )
+                if existing_memory:
+                    logger.info(
+                        "Duplicate content detected, returning existing memory",
+                        extra_data={
+                            "existing_memory_id": existing_memory.id,
+                            "content_preview": content[:50]
+                        }
+                    )
+                    return existing_memory
+            
+            # Add scope to metadata
+            final_metadata = metadata or {}
+            final_metadata["scope"] = scope
+            
+            # Create memory object
+            memory = Memory(
+                scope=scope,
+                content=content,
+                metadata=final_metadata,
+                tags=tags or [],
+                category=category,
+                user_id=user_id,
+                project_id=project_id,
+                session_id=session_id
+            )
+
+            # Generate embedding vector
+            embedding = await self.embedding_service.get_embedding(content)
+            if embedding is None:
+                logger.warning(
+                    "Failed to generate embedding, storing without vector",
+                    extra_data={"memory_id": memory.id}
+                )
+
+            async with self.operation_lock:
+                # Store in vector store
+                if embedding is not None:
+                    success = await self.vector_store.store_embedding(
+                        memory.id,
+                        embedding,
+                        memory.to_dict()
+                    )
+                    if not success:
+                        logger.warning(
+                            "Failed to store in vector store",
+                            extra_data={"memory_id": memory.id}
+                        )
+
+                # Store in metadata store
+                metadata_id = await self.metadata_store.store_memory(memory)
+                if not metadata_id:
+                    logger.error(
+                        "Failed to store in metadata store",
+                        error_code="METADATA_STORE_ERROR",
+                        memory_id=memory.id
+                    )
+                    return None
+
+                # Add memory node to graph store
+                graph_success = await self.graph_store.add_memory_node(memory)
+                if not graph_success:
+                    logger.warning(
+                        "Failed to add to graph store",
+                        extra_data={"memory_id": memory.id}
+                    )
+
+                # Store in cache
+                self.memory_cache.set(memory.id, memory)
+
+                logger.info(
+                    "Memory stored successfully",
+                    extra_data={
+                        "memory_id": memory.id,
+                        "scope": scope,
+                        "content_length": len(content),
+                        "has_embedding": embedding is not None
+                    }
+                )
+
+                return memory
+
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            logger.error(
+                "Failed to store memory",
+                error_code="MEMORY_STORE_ERROR",
+                scope=scope,
+                content_length=len(content),
+                error=str(e),
+                traceback=tb
+            )
+            return None
+
+    async def get_memory(self, memory_id: str) -> Optional[Memory]:
+        """Get memory by ID"""
+        try:
+            # Check cache
+            cached_memory = self.memory_cache.get(memory_id)
+            if cached_memory:
+                # Update access count
+                cached_memory.access_count += 1
+                cached_memory.accessed_at = datetime.utcnow()
+                return cached_memory
+
+            # Get from metadata store
+            memory = await self.metadata_store.get_memory(memory_id)
+            if memory:
+                # Store in cache
+                self.memory_cache.set(memory_id, memory)
+                
+                # Update access count
+                memory.access_count += 1
+                memory.accessed_at = datetime.utcnow()
+                
+                return memory
+
+            return None
+
+        except Exception as e:
+            logger.error(
+                "Failed to get memory",
+                error_code="MEMORY_GET_ERROR",
+                memory_id=memory_id,
+                error=str(e)
+            )
+            return None
+
+    async def update_memory(
+        self,
+        memory_id: str,
+        content: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[List[str]] = None,
+        category: Optional[str] = None,
+        preserve_associations: bool = True
+    ) -> Optional[Memory]:
+        """Update existing memory"""
+        try:
+            # Get existing memory
+            existing_memory = await self.get_memory(memory_id)
+            if not existing_memory:
+                logger.warning(f"Memory not found for update: {memory_id}")
+                return None
+
+            # Prepare update data
+            update_data = {}
+            
+            if content is not None:
+                update_data["content"] = content
+                # Regenerate embedding if content changed
+                new_embedding = await self.embedding_service.get_embedding(content)
+                if new_embedding is not None:
+                    update_data["embedding"] = new_embedding
+
+            if metadata is not None:
+                # Merge with existing metadata
+                updated_metadata = existing_memory.metadata.copy()
+                updated_metadata.update(metadata)
+                update_data["metadata"] = updated_metadata
+
+            if tags is not None:
+                update_data["tags"] = tags
+
+            if category is not None:
+                update_data["category"] = category
+
+            # Update timestamp
+            update_data["updated_at"] = datetime.utcnow()
+
+            async with self.operation_lock:
+                # Update metadata store
+                success = await self.metadata_store.update_memory(memory_id, update_data)
+                if not success:
+                    return None
+
+                # Update vector store if embedding changed
+                if "embedding" in update_data:
+                    await self.vector_store.update_embedding(
+                        memory_id,
+                        update_data["embedding"],
+                        existing_memory.to_dict()
+                    )
+
+                # Update graph store
+                updated_memory = await self.get_memory(memory_id)
+                if updated_memory:
+                    await self.graph_store.update_memory_node(updated_memory)
+
+                # Clear cache to force reload
+                self.memory_cache.delete(memory_id)
+
+                logger.info(
+                    "Memory updated successfully",
+                    extra_data={
+                        "memory_id": memory_id,
+                        "updated_fields": list(update_data.keys())
+                    }
+                )
+
+                return await self.get_memory(memory_id)
+
+        except Exception as e:
+            logger.error(
+                "Failed to update memory",
+                error_code="MEMORY_UPDATE_ERROR",
+                memory_id=memory_id,
+                error=str(e)
+            )
+            return None
+
+    async def delete_memory(self, memory_id: str) -> bool:
+        """Delete memory and all associated data"""
+        try:
+            async with self.operation_lock:
+                # Remove from all stores
+                results = await asyncio.gather(
+                    self.vector_store.delete_embedding(memory_id),
+                    self.metadata_store.delete_memory(memory_id),
+                    self.graph_store.remove_memory_node(memory_id),
+                    return_exceptions=True
+                )
+
+                # Check if any operation failed
+                success = all(
+                    result is True or result is None 
+                    for result in results 
+                    if not isinstance(result, Exception)
+                )
+
+                if success:
+                    # Clear from cache
+                    self.memory_cache.delete(memory_id)
+                    
+                    logger.info(
+                        "Memory deleted successfully",
+                        extra_data={"memory_id": memory_id}
+                    )
+                else:
+                    logger.warning(
+                        "Some delete operations failed",
+                        extra_data={
+                            "memory_id": memory_id,
+                            "results": [str(r) for r in results]
+                        }
+                    )
+
+                return success
+
+        except Exception as e:
+            logger.error(
+                "Failed to delete memory",
+                error_code="MEMORY_DELETE_ERROR",
+                memory_id=memory_id,
+                error=str(e)
+            )
+            return False

@@ -232,7 +232,7 @@ async def handle_memory_search(
             scope=request.scope,
             include_child_scopes=request.include_child_scopes,
             limit=request.limit,
-            similarity_threshold=request.similarity_threshold
+            min_score=request.similarity_threshold
         )
         
         # Format results for response
@@ -414,7 +414,7 @@ async def handle_memory_get(
         # Include associations if requested
         if include_associations:
             try:
-                associations = await memory_manager.get_associations(memory_id, limit=10)
+                associations = await memory_manager.get_related_memories(memory_id, limit=10)
                 result["associations"] = [
                     {
                         "memory_id": assoc.id,
@@ -547,7 +547,7 @@ async def handle_memory_discover_associations(
         search_results = await memory_manager.search_memories(
             query=memory.content,
             limit=limit * 3,  # Search more to account for filtering
-            similarity_threshold=max(0.1, similarity_threshold - 0.2)  # Lower threshold for diversity
+            min_score=max(0.1, similarity_threshold - 0.2)  # Lower threshold for diversity
         )
         
         # If we didn't find enough diverse results, try with the original content plus tags
@@ -562,7 +562,7 @@ async def handle_memory_discover_associations(
             additional_results = await memory_manager.search_memories(
                 query=enhanced_query,
                 limit=limit * 2,
-                similarity_threshold=max(0.1, similarity_threshold - 0.3)
+                min_score=max(0.1, similarity_threshold - 0.3)
             )
             
             # Merge results (will be deduplicated later)

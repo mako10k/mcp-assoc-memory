@@ -33,6 +33,22 @@ stop() {
     if kill -0 $PID 2>/dev/null; then
         echo "Stopping MCP server..."
         kill $PID
+        
+        # Wait for process to actually stop (max 10 seconds)
+        for i in {1..10}; do
+            if ! kill -0 $PID 2>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
+        
+        # Force kill if still running
+        if kill -0 $PID 2>/dev/null; then
+            echo "Process didn't stop gracefully, force killing..."
+            kill -9 $PID
+            sleep 2
+        fi
+        
         rm -f "$PID_FILE"
         echo "Stopped successfully"
     else
@@ -44,7 +60,7 @@ stop() {
 
 restart() {
     stop
-    sleep 1
+    sleep 5
     start
 }
 
