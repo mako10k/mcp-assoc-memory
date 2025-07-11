@@ -159,199 +159,19 @@ async def memory_store(
     return await handle_memory_store(request, ctx)
 
 
-@mcp.tool(
-    name="memory_search",
-    description="""🔍 Semantic Memory Search: Find related memories using natural language
-
-When to use:
-→ "What did I learn about [topic]?"
-→ "Find memories related to [concept]"  
-→ "Show me similar ideas to [content]"
-
-How it works:
-Converts your query to semantic embeddings and searches the vector space for conceptually similar memories, ranked by relevance.
-
-💡 Quick Start:
-- Default: similarity_threshold=0.1 (noise filtering with Top-K results)
-- No results? Check limit parameter instead of lowering threshold
-- Precision needed? Raise to 0.4+ for stricter matching
-- Include associations: include_associations=True for richer context
-
-⚠️ Important: ChromaDB returns Top-K results; threshold mainly filters noise, LLM judges relevance via similarity scores
-
-➡️ What's next: Use memory_get for details, memory_discover_associations for deeper exploration""",
-    annotations={
-        "title": "Semantic Memory Search",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True
-    }
-)
-async def memory_search(
-    request: MemorySearchRequest,
-    ctx: Context
-) -> List[MemoryResponse]:
-    """Search memories with full semantic and associative capabilities"""
-    # Delegate to handler
-    result = await handle_memory_search(request, ctx)
-    # Convert handler result to expected format
-    if isinstance(result, dict) and "results" in result:
-        return result["results"]
-    return result
+# Old memory_search deleted - replaced by memory_search_unified (renamed to memory_search)
 
 
-@mcp.tool(
-    name="memory_diversified_search",
-    description="""🔄 Diversified Memory Search: Find diverse memories for creative exploration
-
-When to use:
-→ Brainstorming and creative thinking sessions
-→ Breaking out of similar content clusters
-→ Exploring different perspectives on a topic
-→ Discovering unexpected connections and ideas
-
-How it works:
-Uses a diversified similarity algorithm to find memories that are relevant but not too similar to each other, ensuring broader coverage of your knowledge space rather than drilling deep into specific topics.
-
-💡 Quick Start:
-- Creative exploration: Use default settings for balanced diversity
-- Broad brainstorming: Lower diversity_threshold (0.6-0.7) for more variety
-- Focused diversity: Higher min_score (0.3-0.5) for relevant but diverse results
-- Deep exploration: Increase limit (15-25) for comprehensive diverse coverage
-
-⚠️ Important: This method prioritizes diversity over pure similarity ranking
-
-➡️ What's next: Use memory_get for details, memory_search for focused follow-up""",
-    annotations={
-        "title": "Diversified Similarity Search",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True
-    }
-)
-async def memory_diversified_search(
-    request: DiversifiedSearchRequest,
-    ctx: Context
-) -> List[MemoryResponse]:
-    """Search memories with diversification for creative exploration"""
-    # Delegate to handler
-    result = await handle_diversified_search(request, ctx)
-    # Convert handler result to expected format
-    if isinstance(result, dict) and "results" in result:
-        return result["results"]
-    return result
+# Old memory_diversified_search deleted - replaced by memory_search diversified mode
 
 
-@mcp.tool(
-    name="memory_get",
-    description="""📄 Retrieve Memory Details: Get complete information about a specific memory
-
-When to use:
-→ After finding a memory ID from search results
-→ When you need full content and metadata
-→ To explore related memories through associations
-
-How it works:
-Fetches the complete memory record including content, metadata, tags, and optionally finds related memories for deeper exploration.
-
-💡 Quick Start:
-- Include associations: include_associations=True (default) for rich context
-- Skip associations: include_associations=False for faster retrieval
-- Use with search: memory_search → memory_get → explore details
-
-⚠️ Important: Requires valid memory_id from previous search or storage
-
-➡️ What's next: Use memory_discover_associations for deeper exploration, memory_store for new insights""",
-    annotations={
-        "title": "Memory Detail Retrieval",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True
-    }
-)
-async def memory_get(
-    memory_id: Annotated[str, Field(description="Memory ID")],
-    ctx: Context,
-    include_associations: Annotated[bool, Field(default=True, description="Include related memories")] = True
-) -> Optional[MemoryResponse]:
-    """Retrieve a memory with its associations"""
-    result = await handle_memory_get(memory_id, ctx, include_associations)
-    # Convert handler result to expected format  
-    if isinstance(result, dict) and "error" not in result:
-        return MemoryResponse(**result)
-    return None
+# Old memory_get deleted - replaced by memory_manage get operation
 
 
-@mcp.tool(
-    name="memory_delete",
-    description="""🗑️ Delete Memory: Permanently remove unwanted or incorrect memories
-
-When to use:
-→ Remove duplicate or incorrect information
-→ Clean up outdated or irrelevant memories
-→ Maintain clean and organized memory space
-
-How it works:
-Permanently removes the specified memory from storage. This action cannot be undone, so use with caution.
-
-💡 Quick Start:
-- Double-check: Use memory_get first to confirm content
-- Safety first: Consider memory_move to archive instead of delete
-- Bulk cleanup: Use memory_list_all to find candidates for deletion
-
-⚠️ Important: This is a destructive operation - deleted memories cannot be recovered
-
-➡️ What's next: Use scope_list to verify organization, memory_store to add corrected content""",
-    annotations={
-        "title": "Memory Deletion",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True
-    }
-)
-async def memory_delete(
-    memory_id: Annotated[str, Field(description="ID of the memory to delete")],
-    ctx: Context
-) -> Dict[str, Any]:
-    """Delete a memory"""
-    return await handle_memory_delete(memory_id, ctx)
+# Old memory_delete deleted - replaced by memory_manage delete operation
 
 
-@mcp.tool(
-    name="memory_update",
-    description="""✏️ Update Memory: Modify existing memory content and metadata
-
-When to use:
-→ Correct or improve stored information
-→ Add new insights to existing memories
-→ Update categorization or organization
-→ Refine content while preserving associations
-
-How it works:
-Updates specific fields of an existing memory while preserving other data and optionally maintaining semantic associations.
-
-💡 Quick Start:
-- Partial updates: Only specify fields you want to change
-- Content updates: Provide new content, optionally preserve associations
-- Reorganization: Change scope, tags, or category for better organization  
-- Safe operation: Original memory preserved if update fails
-
-⚠️ Important: Content changes may affect semantic associations
-
-➡️ What's next: Use memory_get to verify changes, memory_discover_associations to explore new connections""",
-    annotations={
-        "title": "Memory Update",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False
-    }
-)
-async def memory_update(
-    request: MemoryUpdateRequest,
-    ctx: Context
-) -> MemoryResponse:
-    """Update an existing memory"""
-    return await handle_memory_update(request, ctx)
+# Old memory_update deleted - replaced by memory_manage update operation
 
 
 @mcp.tool(
@@ -561,72 +381,10 @@ async def scope_suggest(request: ScopeSuggestRequest, ctx: Context):
     return await handle_scope_suggest(request, ctx)
 
 
-@mcp.tool(
-    name="memory_export",
-    description="""📤 Export Memories: "Save my memories for backup or sync across environments"
-
-When to use:
-→ Backup memories before system changes
-→ Sync memories across development environments
-→ Share project-specific memories with team
-→ Create portable memory snapshots
-
-How it works:
-Exports memories and metadata (excluding re-computable embeddings) to files or direct data exchange for cross-environment portability.
-
-💡 Quick Start:
-- Full backup: No scope specified, file_path=None for direct data
-- Project export: scope="work/projects/my-project" 
-- File export: file_path="backup/memories-2025-07-10.json"
-- Compressed: compression=True for large datasets
-
-⚠️ Important: Embeddings excluded (will be re-computed on import)
-
-➡️ What's next: Use memory_import to restore in target environment""",
-    annotations={
-        "title": "Memory Export",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True
-    }
-)
-async def memory_export(request: MemoryExportRequest, ctx: Context):
-    """Export memories to file or direct data exchange"""
-    return await handle_memory_export(request, ctx)
+# Old memory_export deleted - replaced by memory_sync export operation
 
 
-@mcp.tool(
-    name="memory_import",
-    description="""📥 Import Memories: "Restore or sync memories from backup or other environments"
-
-When to use:
-→ Restore memories from backup files
-→ Sync memories from other development environments
-→ Import shared project memories from team
-→ Merge memory datasets
-
-How it works:
-Imports memories and metadata from files or direct data, with configurable merge strategies to handle duplicates and conflicts.
-
-💡 Quick Start:
-- File import: file_path="backup/memories-2025-07-10.json"
-- Direct import: import_data="<exported_json_data>"
-- Safe merge: merge_strategy="skip_duplicates" (default)
-- Scope isolation: target_scope_prefix="imported/" to avoid conflicts
-
-⚠️ Important: Embeddings will be re-computed after import
-
-➡️ What's next: Use memory_search to verify imported memories""",
-    annotations={
-        "title": "Memory Import",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False
-    }
-)
-async def memory_import(request: MemoryImportRequest, ctx: Context):
-    """Import memories from file or direct data"""
-    return await handle_memory_import(request, ctx)
+# Old memory_import deleted - replaced by memory_sync import operation
 
 
 @mcp.tool(
@@ -702,8 +460,8 @@ async def memory_discover_associations(
 
 
 @mcp.tool(
-    name="memory_search_unified",
-    description="""🔍 Unified Memory Search: Flexible search with multiple modes
+    name="memory_search",
+    description="""🔍 Memory Search: Flexible search with standard and diversified modes
 
 When to use:
 → Standard search for specific information
@@ -714,22 +472,22 @@ How it works:
 Provides unified interface for both standard semantic search and diversified search modes. Use mode parameter to control search behavior.
 
 💡 Quick Start:
-- Standard search: mode="standard" for focused results
+- Standard search: mode="standard" for focused results (default)
 - Creative exploration: mode="diversified" for diverse perspectives
 - Auto-categorize: Let system recommend best approach
 - Consistent interface: Same parameters across modes
 
 ⚠️ Important: Different modes may return different result structures
 
-➡️ What's next: Use memory_get for details, adjust mode based on needs""",
+➡️ What's next: Use memory_manage to get details, adjust mode based on needs""",
     annotations={
-        "title": "Unified Search Interface",
+        "title": "Memory Search Interface",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True
     }
 )
-async def memory_search_unified(
+async def memory_search(
     request: UnifiedSearchRequest,
     ctx: Context
 ) -> List[MemoryResponse]:

@@ -47,21 +47,16 @@ Built with **FastMCP 2.0** for modern LLM integration, optimized for **GitHub Co
 
 ## 🎯 Complete MCP Tool Suite
 
-### 🆕 **Unified Tools (Recommended - Tool Consolidation Sprint 2)**
-- **`memory_search_unified`** - 🔍 Unified search with standard and diversified modes
-- **`memory_manage`** - 🛠️ Unified CRUD operations (get, update, delete)
-- **`memory_sync`** - 🔄 Unified data sync (import and export operations)
+### 🚀 **Modern API (10 Clean Tools)**
 
-### Core Memory Operations
-- **`memory_store`** - Store insights with automatic association discovery
-- **`memory_search`** - Semantic search with configurable similarity thresholds *(use unified version)*
-- **`memory_get`** - Retrieve detailed memory information with associations *(use unified version)*
-- **`memory_update`** - Modify content, scope, tags, and metadata *(use unified version)*
-- **`memory_delete`** - Clean removal with association cleanup *(use unified version)*
+### Core Operations (Primary API)
+- **`memory_store`** - Store new memories with auto-association
+- **`memory_search`** - Unified search with standard and diversified modes
+- **`memory_manage`** - Get, update, and delete memory operations  
+- **`memory_sync`** - Import and export memories for backup/sync
 
 ### Discovery and Analysis
 - **`memory_discover_associations`** - Find semantically related memories
-- **`memory_diversified_search`** - Creative exploration with diversity *(use unified version)*
 - **`memory_list_all`** - Browse complete memory collection with pagination
 
 ### Organization Management  
@@ -69,15 +64,11 @@ Built with **FastMCP 2.0** for modern LLM integration, optimized for **GitHub Co
 - **`scope_suggest`** - AI-powered scope recommendations
 - **`memory_move`** - Reorganize memories into better categories
 
-### Sync and Backup
-- **`memory_export`** - Export memories for backup or cross-environment sync *(use unified version)*
-- **`memory_import`** - Import memories with flexible merge strategies *(use unified version)*
-
 ### Session Management
 - **`session_manage`** - Create, list, and cleanup temporary working sessions
 
-### 🔗 **Migration Guide**
-New users should use the **unified tools** for simplified API experience. Existing tools remain available for backward compatibility during the transition period.
+### 🎯 **Clean, Modern API**
+All tools use intuitive, natural names with powerful unified interfaces for better developer experience.
 
 ## 📚 Comprehensive Documentation
 

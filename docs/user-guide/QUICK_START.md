@@ -55,30 +55,24 @@ Show me memories related to web frameworks
 
 ## 🎯 Essential Commands (GitHub Copilot)
 
-### 🆕 **New Unified Tools (Sprint 2 - Recommended)**
+### 🚀 **Modern API (10 Clean Tools)**
 | What You Want | Tool Used | Say to Copilot |
 |---------------|-----------|----------------|
-| **Unified Search** | `memory_search_unified` | "Find memories about [topic]" *(standard mode)* |
-| **Creative Search** | `memory_search_unified` | "Find diverse memories about [topic]" *(diversified mode)* |
+| **Search** | `memory_search` | "Find memories about [topic]" *(standard mode)* |
+| **Creative Search** | `memory_search` | "Find diverse memories about [topic]" *(diversified mode)* |
 | **Memory Management** | `memory_manage` | "Get/update/delete this memory" *(all CRUD operations)* |
 | **Data Sync** | `memory_sync` | "Export/import my memories" *(both sync operations)* |
+| **Store knowledge** | `memory_store` | "Remember this: [your content]" |
+| **Explore connections** | `memory_discover_associations` | "Show me what's related to [concept]" |
+| **Organize memories** | `memory_move` | "Move these memories to [category]" |
+| **Session work** | `session_manage` | "Create a session for [project]" |
 
-### Traditional Commands (Still Available)
-| What You Want | Say to Copilot |
-|---------------|----------------|
-| Store knowledge | "Remember this: [your content]" |
-| Find related info | "Find memories about [topic]" |
-| Explore connections | "Show me what's related to [concept]" |
-| Organize memories | "Move these memories to [category]" |
-| Export/backup | "Export my memories" |
-| Session work | "Create a session for [project]" |
-
-### 🔗 **Tool Consolidation Benefits**
-The new unified tools provide:
-- **Simplified API**: One tool for multiple operations
-- **Consistent parameters**: Same interface patterns
-- **Reduced complexity**: Fewer tools to learn
-- **Backward compatibility**: Old tools still work during transition
+### 🎯 **Clean, Modern Design**
+Our streamlined API provides:
+- **Intuitive naming**: Natural tool names without confusing prefixes
+- **Functional grouping**: Related operations consolidated logically
+- **Reduced complexity**: 41% fewer tools to learn (17→10)
+- **Professional experience**: Clean, predictable interface
 
 ## 🗂️ Understanding Scopes
 

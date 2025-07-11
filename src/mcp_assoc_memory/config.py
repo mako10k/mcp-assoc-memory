@@ -115,10 +115,8 @@ class Config:
         else:
             # Check environment variable first (for test/alternate configs)
             env_config = os.getenv("MCP_CONFIG_FILE")
-            print(f"[DEBUG] MCP_CONFIG_FILE env var: {env_config}")
             if env_config and Path(env_config).exists():
                 config_file = env_config
-                print(f"[DEBUG] Using config from MCP_CONFIG_FILE: {config_file}")
             else:
                 # Auto-discover config.json in current and parent directories
                 default_path = Path.cwd() / "config.json"
@@ -128,7 +126,6 @@ class Config:
                 elif parent_path.exists():
                     config_file = str(parent_path)
 
-        print(f"[DEBUG] config_file resolved: {config_file}")
         if config_file:
             config._load_from_file(config_file)
 
@@ -213,22 +210,18 @@ class Config:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
 
-            print(f"[DEBUG] config.json loaded: {config_data}")
             # Merge configuration (file takes priority)
             self._merge_config(config_data)
-            print(f"[DEBUG] after merge: http_host={self.transport.http_host}, http_port={self.transport.http_port}, http_enabled={getattr(self.transport, 'http_enabled', None)}")
 
         except Exception as e:
             logger.warning(f"Failed to load configuration file: {e}")
 
     def _merge_config(self, config_data: Dict[str, Any]):
         """Merge configuration data (transport uses dataclass regeneration for strict reflection)"""
-        print(f"[DEBUG] _merge_config input: {config_data}")
         for section, values in config_data.items():
             if section == "transport" and isinstance(values, dict):
                 # TransportConfig only: dict → dataclass regeneration
                 self.transport = TransportConfig(**values)
-                print(f"[DEBUG] after TransportConfig dataclass: {self.transport}")
             elif hasattr(self, section) and isinstance(values, dict):
                 section_obj = getattr(self, section)
                 for key, value in values.items():
