@@ -6,7 +6,13 @@ from datetime import datetime, timedelta
 
 from ...core import memory_manager
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
-from ..models.responses import MemoryMoveResponse, MemoryDiscoverAssociationsResponse, SessionManageResponse, SessionInfo
+from ..models.responses import (
+    MemoryMoveResponse,
+    MemoryDiscoverAssociationsResponse,
+    SessionManageResponse,
+    SessionInfo,
+    SearchResultWithAssociations,
+)
 from ...simple_persistence import get_persistent_storage
 
 # Get storage
@@ -55,27 +61,28 @@ async def handle_memory_discover_associations(
     """Handle memory_discover_associations tool requests."""
     try:
         await ctx.info(f"Discovering associations for memory: {memory_id}")
-        
-        # Use the memory manager to get related memories
-        associations = await memory_manager.get_associations(
-            memory_id, 
-            limit=limit
+
+        # Retrieve related memories using association traversal
+        related_memories = await memory_manager.get_related_memories(
+            memory_id,
+            min_strength=similarity_threshold,
+            limit=limit,
         )
-        
+
         return MemoryDiscoverAssociationsResponse(
-            memory_id=memory_id,
+            success=True,
+            message="Associations discovered",
+            data={},
+            source_memory=None,
             associations=[
-                {
-                    "memory_id": assoc.id,
-                    "content": assoc.content[:200] + "..." if len(assoc.content) > 200 else assoc.content,
-                    "scope": assoc.scope,
-                    "similarity_score": getattr(assoc, 'similarity_score', 0.0),
-                    "relationship_type": "semantic_similarity"
-                }
-                for assoc in associations
+                SearchResultWithAssociations(
+                    memory=mem,
+                    similarity_score=1.0,
+                    associations=[],
+                )
+                for mem in related_memories
             ],
-            total_associations=len(associations),
-            similarity_threshold=similarity_threshold
+            total_found=len(related_memories),
         ).model_dump()
         
     except Exception as e:
