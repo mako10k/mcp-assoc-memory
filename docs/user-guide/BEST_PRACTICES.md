@@ -123,6 +123,54 @@ Monitor connection utilization to optimize pool size."
 "What concepts are related to [new learning]?"
 ```
 
+### Session Management Best Practices
+
+#### When to Use Sessions
+- **Debugging sessions**: Temporary investigation notes
+- **Meeting notes**: Time-bound discussion points
+- **Research phases**: Exploratory learning that may not be permanent
+- **Collaborative work**: Shared temporary workspace
+
+#### Session Lifecycle
+```instructions
+# Start focused work
+"Create a session for API performance debugging"
+
+# Store session-specific insights
+Use scope: "session/api-debugging"
+
+# Regular cleanup
+"Clean up sessions older than 14 days"
+```
+
+#### Session Naming Conventions
+- `session/[project]-[purpose]` - "session/api-debugging"
+- `session/[date]-[meeting]` - "session/2025-07-10-standup"
+- `session/[exploration]` - "session/ml-algorithm-research"
+
+### Advanced Search Strategies
+
+#### Diversified Search for Creativity
+```instructions
+# Break out of echo chambers
+"Find diverse memories about problem-solving approaches"
+
+# Explore different perspectives
+"Show me varied approaches to API design"
+
+# Creative brainstorming
+"Find loosely related memories about [topic] for inspiration"
+```
+
+#### When to Use Diversified vs. Regular Search
+- **Diversified Search**: Brainstorming, creative problem-solving, exploring new perspectives
+- **Regular Search**: Specific information retrieval, finding known solutions, targeted research
+
+#### Search Threshold Guidelines
+- **High precision (0.4+)**: Finding specific known information
+- **Balanced (0.2-0.4)**: General exploration and learning
+- **Creative (0.1-0.2)**: Brainstorming and unexpected connections
+
 ## 🔄 Workflow Integration
 
 ### Daily Usage Patterns
@@ -164,9 +212,49 @@ Monitor connection utilization to optimize pool size."
 ```instructions
 1. Store lessons learned
 2. Document what worked well
-3. Export project knowledge
+3. Export project knowledge for reuse
 4. Create reusable patterns for future projects
+5. Archive project memories to prevent scope pollution
 ```
+
+### Export & Backup Strategies
+
+#### Regular Backup Schedule
+- **Daily**: Export work scope for active projects
+- **Weekly**: Full system backup
+- **Monthly**: Archive completed project memories
+- **Quarterly**: Clean export for long-term storage
+
+#### Export Scope Strategies
+```instructions
+# Project-specific backup
+"Export memories from work/projects/[name] scope"
+
+# Knowledge domain backup
+"Export all learning/[technology] memories"
+
+# Complete system backup
+"Export all memories with compression"
+```
+
+#### Cross-Environment Sync
+```instructions
+# Development to production
+1. Export work scope from dev environment
+2. Import with skip_duplicates strategy in production
+3. Verify import success with search test
+
+# Team knowledge sharing
+1. Export project/[name] scope
+2. Share export file with team
+3. Team imports with create_versions strategy
+```
+
+#### Merge Strategy Guidelines
+- **skip_duplicates** (default): Safe for regular backups
+- **overwrite**: When authoritative source is clear
+- **create_versions**: For collaborative environments
+- **merge_metadata**: Preserve local customizations
 
 ### Code Review Integration
 

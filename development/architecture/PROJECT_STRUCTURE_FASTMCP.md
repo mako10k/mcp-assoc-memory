@@ -61,7 +61,20 @@
         ├── config.py                         # Configuration management
         ├── server.py                         # 🌟 FastMCP server implementation
         │
-        ├── 💎 core/                          # Core memory logic
+        ├── � api/                           # API layer - modular handlers
+        │   ├── models/                       # Request/response models
+        │   ├── utils/                        # API utilities
+        │   └── tools/                        # Tool handlers (modular architecture)
+        │       ├── __init__.py               # Handler exports and dependency injection
+        │       ├── memory_tools.py           # Core memory operations
+        │       ├── scope_tools.py            # Scope management
+        │       ├── session_tools.py          # Session lifecycle
+        │       ├── export_tools.py           # Import/export operations
+        │       ├── resource_tools.py         # Resource handlers
+        │       ├── prompt_tools.py           # Prompt handlers
+        │       └── other_tools.py            # Miscellaneous tools
+        │
+        ├── �💎 core/                          # Core memory logic
         │   ├── __init__.py
         │   ├── association.py                # Association algorithms
         │   ├── embedding_service.py          # Embedding generation
@@ -96,12 +109,22 @@
 #### `src/mcp_assoc_memory/server.py`
 **The main FastMCP server implementation**
 - FastMCP 2.0 application with decorators
-- 5 tools: `memory_store`, `memory_search`, `memory_get`, `memory_delete`, `memory_list_all`
-- 2 resources: `memory_stats`, `domain_memories/{domain}`
-- 2 prompts: `analyze_memories`, `summarize_memory`
-- Pydantic models for request/response validation
-- Context logging and structured error handling
+- Modular architecture with handler delegation
+- Tools, resources, and prompts delegated to handler modules
+- Clean separation of FastMCP protocol and business logic
+- Dependency injection setup for handlers
 - English interface throughout
+
+#### `src/mcp_assoc_memory/api/tools/`
+**Modular tool handler architecture**
+- **memory_tools.py**: Core memory operations (store, search, get, delete, list_all, update, move, discover_associations, diversified_search)
+- **scope_tools.py**: Scope management (list, suggest)
+- **session_tools.py**: Session lifecycle management (create, list, cleanup)
+- **export_tools.py**: Import/export operations (export, import)
+- **resource_tools.py**: Resource handlers (memory_stats, scope_memories)
+- **prompt_tools.py**: Prompt handlers (analyze_memories, summarize_memory)
+- **other_tools.py**: Miscellaneous utility tools
+- **__init__.py**: Handler exports and dependency injection setup
 
 #### `src/mcp_assoc_memory/__main__.py`
 **Application entry point**
@@ -115,7 +138,58 @@
 - Default values for all settings
 - Validation and type checking
 
-### 💎 Core Logic Layer
+### � API Layer (Modular Handlers)
+
+#### `src/mcp_assoc_memory/api/tools/memory_tools.py`
+**Core memory operation handlers**
+- Memory storage, retrieval, search, deletion
+- Memory listing and updating
+- Association discovery and diversified search
+- Memory movement between scopes
+- Business logic delegation to MemoryManager
+
+#### `src/mcp_assoc_memory/api/tools/scope_tools.py`
+**Scope management handlers**
+- Scope listing and hierarchy browsing
+- Scope suggestion based on content analysis
+- Scope organization and categorization support
+
+#### `src/mcp_assoc_memory/api/tools/session_tools.py`
+**Session lifecycle handlers**
+- Session creation with custom or auto-generated IDs
+- Session listing with statistics
+- Session cleanup based on age criteria
+- Temporary workspace management
+
+#### `src/mcp_assoc_memory/api/tools/export_tools.py`
+**Import/export operation handlers**
+- Memory export to JSON/YAML formats
+- Memory import with merge strategies
+- Backup and restoration utilities
+- Cross-environment memory sync
+
+#### `src/mcp_assoc_memory/api/tools/resource_tools.py`
+**Resource handler implementations**
+- Memory statistics resource (total counts, scope distribution)
+- Scope-specific memory resources
+- Dynamic resource generation
+- Resource metadata and caching
+
+#### `src/mcp_assoc_memory/api/tools/prompt_tools.py`
+**Prompt handler implementations**
+- Memory analysis prompt (pattern detection, insights)
+- Memory summarization prompt (content summary)
+- AI-assisted memory exploration
+- Natural language memory interaction
+
+#### `src/mcp_assoc_memory/api/tools/__init__.py`
+**Handler coordination and dependency injection**
+- Handler exports and registration
+- Dependency injection setup for all handlers
+- Common handler utilities and patterns
+- Handler lifecycle management
+
+### �💎 Core Logic Layer
 
 #### `src/mcp_assoc_memory/core/memory_manager.py`
 **High-level memory operations**

@@ -2,7 +2,35 @@
 
 ## 📖 Complete Tool Documentation
 
-This reference covers all available MCP tools for the Associative Memory Server. Each tool is designed for specific use cases in memory management and knowledge discovery.
+This reference covers all available MCP tools for the Associative Memory Server. The system provides a comprehensive suite of 15+ tools organized into functional modules for memory management and knowledge discovery.
+
+## 🗂️ Tool Organization
+
+### Core Memory Operations (memory_tools.py)
+- `memory_store` - Store new memories with association discovery
+- `memory_search` - Semantic search using natural language  
+- `memory_get` - Retrieve specific memories with details
+- `memory_delete` - Remove memories safely
+- `memory_list_all` - Browse complete memory collection
+- `memory_update` - Modify existing memories
+- `memory_move` - Reorganize memories between scopes
+- `memory_discover_associations` - Explore memory connections
+- `memory_diversified_search` - Enhanced creative search
+
+### Scope Management (scope_tools.py)
+- `scope_list` - Browse hierarchical memory organization
+- `scope_suggest` - AI-powered scope recommendations
+
+### Session Management (session_tools.py)
+- `session_manage` - Create, list, and cleanup temporary sessions
+
+### Import/Export Operations (export_tools.py)
+- `memory_export` - Export memories to JSON/YAML
+- `memory_import` - Import with merge strategies
+
+### Resources & Prompts
+- 2 Resources: `memory_stats`, `scope_memories`
+- 2 Prompts: `analyze_memories`, `summarize_memory`
 
 ## 🧠 Core Memory Operations
 
@@ -249,6 +277,73 @@ This reference covers all available MCP tools for the Associative Memory Server.
 - Knowledge synthesis
 - Learning reinforcement
 - Unexpected connection discovery
+
+---
+
+### memory_diversified_search
+**Enhanced search algorithm for creative exploration and diverse results**
+
+```json
+{
+  "tool": "memory_diversified_search",
+  "parameters": {
+    "request": {
+      "query": "machine learning optimization techniques",
+      "scope": "learning/ai",
+      "limit": 15,
+      "min_score": 0.1,
+      "diversity_threshold": 0.8,
+      "expansion_factor": 2.5,
+      "max_expansion_factor": 5.0,
+      "include_associations": true
+    }
+  }
+}
+```
+
+**Parameters:**
+- `query` (required): Natural language search query
+- `scope` (optional): Limit search to specific scope
+- `limit` (optional): Maximum diverse results (default: 10, max: 100)
+- `min_score` (optional): Minimum similarity threshold (default: 0.1)
+- `diversity_threshold` (optional): Similarity threshold for exclusion (default: 0.8)
+- `expansion_factor` (optional): Initial search multiplier (default: 2.5)
+- `max_expansion_factor` (optional): Maximum expansion for fallback (default: 5.0)
+- `include_associations` (optional): Include related memories (default: true)
+
+**Response:**
+```json
+{
+  "memories": [
+    {
+      "memory_id": "uuid",
+      "content": "Diverse memory content",
+      "scope": "learning/ai/optimization",
+      "similarity_score": 0.75,
+      "diversity_rank": 1,
+      "associations": [...]
+    }
+  ],
+  "search_stats": {
+    "initial_candidates": 50,
+    "filtered_results": 15,
+    "diversity_achieved": 0.82,
+    "expansion_used": 2.5
+  }
+}
+```
+
+**Use Cases:**
+- Creative brainstorming sessions
+- Breaking out of similarity echo chambers
+- Exploring different perspectives on topics
+- Comprehensive knowledge discovery
+
+**Algorithm Benefits:**
+- Avoids redundant similar results
+- Promotes knowledge diversity
+- Enhances creative thinking
+- Reduces cognitive bias in memory exploration
 
 ---
 

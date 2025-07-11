@@ -210,6 +210,55 @@ class MemoryManager:
                 error=str(e)
             )
 
+    async def check_content_duplicate(
+        self,
+        content: str,
+        scope: Optional[str] = None,
+        similarity_threshold: float = 0.95
+    ) -> Optional[Memory]:
+        """Check for duplicate content within the specified scope"""
+        try:
+            # Search for similar content using vector search
+            search_results = await self.search_memories(
+                query=content,
+                scope=scope,
+                limit=10,  # Check top 10 most similar
+                min_score=similarity_threshold
+            )
+            
+            # Check for exact or near-exact matches
+            for result in search_results:
+                existing_memory = result["memory"]
+                similarity = result["similarity"]
+                
+                # Check for very high similarity (potential duplicate)
+                if similarity >= similarity_threshold:
+                    # Additional check: compare content length and key phrases
+                    content_normalized = content.strip().lower()
+                    existing_normalized = existing_memory.content.strip().lower()
+                    
+                    # If content is very similar in both similarity score and normalized form
+                    if (len(content_normalized) > 10 and 
+                        len(existing_normalized) > 10 and
+                        abs(len(content_normalized) - len(existing_normalized)) / max(len(content_normalized), len(existing_normalized)) < 0.2):
+                        
+                        logger.info(
+                            "Duplicate content detected",
+                            extra_data={
+                                "existing_memory_id": existing_memory.id,
+                                "similarity_score": similarity,
+                                "content_length_diff": abs(len(content) - len(existing_memory.content))
+                            }
+                        )
+                        return existing_memory
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error checking for duplicates: {e}")
+            # Return None to allow storing if duplicate check fails
+            return None
+
     async def store_memory(
         self,
         scope: str = "user/default",  # Hierarchical scope for organization
@@ -888,7 +937,16 @@ class MemoryManager:
         limit: int = 10,
         min_score: float = 0.7
     ) -> List[Tuple[Memory, float]]:
-        """Semantic search"""
+        """
+        Traditional semantic search for focused content discovery
+        
+        This method performs standard similarity-based search, returning the most
+        relevant memories for a given query. Best for finding specific information
+        or exploring content within the same knowledge domain.
+        
+        For diverse, broad exploration across different topics, use 
+        diversified_similarity_search() instead.
+        """
         try:
             embedding = await self.embedding_service.get_embedding(query)
             if not embedding:
@@ -1004,7 +1062,15 @@ class MemoryManager:
         limit: int = 10,
         min_score: float = 0.7
     ) -> List[Tuple[Memory, float]]:
-        """類似記憶検索"""
+        """
+        Traditional similarity search for focused knowledge exploration
+        
+        This method finds memories most similar to a reference memory,
+        ideal for drilling deeper into specific topics or knowledge areas.
+        Use this when you want to explore related content in the same domain.
+        
+        For broader, more diverse exploration, use diversified_similarity_search() instead.
+        """
         try:
             # 参照記憶の埋め込みを取得
             reference_embedding = await self.vector_store.get_embedding(reference_id)
@@ -1032,111 +1098,206 @@ class MemoryManager:
             logger.error(f"類似記憶検索エラー: {e}")
             return []
 
-    async def get_related_memories(
+    async def diversified_similarity_search(
         self,
-        memory_id: str,
-        limit: int = 5,
-        min_score: float = 0.7
+        query: str,
+        scope: Optional[str] = None,
+        limit: int = 10,
+        min_score: float = 0.1,
+        diversity_threshold: float = 0.8,
+        expansion_factor: float = 2.5,
+        max_expansion_factor: float = 5.0
     ) -> List[Tuple[Memory, float]]:
-        """関連記憶を取得"""
+        """
+        Diversified similarity search for broader knowledge exploration
+        
+        This method finds diverse memories by avoiding clusters of similar content,
+        ensuring broader coverage of the knowledge space rather than drilling deep
+        into specific topics.
+        
+        Args:
+            query: Search query
+            scope: Target scope for search
+            limit: Number of diverse results to return
+            min_score: Minimum similarity threshold
+            diversity_threshold: Similarity threshold for excluding similar items (0.8 = exclude items >80% similar)
+            expansion_factor: Initial expansion multiplier for candidate search (2.5x)
+            max_expansion_factor: Maximum expansion when fallback is needed (5.0x)
+            
+        Returns:
+            List of diverse memories with similarity scores, prioritizing variety
+        """
         try:
-            memory = await self.get_memory(memory_id)
-            if not memory:
+            logger.info(f"Starting diversified similarity search: query='{query}', limit={limit}")
+            
+            # Generate query embedding
+            query_embedding = await self.embedding_service.get_embedding(query)
+            if query_embedding is None:
+                logger.warning("Failed to generate query embedding for diversified search")
+                return []
+            
+            # Ensure embedding is valid
+            if hasattr(query_embedding, 'size') and query_embedding.size == 0:
+                logger.warning("Empty query embedding generated for diversified search")
                 return []
 
-            return await self.find_similar_memories(
-                reference_id=memory_id,
-                scope=memory.scope,
+            # Calculate initial search size with expansion factor
+            initial_search_size = max(limit * expansion_factor, limit + 10)
+            initial_search_size = min(initial_search_size, 100)  # Cap at reasonable limit
+            
+            # Phase 1: Get initial candidate pool
+            candidates = await self._get_similarity_candidates(
+                query_embedding, scope, int(initial_search_size), min_score
+            )
+            
+            if not candidates:
+                logger.info("No candidates found in initial search")
+                return []
+
+            # Phase 2: Diversified selection algorithm
+            selected_results = []
+            exclude_set = set()
+            candidate_index = 0
+            
+            logger.info(f"Starting diversification with {len(candidates)} candidates")
+            
+            while len(selected_results) < limit:
+                # Check if we need more candidates
+                if candidate_index >= len(candidates):
+                    # Expand search with larger pool
+                    expanded_size = min(
+                        int(limit * max_expansion_factor), 
+                        len(candidates) + limit * 2,
+                        200  # Absolute maximum
+                    )
+                    
+                    if expanded_size > len(candidates):
+                        logger.info(f"Expanding candidate pool to {expanded_size}")
+                        expanded_candidates = await self._get_similarity_candidates(
+                            query_embedding, scope, expanded_size, min_score
+                        )
+                        
+                        if len(expanded_candidates) <= len(candidates):
+                            # No new candidates found, break
+                            logger.info("No additional candidates found, stopping diversification")
+                            break
+                            
+                        candidates = expanded_candidates
+                    else:
+                        # Cannot expand further
+                        break
+
+                # Get current candidate
+                if candidate_index >= len(candidates):
+                    break
+                    
+                current_candidate = candidates[candidate_index]
+                memory_id = current_candidate.get("memory_id") or current_candidate.get("id")
+                
+                candidate_index += 1
+                
+                # Skip if in exclude set
+                if memory_id in exclude_set:
+                    continue
+                
+                # Get memory object
+                memory = await self.get_memory(memory_id)
+                if not memory:
+                    continue
+                
+                # Add to results
+                similarity_score = current_candidate.get("similarity", current_candidate.get("score", 0.0))
+                selected_results.append((memory, similarity_score))
+                
+                # Add similar memories to exclude set for diversity
+                await self._add_to_exclude_set(
+                    memory, exclude_set, scope, diversity_threshold
+                )
+                
+                logger.debug(f"Selected memory {memory_id} (similarity: {similarity_score:.3f}), "
+                           f"exclude_set size: {len(exclude_set)}")
+
+            logger.info(f"Diversified search completed: found {len(selected_results)} diverse results")
+            return selected_results
+            
+        except Exception as e:
+            logger.error(f"Diversified similarity search error: {e}")
+            return []
+
+    async def _get_similarity_candidates(
+        self,
+        query_embedding: Any,
+        scope: Optional[str],
+        limit: int,
+        min_score: float
+    ) -> List[Dict[str, Any]]:
+        """Get similarity search candidates from vector store"""
+        try:
+            # Convert embedding to list format safely
+            embedding_list = None
+            try:
+                if hasattr(query_embedding, 'flatten'):
+                    embedding_list = query_embedding.flatten().tolist()
+                elif hasattr(query_embedding, 'tolist'):
+                    embedding_list = query_embedding.tolist()
+                elif isinstance(query_embedding, (list, tuple)):
+                    embedding_list = list(query_embedding)
+                else:
+                    # Try to convert numpy array or other array-like objects
+                    import numpy as np
+                    embedding_array = np.array(query_embedding)
+                    embedding_list = embedding_array.flatten().tolist()
+            except Exception as conv_e:
+                logger.error(f"Failed to convert embedding to list: {conv_e}")
+                return []
+            
+            if not embedding_list:
+                logger.warning("Empty embedding list after conversion")
+                return []
+
+            # Search vector store
+            candidates = await self.vector_store.search_similar(
+                embedding_list,
+                scope=scope,
                 limit=limit,
                 min_score=min_score
             )
+            
+            # Filter by minimum score
+            filtered_candidates = [
+                candidate for candidate in candidates 
+                if candidate.get("similarity", candidate.get("score", 0.0)) >= min_score
+            ]
+            
+            return filtered_candidates
+            
         except Exception as e:
-            logger.error(f"関連記憶取得エラー: {e}")
+            logger.error(f"Error getting similarity candidates: {e}")
             return []
 
-    async def check_content_duplicate(
+    async def _add_to_exclude_set(
         self,
-        content: str,
-        scope: Optional[str] = None,  # Hierarchical scope for organization
-        similarity_threshold: float = 0.95
-    ) -> Optional[Memory]:
-        """
-        Check if memory with same content already exists
-        
-        Args:
-            content: Content to check
-            scope: Target scope for search (None for all scopes)
-            similarity_threshold: Similarity threshold for duplicate detection (default 0.95)
-            
-        Returns:
-            Memory object if duplicate found, None otherwise
-        """
+        memory: Memory,
+        exclude_set: set,
+        scope: Optional[str],
+        diversity_threshold: float
+    ) -> None:
+        """Add similar memories to exclude set for diversity"""
         try:
-            # Exact match check (fast)
-            try:
-                memories = await self.metadata_store.get_memories_by_scope(scope)  # Updated method name
-                for memory in memories:
-                    if memory.content.strip() == content.strip():
-                        logger.info(
-                            "Exact content duplicate found",
-                            extra_data={
-                                "existing_memory_id": memory.id,
-                                "content_preview": content[:50]
-                            }
-                        )
-                        return memory
-            except Exception as db_error:
-                logger.warning(
-                    "Error during database duplicate check, skipping",
-                    extra_data={"error": str(db_error)}
-                )
+            # Add current memory to exclude set
+            exclude_set.add(memory.id)
             
-            # 高類似度チェック（埋め込みベクトルベース）
-            try:
-                if await self.embedding_service.is_available():
-                    embedding = await self.embedding_service.get_embedding(content)
-                    if embedding is not None:
-                        # 高い類似度で検索
-                        similar_memories = await self.vector_store.search_similar(
-                            embedding,
-                            scope=scope,
-                            limit=5,
-                            min_score=similarity_threshold
-                        )
-                        
-                        if similar_memories:
-                            # 最も類似度が高いものを返す
-                            most_similar = similar_memories[0]
-                            existing_memory = await self.metadata_store.get_memory(most_similar["memory_id"])
-                            if existing_memory:
-                                logger.info(
-                                    "High similarity duplicate found",
-                                    extra_data={
-                                        "existing_memory_id": existing_memory.id,
-                                        "similarity_score": most_similar["similarity_score"],
-                                        "content_preview": content[:50]
-                                    }
-                                )
-                                return existing_memory
-            except Exception as vector_error:
-                logger.warning(
-                    "Error during vector similarity duplicate check, skipping",
-                    extra_data={"error": str(vector_error)}
-                )
-            
-            return None
-            
-        except Exception as e:
-            logger.warning(
-                "Error during duplicate check, allowing storage",
-                extra_data={
-                    "error": str(e),
-                    "content_preview": content[:50]
-                }
+            # Find similar memories to exclude for diversity
+            similar_memories = await self.find_similar_memories(
+                reference_id=memory.id,
+                scope=scope,
+                limit=10,  # Small limit for efficiency
+                min_score=diversity_threshold
             )
-            # エラーの場合は重複なしとして扱う（安全側に倒す）
-            return None
-
-    # Phase 3: MCPツール用メソッド群の未実装部分（例: get_memory_stats, export_memories, import_memories など）は既に実装済み
-
-    # TODO: Phase 3/4で必要な追加メソッドや最適化ロジックがあればここに追記
+            
+            # Add similar memory IDs to exclude set
+            for similar_memory, _ in similar_memories:
+                exclude_set.add(similar_memory.id)
+                
+        except Exception as e:
+            logger.error(f"Error adding to exclude set: {e}")

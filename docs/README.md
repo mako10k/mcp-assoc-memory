@@ -130,29 +130,40 @@ Natural language search that understands meaning, not just keywords:
 
 ## 🚀 Key Features
 
-### ✅ Complete CRUD Operations
-- **Create**: Store memories with automatic association discovery
-- **Read**: Retrieve with rich context and related memories
+### ✅ Complete Memory Management
+- **Store**: Capture insights with automatic association discovery
+- **Search**: Semantic and diversified search algorithms
+- **Retrieve**: Rich context with related memories
 - **Update**: Modify content, scope, and metadata
-- **Delete**: Clean removal with association cleanup
+- **Delete**: Safe removal with association cleanup
+- **Move**: Reorganize memories between scopes
 
-### ✅ Intelligent Discovery
+### ✅ Intelligent Discovery Systems
 - **Semantic Search**: Find relevant memories using natural language
+- **Diversified Search**: Enhanced creative exploration avoiding echo chambers
 - **Association Discovery**: Explore connections between concepts
 - **Scope Management**: Organize knowledge hierarchically
-- **Session Isolation**: Temporary workspaces for specific projects
+- **Session Management**: Temporary workspaces for projects
 
-### ✅ Cross-Environment Sync
-- **Export**: Backup memories to files or direct data transfer
-- **Import**: Restore from backups with flexible merge strategies
+### ✅ Advanced Organization Features
+- **Hierarchical Scopes**: Intuitive knowledge organization
+- **Smart Scope Suggestions**: AI-powered categorization
+- **Session Lifecycle**: Create, manage, and cleanup temporary workspaces
+- **Memory Movement**: Reorganize knowledge as understanding evolves
+
+### ✅ Cross-Environment Capabilities
+- **Export/Import**: Backup and restore with multiple formats (JSON/YAML)
+- **Merge Strategies**: Flexible duplicate handling for imports
+- **Compression**: Efficient large dataset handling
 - **Portability**: Move knowledge between development environments
-- **Collaboration**: Share curated knowledge sets
+- **Collaboration**: Share curated knowledge sets with teams
 
-### ✅ VS Code Integration
+### ✅ Developer Integration
 - **GitHub Copilot**: Natural language memory operations
-- **Task Runner**: One-click server management
-- **MCP Protocol**: Seamless tool integration
-- **Development Workflow**: Embedded in coding environment
+- **VS Code Tasks**: One-click server management
+- **MCP Protocol**: Seamless tool integration with 15+ tools
+- **API Resources**: Real-time statistics and dynamic data access
+- **AI Prompts**: Memory analysis and summarization assistance
 
 ---
 

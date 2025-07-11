@@ -62,9 +62,120 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 2. FastMCP Application Architecture
+## 2. Modular Handler Architecture
 
-### 2.1 Application Structure
+### 2.1 Handler-Based Design
+
+The system follows a modular handler architecture where all business logic is separated from FastMCP decorators:
+
+```
+FastMCP Server (server.py)
+├── @app.tool() decorators         → Delegate to handlers
+├── @app.resource() decorators     → Delegate to handlers  
+├── @app.prompt() decorators       → Delegate to handlers
+└── Dependency injection setup
+
+API Handler Layer (api/tools/)
+├── memory_tools.py     → Core memory operations
+├── scope_tools.py      → Scope management
+├── session_tools.py    → Session lifecycle
+├── export_tools.py     → Import/export operations
+├── resource_tools.py   → Resource implementations
+├── prompt_tools.py     → Prompt implementations
+├── other_tools.py      → Utility tools
+└── __init__.py         → Handler exports & DI setup
+
+Core Business Layer
+├── MemoryManager       → Business logic
+├── EmbeddingService    → AI/ML operations
+├── Storage Layer       → Data persistence
+└── Utility Services    → Support functions
+```
+
+### 2.2 Handler Module Organization
+
+#### 2.2.1 Memory Tools (`memory_tools.py`)
+**Complete memory lifecycle management**
+
+- `memory_store`: Store new memories with embedding generation
+- `memory_search`: Semantic similarity search
+- `memory_get`: Retrieve specific memories with associations
+- `memory_delete`: Safe memory deletion with cleanup
+- `memory_list_all`: Browse complete memory collection
+- `memory_update`: Modify existing memories
+- `memory_move`: Reorganize memories between scopes
+- `memory_discover_associations`: Explore memory connections
+- `memory_diversified_search`: Enhanced creative search
+
+#### 2.2.2 Scope Tools (`scope_tools.py`)
+**Memory organization and categorization**
+
+- `scope_list`: Browse hierarchical memory organization
+- `scope_suggest`: AI-powered scope recommendation
+
+#### 2.2.3 Session Tools (`session_tools.py`)
+**Temporary workspace management**
+
+- `session_manage`: Create, list, cleanup sessions
+- Isolated memory spaces for projects
+- Automatic cleanup based on age
+
+#### 2.2.4 Export Tools (`export_tools.py`)
+**Cross-environment memory transfer**
+
+- `memory_export`: Export memories to JSON/YAML
+- `memory_import`: Import with merge strategies
+- Backup and restoration support
+- Memory sync across environments
+
+#### 2.2.5 Resource Tools (`resource_tools.py`)
+**Dynamic data access via MCP resources**
+
+- `memory_stats`: System statistics and metrics
+- `scope_memories`: Scope-specific memory access
+- Real-time data generation
+- JSON-structured responses
+
+#### 2.2.6 Prompt Tools (`prompt_tools.py`)
+**AI-assisted memory interaction**
+
+- `analyze_memories`: Memory pattern analysis prompts
+- `summarize_memory`: Content summarization prompts
+- Context-aware prompt generation
+- LLM-optimized templates
+
+### 2.3 Dependency Injection Pattern
+
+The `__init__.py` module coordinates handler dependencies:
+
+```python
+# Service initialization
+memory_manager = MemoryManager(vector_store, metadata_store, graph_store)
+embedding_service = EmbeddingService()
+
+# Handler dependency injection
+def setup_handlers():
+    """Inject dependencies into all handler modules"""
+    memory_tools.memory_manager = memory_manager
+    scope_tools.memory_manager = memory_manager
+    session_tools.memory_manager = memory_manager
+    export_tools.memory_manager = memory_manager
+    resource_tools.memory_manager = memory_manager
+    prompt_tools.memory_manager = memory_manager
+```
+
+### 2.4 Benefits of Modular Architecture
+
+1. **Separation of Concerns**: FastMCP protocol separate from business logic
+2. **Maintainability**: Each handler focused on specific functionality
+3. **Testability**: Handlers can be unit tested independently
+4. **Extensibility**: New tools easily added as new handler modules
+5. **Reusability**: Handler logic reusable across different protocols
+6. **Organization**: Related functionality grouped logically
+
+## 3. FastMCP Application Architecture
+
+### 3.1 Application Structure
 
 ```python
 # FastMCP Application Entry Point
@@ -89,9 +200,9 @@ async def analyze_memories_prompt(ctx: Context, domain: str = "user") -> str:
     pass
 ```
 
-### 2.2 Tool Layer Design
+### 3.2 Tool Layer Design
 
-#### 2.2.1 Tool Functions
+#### 3.2.1 Tool Functions
 **Responsibility**: Handle specific LLM tool requests
 
 ```python
@@ -116,7 +227,7 @@ async def memory_store(
 - Structured error responses
 - Context-aware logging
 
-#### 2.2.2 Resource Functions
+#### 3.2.2 Resource Functions
 **Responsibility**: Provide dynamic data access
 
 ```python
@@ -138,7 +249,7 @@ async def get_memory_stats(ctx: Context) -> dict:
 - Real-time data access
 - Domain-specific information
 
-#### 2.2.3 Prompt Functions
+#### 3.2.3 Prompt Functions
 **Responsibility**: Generate LLM interaction templates
 
 ```python
@@ -160,9 +271,9 @@ async def analyze_memories_prompt(
 - Dynamic parameter support
 - LLM-optimized formatting
 
-## 3. Core Memory Layer
+## 4. Core Memory Layer
 
-### 3.1 Memory Manager
+### 4.1 Memory Manager
 **Responsibility**: High-level memory operations
 
 ```python
@@ -185,7 +296,7 @@ class MemoryManager:
         """Delete memory and related data"""
 ```
 
-### 3.2 Association Engine
+### 4.2 Association Engine
 **Responsibility**: Semantic relationships and similarity
 
 ```python

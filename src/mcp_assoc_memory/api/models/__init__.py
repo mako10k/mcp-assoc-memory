@@ -1,0 +1,84 @@
+"""
+Models module initialization
+"""
+
+from .requests import (
+    MemoryStoreRequest,
+    MemorySearchRequest,
+    DiversifiedSearchRequest,
+    MemoryUpdateRequest,
+    MemoryMoveRequest,
+    ScopeListRequest,
+    ScopeSuggestRequest,
+    SessionManageRequest,
+    MemoryExportRequest,
+    MemoryImportRequest
+)
+
+from .responses import (
+    Memory,
+    SearchResult,
+    Association,
+    MemoryWithAssociations,
+    SearchResultWithAssociations,
+    ScopeInfo,
+    ScopeRecommendation,
+    SessionInfo,
+    PaginationInfo,
+    MemoryResponse,
+    MemoryStoreResponse,
+    MemorySearchResponse,
+    MemoryGetResponse,
+    MemoryUpdateResponse,
+    MemoryDeleteResponse,
+    MemoryMoveResponse,
+    MemoryListAllResponse,
+    MemoryDiscoverAssociationsResponse,
+    ScopeListResponse,
+    ScopeSuggestResponse,
+    SessionManageResponse,
+    MemoryExportResponse,
+    MemoryImportResponse,
+    ErrorResponse,
+    MCPResponse
+)
+
+__all__ = [    # Request models
+    "MemoryStoreRequest",
+    "MemorySearchRequest",
+    "DiversifiedSearchRequest",
+    "MemoryUpdateRequest",
+    "MemoryMoveRequest",
+    "ScopeListRequest",
+    "ScopeSuggestRequest",
+    "SessionManageRequest",
+    "MemoryExportRequest",
+    "MemoryImportRequest",
+    
+    # Response models
+    "Memory",
+    "SearchResult",
+    "Association",
+    "MemoryWithAssociations",
+    "SearchResultWithAssociations",
+    "ScopeInfo",
+    "ScopeRecommendation",
+    "SessionInfo",
+    "PaginationInfo",
+    "MemoryResponse",
+    "MemoryStoreResponse",
+    "MemorySearchResponse",
+    "MemoryGetResponse", 
+    "MemoryUpdateResponse",
+    "MemoryDeleteResponse",
+    "MemoryMoveResponse",
+    "MemoryListAllResponse",
+    "MemoryDiscoverAssociationsResponse",
+    "ScopeListResponse",
+    "ScopeSuggestResponse",
+    "SessionManageResponse",
+    "MemoryExportResponse",
+    "MemoryImportResponse",
+    "ErrorResponse",
+    "MCPResponse"
+]

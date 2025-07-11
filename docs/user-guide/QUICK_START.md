@@ -62,6 +62,8 @@ Show me memories related to web frameworks
 | Explore connections | "Show me what's related to [concept]" |
 | Organize memories | "Move these memories to [category]" |
 | Export/backup | "Export my memories" |
+| Session work | "Create a session for [project]" |
+| Diversified search | "Find diverse memories about [topic]" |
 
 ## 🗂️ Understanding Scopes
 
@@ -81,12 +83,37 @@ learning/
 personal/
   ├── goals/
   └── reflections/
+
+session/
+  ├── [project-name]/
+  └── [temporary-work]/
 ```
 
 ### Scope Examples
 - `work/projects/mcp-server` - Project-specific memories
 - `learning/python/async` - Learning about Python async
 - `personal/ideas` - Personal ideas and thoughts
+- `session/debugging-session` - Temporary working session
+
+## 🏃‍♂️ Session Management
+
+### Working Sessions
+Create isolated workspaces for temporary work:
+
+```instructions
+Create a session for debugging the API issue
+```
+
+### Session Cleanup
+```instructions
+Clean up sessions older than 7 days
+```
+
+Sessions are perfect for:
+- Project-specific debugging
+- Temporary research
+- Meeting notes that expire
+- Experimental ideas
 
 ## 🔍 Search Tips
 
@@ -94,6 +121,25 @@ personal/
 - **Specific**: "React component lifecycle methods"
 - **Conceptual**: "error handling patterns"
 - **Problem-based**: "database connection issues"
+
+### Advanced Search Options
+
+#### Diversified Search
+For creative exploration and avoiding echo chambers:
+```instructions
+Find diverse memories about machine learning optimization
+```
+
+Benefits:
+- Prevents redundant similar results
+- Promotes creative thinking
+- Discovers unexpected connections
+
+#### Focused Search
+For specific information retrieval:
+```instructions
+Find memories about Python async patterns
+```
 
 ### Understanding Results
 - Results include similarity scores (0.0-1.0)
@@ -127,7 +173,23 @@ Export my work memories to a file
 Export all memories for backup
 ```
 
+### Import from Backup
+```instructions
+Import memories from backup file
+```
+
+### Advanced Export Options
+- **Scope-specific**: Export only work or learning memories
+- **Compressed**: Large datasets with gzip compression
+- **Direct transfer**: Export data for immediate import elsewhere
+
 Files are saved to `data/exports/` by default.
+
+### Merge Strategies
+When importing, choose how to handle duplicates:
+- **Skip duplicates** (default): Keep existing, ignore imports
+- **Overwrite**: Replace existing with imported versions
+- **Create versions**: Preserve both local and imported
 
 ## 🆘 Quick Troubleshooting
 
