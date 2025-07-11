@@ -68,15 +68,18 @@ class ChromaVectorStore(BaseVectorStore):
                 )
                 logger.info(f"Using existing collection: {collection_name}")
             except Exception:
-                # Create new collection
+                # Create new collection with cosine distance
                 self.collection = await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda: self.client.create_collection(
                         name=collection_name,
-                        metadata={"description": "Unified memory collection with scope-based organization"},
+                        metadata={
+                            "description": "Unified memory collection with scope-based organization",
+                            "hnsw:space": "cosine"  # Use cosine distance as per design spec
+                        },
                     )
                 )
-                logger.info(f"Created new collection: {collection_name}")
+                logger.info(f"Created new collection: {collection_name} with cosine distance")
 
             logger.info("ChromaDB vector store initialized successfully")
 
@@ -178,35 +181,73 @@ class ChromaVectorStore(BaseVectorStore):
         self,
         embedding: Any,
         scope: Optional[str] = None,
+        include_child_scopes: bool = False,
         limit: int = 10,
         min_score: float = 0.1
     ) -> List[Dict[str, Any]]:
-        """Search for similar vectors"""
+        """Search for similar vectors with hierarchical scope support"""
         try:
             # Prepare where clause for scope filtering
             where_clause = None
             if scope:
-                where_clause = {"scope": scope}
+                if include_child_scopes:
+                    # Use prefix matching for hierarchical scopes
+                    # Note: ChromaDB doesn't support prefix matching directly,
+                    # so we'll filter post-query
+                    where_clause = None  # Get all results and filter after
+                else:
+                    where_clause = {"scope": scope}
+
+            # Log debug info
+            logger.info(f"[DEBUG] search_similar: scope={scope}, include_child_scopes={include_child_scopes}, where_clause={where_clause}")
 
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: self.collection.query(
                     query_embeddings=[embedding],
-                    n_results=limit,
+                    n_results=limit * 3 if include_child_scopes else limit,  # Get more results for filtering
                     where=where_clause,
                     include=["metadatas", "distances"]
                 )
             )
 
-            # Convert results
+            logger.info(f"[DEBUG] ChromaDB raw results count: {len(result['ids'][0]) if result['ids'] and result['ids'][0] else 0}")
+
+            # Convert and filter results
             results = []
             if result["ids"] and result["ids"][0]:
                 for i, memory_id in enumerate(result["ids"][0]):
                     distance = result["distances"][0][i]
-                    similarity = 1.0 - distance  # Convert distance to similarity
                     
-                    if similarity >= min_score:
-                        metadata = result["metadatas"][0][i] if result["metadatas"] and result["metadatas"][0] else {}
+                    # Handle cosine distance properly
+                    # ChromaDB cosine distance: 0 = identical, 2 = opposite
+                    # Convert to similarity: 1 = identical, 0 = opposite
+                    if distance <= 0:
+                        similarity = 1.0  # Perfect match
+                    elif distance >= 2.0:
+                        similarity = 0.0  # Completely opposite (rare)
+                    else:
+                        # Standard cosine distance to similarity conversion
+                        similarity = 1.0 - distance
+                    
+                    metadata = result["metadatas"][0][i] if result["metadatas"] and result["metadatas"][0] else {}
+                    
+                    # Apply hierarchical scope filtering if needed
+                    result_scope = metadata.get("scope", "")
+                    scope_match = True
+                    
+                    if scope and include_child_scopes:
+                        # Check if result scope is under the requested scope hierarchy
+                        scope_match = (result_scope == scope or 
+                                     result_scope.startswith(scope + "/") or
+                                     scope.startswith(result_scope + "/"))
+                    elif scope and not include_child_scopes:
+                        # Exact scope match (already handled by where_clause, but double-check)
+                        scope_match = (result_scope == scope)
+                    
+                    logger.info(f"[DEBUG] Processing result: memory_id={memory_id}, scope={result_scope}, similarity={similarity:.3f}, scope_match={scope_match}")
+                    
+                    if similarity >= min_score and scope_match:
                         results.append({
                             "id": None,  # For compatibility
                             "memory_id": memory_id,
@@ -215,7 +256,10 @@ class ChromaVectorStore(BaseVectorStore):
                             "metadata": metadata
                         })
 
-            logger.info("Vector search completed", extra={"results_count": len(results)})
+            # Limit final results
+            results = results[:limit]
+            
+            logger.info(f"Vector search completed: {len(results)} results after filtering (scope={scope}, include_child={include_child_scopes})")
             return results
 
         except Exception as e:

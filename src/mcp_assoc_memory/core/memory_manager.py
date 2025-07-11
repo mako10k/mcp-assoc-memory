@@ -430,6 +430,7 @@ class MemoryManager:
         self,
         query: str,
         scope: Optional[str] = None,  # Hierarchical scope for organization
+        include_child_scopes: bool = False,  # Include child scopes in search
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -438,11 +439,12 @@ class MemoryManager:
         similarity_threshold: float = 0.7,
         min_score: Optional[float] = None
     ) -> List[Dict[str, Any]]:
-        """Search memories using scope-based organization"""
+        """Search memories using scope-based organization with fallback support"""
         try:
             if min_score is not None:
                 similarity_threshold = min_score
-            logger.info(f"[DEBUG] search_memories called with similarity_threshold={similarity_threshold!r} (min_score={min_score!r})")
+            logger.info(f"[DEBUG] search_memories called with similarity_threshold={similarity_threshold!r}, include_child_scopes={include_child_scopes}")
+            
             # Generate query embedding vector
             query_embedding = await self.embedding_service.get_embedding(query)
             if query_embedding is None:
@@ -462,7 +464,6 @@ class MemoryManager:
             if tags:
                 filters["tags"] = tags
 
-            # Execute vector search
             # Convert to 1D list
             if hasattr(query_embedding, 'flatten'):
                 embedding_list = query_embedding.flatten().tolist()
@@ -471,18 +472,61 @@ class MemoryManager:
             else:
                 embedding_list = list(query_embedding) if not isinstance(query_embedding, list) else query_embedding
 
+            # Execute vector search with hierarchical scope support
             vector_results = await self.vector_store.search_similar(
                 embedding_list,
-                scope=scope,  # Use scope directly
+                scope=scope,
+                include_child_scopes=include_child_scopes,
                 limit=limit * 2,
-                min_score=similarity_threshold  # Use min_score parameter
+                min_score=similarity_threshold
             )
+            
+            logger.info(f"[DEBUG] Initial search results: {len(vector_results)} items")
+
+            # Fallback search if no results found
+            if not vector_results and scope:
+                logger.info("[DEBUG] No results found, trying fallback searches...")
+                
+                # Fallback 1: Include child scopes if not already included
+                if not include_child_scopes:
+                    logger.info("[DEBUG] Fallback 1: Including child scopes")
+                    vector_results = await self.vector_store.search_similar(
+                        embedding_list,
+                        scope=scope,
+                        include_child_scopes=True,
+                        limit=limit * 2,
+                        min_score=similarity_threshold
+                    )
+                
+                # Fallback 2: Lower similarity threshold
+                if not vector_results:
+                    fallback_threshold = max(0.05, similarity_threshold - 0.05)
+                    logger.info(f"[DEBUG] Fallback 2: Lower threshold to {fallback_threshold}")
+                    vector_results = await self.vector_store.search_similar(
+                        embedding_list,
+                        scope=scope,
+                        include_child_scopes=True,
+                        limit=limit * 2,
+                        min_score=fallback_threshold
+                    )
+                
+                # Fallback 3: Remove scope constraint entirely
+                if not vector_results:
+                    logger.info("[DEBUG] Fallback 3: Search without scope constraint")
+                    vector_results = await self.vector_store.search_similar(
+                        embedding_list,
+                        scope=None,
+                        include_child_scopes=False,
+                        limit=limit * 2,
+                        min_score=max(0.01, similarity_threshold - 0.1)
+                    )
+
             # DEBUG→INFO temporary upgrade (can be easily commented out later)
             logger.info(
-                f"[DEBUG] vector_results: {[{'id': r.get('id'), 'memory_id': r.get('memory_id'), 'similarity': r.get('similarity')} for r in vector_results]}"
+                f"[DEBUG] vector_results after fallback: {[{'id': r.get('id'), 'memory_id': r.get('memory_id'), 'similarity': r.get('similarity')} for r in vector_results]}"
             )
 
-            # Filter by similarity
+            # Filter by similarity and build final results
             filtered_results = []
             for result in vector_results:
                 logger.info(f"[DEBUG] result dump: {result!r}")
@@ -514,13 +558,23 @@ class MemoryManager:
                     "query_length": len(query),
                     "total_results": len(vector_results),
                     "filtered_results": len(filtered_results),
-                    "filters": filters
+                    "filters": filters,
+                    "include_child_scopes": include_child_scopes
                 }
             )
 
             return filtered_results
 
         except Exception as e:
+            import traceback
+            logger.error(traceback.format_exc())
+            logger.error(
+                "Failed to search memories",
+                error_code="MEMORY_SEARCH_ERROR",
+                query_length=len(query),
+                error=str(e)
+            )
+            return []
             import traceback
             logger.error(traceback.format_exc())
             logger.error(

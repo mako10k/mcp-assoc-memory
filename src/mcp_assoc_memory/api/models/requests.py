@@ -46,6 +46,17 @@ class MemoryStoreRequest(BaseModel):
         Example: similarity_threshold=0.95 for most cases""",
         examples=[0.95, 0.90, 0.85]
     )
+    minimal_response: bool = Field(
+        default=False,
+        description="""Return minimal response data to reduce payload size:
+        
+        Use Cases:
+        • True: Return only essential fields (memory_id, success, message) ← RECOMMENDED for bulk operations
+        • False: Return complete memory data with associations (default)
+        
+        Strategy: Use minimal=True for storage operations, False for retrieval
+        Target: Minimal responses < 1KB vs full responses with associations"""
+    )
 
 
 class MemorySearchRequest(BaseModel):

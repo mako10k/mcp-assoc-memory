@@ -83,17 +83,32 @@ async def handle_memory_store(
                 for existing_id, existing_memory in memory_storage.items():
                     if existing_memory["content"].strip().lower() == request.content.strip().lower():
                         await ctx.warning(f"Duplicate content detected. Existing memory_id: {existing_id}")
-                        return MemoryResponse(
-                            memory_id=existing_id,
-                            content=existing_memory["content"],
-                            scope=existing_memory["scope"],
-                            metadata=existing_memory.get("metadata", {}),
-                            tags=existing_memory.get("tags", []),
-                            category=existing_memory.get("category"),
-                            created_at=existing_memory["created_at"],
-                            is_duplicate=True,
-                            duplicate_of=existing_id
-                        )
+                        
+                        # Return minimal or full response for duplicate
+                        if request.minimal_response:
+                            return MemoryResponse(
+                                memory_id=existing_id,
+                                content="[Content hidden for minimal response]",
+                                scope=existing_memory["scope"],
+                                metadata={},
+                                tags=[],
+                                category=existing_memory.get("category"),
+                                created_at=existing_memory["created_at"],
+                                is_duplicate=True,
+                                duplicate_of=existing_id
+                            )
+                        else:
+                            return MemoryResponse(
+                                memory_id=existing_id,
+                                content=existing_memory["content"],
+                                scope=existing_memory["scope"],
+                                metadata=existing_memory.get("metadata", {}),
+                                tags=existing_memory.get("tags", []),
+                                category=existing_memory.get("category"),
+                                created_at=existing_memory["created_at"],
+                                is_duplicate=True,
+                                duplicate_of=existing_id
+                            )
             
             # Store in simple storage
             memory_data = {
@@ -111,44 +126,84 @@ async def handle_memory_store(
             
             await ctx.info(f"Memory stored using simple storage with ID: {memory_id}")
             
-            return MemoryResponse(
-                memory_id=memory_id,
-                content=request.content,
-                scope=request.scope,
-                metadata=request.metadata or {},
-                tags=request.tags or [],
-                category=request.category,
-                created_at=memory_data["created_at"],
-                is_duplicate=False
-            )
+            # Return minimal or full response
+            if request.minimal_response:
+                return MemoryResponse(
+                    memory_id=memory_id,
+                    content="[Content hidden for minimal response]",
+                    scope=request.scope,
+                    metadata={},
+                    tags=[],
+                    category=request.category,
+                    created_at=memory_data["created_at"],
+                    is_duplicate=False
+                )
+            else:
+                return MemoryResponse(
+                    memory_id=memory_id,
+                    content=request.content,
+                    scope=request.scope,
+                    metadata=request.metadata or {},
+                    tags=request.tags or [],
+                    category=request.category,
+                    created_at=memory_data["created_at"],
+                    is_duplicate=False
+                )
         
         # Advanced storage succeeded - check for duplicates if not allowed
         if not request.allow_duplicates and memory:
             if hasattr(memory, 'metadata') and memory.metadata and memory.metadata.get("is_duplicate"):
                 await ctx.warning(f"Duplicate memory detected. Existing memory_id: {memory.metadata.get('original_memory_id')}")
-                return MemoryResponse(
-                    memory_id=memory.metadata.get("original_memory_id", "unknown"),
-                    content=memory.content,
-                    scope=memory.scope,
-                    metadata=memory.metadata,
-                    tags=memory.tags or [],
-                    category=memory.category,
-                    created_at=memory.created_at,
-                    is_duplicate=True,
-                    duplicate_of=memory.metadata.get("original_memory_id")
-                )
+                
+                # Return minimal or full response based on request
+                if request.minimal_response:
+                    return MemoryResponse(
+                        memory_id=memory.metadata.get("original_memory_id", "unknown"),
+                        content="[Content hidden for minimal response]",  # Required field but minimized
+                        scope=memory.scope,
+                        metadata={},  # Minimal metadata
+                        tags=[],
+                        category=memory.category,
+                        created_at=memory.created_at,
+                        is_duplicate=True,
+                        duplicate_of=memory.metadata.get("original_memory_id")
+                    )
+                else:
+                    return MemoryResponse(
+                        memory_id=memory.metadata.get("original_memory_id", "unknown"),
+                        content=memory.content,
+                        scope=memory.scope,
+                        metadata=memory.metadata,
+                        tags=memory.tags or [],
+                        category=memory.category,
+                        created_at=memory.created_at,
+                        is_duplicate=True,
+                        duplicate_of=memory.metadata.get("original_memory_id")
+                    )
         
         # Return successful advanced storage result
-        return MemoryResponse(
-            memory_id=memory.id,
-            content=memory.content,
-            scope=memory.scope,
-            metadata=memory.metadata if hasattr(memory, 'metadata') else {},
-            tags=memory.tags or [],
-            category=memory.category,
-            created_at=memory.created_at,
-            is_duplicate=False
-        )
+        if request.minimal_response:
+            return MemoryResponse(
+                memory_id=memory.id,
+                content="[Content hidden for minimal response]",  # Required field but minimized
+                scope=memory.scope,
+                metadata={},  # Minimal metadata
+                tags=[],
+                category=memory.category,
+                created_at=memory.created_at,
+                is_duplicate=False
+            )
+        else:
+            return MemoryResponse(
+                memory_id=memory.id,
+                content=memory.content,
+                scope=memory.scope,
+                metadata=memory.metadata if hasattr(memory, 'metadata') else {},
+                tags=memory.tags or [],
+                category=memory.category,
+                created_at=memory.created_at,
+                is_duplicate=False
+            )
         
     except Exception as e:
         await ctx.error(f"Failed to store memory: {e}")
@@ -165,15 +220,16 @@ async def handle_memory_search(
     request: MemorySearchRequest,
     ctx: Context
 ) -> Dict[str, Any]:
-    """Search memories using semantic similarity"""
+    """Search memories using semantic similarity with hierarchical scope support"""
     try:
         await ensure_initialized()
-        await ctx.info(f"Searching memories: '{request.query[:50]}...' in scope: {request.scope}")
+        await ctx.info(f"Searching memories: '{request.query[:50]}...' in scope: {request.scope} (include_child_scopes: {request.include_child_scopes})")
         
-        # Perform search using memory manager
+        # Perform search using memory manager with enhanced parameters
         results = await memory_manager.search_memories(
             query=request.query,
             scope=request.scope,
+            include_child_scopes=request.include_child_scopes,
             limit=request.limit,
             similarity_threshold=request.similarity_threshold
         )
@@ -216,13 +272,29 @@ async def handle_memory_search(
         
         await ctx.info(f"Found {len(formatted_results)} memories")
         
-        return {
+        # Enhanced response with search metadata
+        response = {
             "results": formatted_results,
             "query": request.query,
             "scope": request.scope,
+            "include_child_scopes": request.include_child_scopes,
             "total_found": len(formatted_results),
-            "similarity_threshold": request.similarity_threshold
+            "similarity_threshold": request.similarity_threshold,
+            "search_metadata": {
+                "scope_coverage": "hierarchical" if request.include_child_scopes else "exact",
+                "fallback_used": len(formatted_results) > 0 and request.scope is not None
+            }
         }
+        
+        # Add scope suggestions if no results found
+        if not formatted_results and request.scope:
+            response["suggestions"] = {
+                "try_include_child_scopes": not request.include_child_scopes,
+                "try_broader_scope": request.scope.rsplit('/', 1)[0] if '/' in request.scope else None,
+                "try_lower_threshold": max(0.05, request.similarity_threshold - 0.05)
+            }
+        
+        return response
         
     except Exception as e:
         await ctx.error(f"Failed to search memories: {e}")
