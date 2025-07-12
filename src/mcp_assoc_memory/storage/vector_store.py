@@ -108,6 +108,9 @@ class ChromaVectorStore(BaseVectorStore):
     async def get_embedding(self, memory_id: str) -> Optional[Any]:
         """Get embedding by memory ID"""
         try:
+            if self.collection is None:
+                raise RuntimeError("ChromaDB collection not initialized")
+                
             result = self.collection.get(ids=[memory_id], include=["embeddings"])
             if result["embeddings"] and result["embeddings"][0]:
                 return result["embeddings"][0]
@@ -123,6 +126,9 @@ class ChromaVectorStore(BaseVectorStore):
     async def delete_vector(self, memory_id: str) -> bool:
         """Delete vector from ChromaDB"""
         try:
+            if self.collection is None:
+                raise RuntimeError("ChromaDB collection not initialized")
+                
             self.collection.delete(ids=[memory_id])
             logger.info("Vector deleted successfully", extra={"memory_id": memory_id})
             return True
@@ -159,6 +165,9 @@ class ChromaVectorStore(BaseVectorStore):
             logger.info(
                 f"[DEBUG] search_similar: scope={scope}, include_child_scopes={include_child_scopes}, where_clause={where_clause}"
             )
+
+            if self.collection is None:
+                raise RuntimeError("ChromaDB collection not initialized")
 
             result = self.collection.query(
                 query_embeddings=[query_embedding],
@@ -245,6 +254,9 @@ class ChromaVectorStore(BaseVectorStore):
     async def get_statistics(self) -> Dict[str, Any]:
         """Get vector store statistics"""
         try:
+            if self.collection is None:
+                raise RuntimeError("ChromaDB collection not initialized")
+                
             result = self.collection.get(include=["metadatas"])
 
             total_count = len(result["ids"]) if result["ids"] else 0
@@ -265,6 +277,9 @@ class ChromaVectorStore(BaseVectorStore):
     async def update_metadata(self, memory_id: str, metadata: Dict[str, Any]) -> bool:
         """Update metadata for existing vector"""
         try:
+            if self.collection is None:
+                raise RuntimeError("ChromaDB collection not initialized")
+                
             # Prepare metadata (ChromaDB requires string values)
             chroma_metadata = {}
             for key, value in metadata.items():

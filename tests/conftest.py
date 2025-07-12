@@ -7,6 +7,7 @@ This version uses minimal, isolated fixtures to avoid async chain issues.
 
 import asyncio
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock
@@ -89,9 +90,12 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
     )
     
     # Mock the store_memory method to return a simple Memory object
+    memory_counter = {"count": 0}  # Use dict to allow modification in nested function
+    
     async def mock_store_memory(content: str, scope: str = "test", **kwargs) -> Memory:
+        memory_counter["count"] += 1
         return Memory(
-            id="test-id-123",
+            id=f"test-id-{memory_counter['count']:03d}",
             content=content,
             scope=scope,
             category=kwargs.get("category", "test"),
