@@ -38,9 +38,10 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
         
         return MemoryMoveResponse(
             success=True,
-            moved_count=len(request.memory_ids),
-            target_scope=request.target_scope,
-            moved_memories=[]
+            message=f"Successfully moved {moved_count} memories to {request.target_scope}",
+            data={"moved_count": moved_count, "target_scope": request.target_scope},
+            moved_memories=[],
+            failed_memory_ids=[]
         ).model_dump()
         
     except Exception as e:
@@ -120,15 +121,16 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
             await ctx.info(f"Created session: {session_id}")
             
             return SessionManageResponse(
-                action="create",
-                session_id=session_id,
-                active_sessions=[SessionInfo(
+                success=True,
+                message=f"Created session: {session_id}",
+                data={"action": "create", "session_id": session_id},
+                session=SessionInfo(
                     session_id=session_id,
-                    scope=session_scope,
-                    memory_count=1,
                     created_at=datetime.now(),
-                    last_updated=datetime.now()
-                )]
+                    memory_count=1,
+                    last_activity=datetime.now()
+                ),
+                sessions=[]
             )
         
         elif request.action == "list":
@@ -154,10 +156,9 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
             active_sessions = [
                 SessionInfo(
                     session_id=session_id,
-                    scope=data["scope"],
-                    memory_count=len(data["memories"]),
                     created_at=data["created_at"],
-                    last_updated=data["last_updated"]
+                    memory_count=len(data["memories"]),
+                    last_activity=data.get("last_updated")
                 )
                 for session_id, data in session_scopes.items()
             ]
@@ -165,8 +166,11 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
             await ctx.info(f"Found {len(active_sessions)} active sessions")
             
             return SessionManageResponse(
-                action="list",
-                active_sessions=active_sessions
+                success=True,
+                message=f"Found {len(active_sessions)} active sessions",
+                data={"action": "list"},
+                session=None,
+                sessions=active_sessions
             )
         
         elif request.action == "cleanup":
@@ -191,9 +195,12 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
             await ctx.info(f"Cleaned up {cleaned_count} old session memories")
             
             return SessionManageResponse(
-                action="cleanup",
-                active_sessions=[],
-                cleaned_sessions=cleaned_count
+                success=True,
+                message=f"Cleaned up {cleaned_count} old session memories",
+                data={"action": "cleanup"},
+                session=None,
+                sessions=[],
+                cleaned_sessions=[f"session-{i}" for i in range(cleaned_count)]  # simplified representation
             )
         
         else:

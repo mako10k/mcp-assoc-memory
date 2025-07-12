@@ -277,7 +277,7 @@ class MemoryManagerDiversified:
                 return []
             
             # Apply diversity filtering
-            diverse_results = []
+            diverse_results: List[Any] = []
             exclude_set: Set[str] = set()
             
             for memory in candidates:
@@ -318,7 +318,7 @@ class MemoryManagerDiversified:
                 return []
             
             # Apply diversity filtering
-            diverse_results = []
+            diverse_results: List[Any] = []
             exclude_set: Set[str] = set()
             
             for memory in candidates:
@@ -355,7 +355,7 @@ class MemoryManagerDiversified:
             current_level = [starting_memory_id]
             
             for depth in range(exploration_depth):
-                next_level = []
+                next_level: List[Any] = []
                 
                 for memory_id in current_level:
                     if memory_id in exclude_set:
@@ -372,7 +372,7 @@ class MemoryManagerDiversified:
                         )
                         
                         # Select diverse candidates for next level
-                        level_exclude = set()
+                        level_exclude: Set[Any] = set()
                         for similar_memory, _ in similar_memories:
                             if (len(next_level) < limit_per_level and 
                                 similar_memory.id not in exclude_set and

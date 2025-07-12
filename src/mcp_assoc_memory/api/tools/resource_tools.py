@@ -34,7 +34,7 @@ async def handle_memory_stats(ctx: Context) -> dict:
     }
     
     # Scope-wise statistics and hierarchy detection
-    scope_counts = {}
+    scope_counts: Dict[str, int] = {}
     session_scopes = set()
     
     for memory_data in memory_storage.values():

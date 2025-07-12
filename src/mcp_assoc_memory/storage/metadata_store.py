@@ -1,5 +1,3 @@
-
-
 import asyncio
 import json
 from datetime import datetime
@@ -836,4 +834,83 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 association_id=association_id,
                 error=str(e)
             )
+            return False
+
+    async def get_all_memories(self, limit: int = 1000) -> List[Memory]:
+        """Get all memories with limit"""
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(
+                    "SELECT * FROM memories ORDER BY created_at DESC LIMIT ?",
+                    (limit,)
+                ) as cursor:
+                    rows = await cursor.fetchall()
+                    memories = [self._row_to_memory(row) for row in rows if row]
+                    return [m for m in memories if m is not None]
+        except Exception as e:
+            logger.error("Failed to get all memories", error=str(e))
+            return []
+
+    async def get_all_scopes(self) -> List[str]:
+        """Get all unique scopes"""
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(
+                    "SELECT DISTINCT JSON_EXTRACT(metadata, '$.scope') as scope FROM memories WHERE scope IS NOT NULL"
+                ) as cursor:
+                    rows = await cursor.fetchall()
+                    return [row[0] for row in rows if row[0]]
+        except Exception as e:
+            logger.error("Failed to get all scopes", error=str(e))
+            return []
+
+    async def get_association_count(self, scope: Optional[str] = None) -> int:
+        """Get count of associations, optionally filtered by scope"""
+        try:
+            if scope:
+                # Count associations where both memories are in the specified scope
+                async with aiosqlite.connect(self.database_path) as db:
+                    async with db.execute("""
+                        SELECT COUNT(*) FROM associations a
+                        JOIN memories m1 ON a.source_memory_id = m1.id
+                        JOIN memories m2 ON a.target_memory_id = m2.id
+                        WHERE JSON_EXTRACT(m1.metadata, '$.scope') = ?
+                        AND JSON_EXTRACT(m2.metadata, '$.scope') = ?
+                    """, (scope, scope)) as cursor:
+                        result = await cursor.fetchone()
+                        return result[0] if result else 0
+            else:
+                async with aiosqlite.connect(self.database_path) as db:
+                    async with db.execute("SELECT COUNT(*) FROM associations") as cursor:
+                        result = await cursor.fetchone()
+                        return result[0] if result else 0
+        except Exception as e:
+            logger.error("Failed to get association count", error=str(e))
+            return 0
+
+    async def update_association(self, association: Association) -> bool:
+        """Update an existing association"""
+        try:
+            async with self.db_lock:
+                async with aiosqlite.connect(self.database_path) as db:
+                    await db.execute("""
+                        UPDATE associations SET
+                            association_type = ?,
+                            strength = ?,
+                            metadata = ?,
+                            description = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                    """, (
+                        association.association_type,
+                        association.strength,
+                        json.dumps(association.metadata),
+                        association.description,
+                        association.updated_at.isoformat(),
+                        association.id
+                    ))
+                    await db.commit()
+            return True
+        except Exception as e:
+            logger.error("Failed to update association", error=str(e))
             return False
