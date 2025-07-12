@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
+from ...simple_persistence import get_persistent_storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
 from ..models.responses import (
     MemoryDiscoverAssociationsResponse,
@@ -12,7 +13,6 @@ from ..models.responses import (
     SessionInfo,
     SessionManageResponse,
 )
-from ...simple_persistence import get_persistent_storage
 
 # Module-level dependencies (set by server initialization)
 memory_manager = None
@@ -86,7 +86,7 @@ async def handle_memory_discover_associations(
             limit=limit + 1,  # +1 to account for source memory in results
             min_score=similarity_threshold,
         )
-        
+
         # If no results, try with a shorter query from content
         if not search_results and len(source_memory.content) > 100:
             short_query = source_memory.content[:100]
@@ -95,7 +95,7 @@ async def handle_memory_discover_associations(
                 limit=limit + 1,
                 min_score=similarity_threshold,
             )
-        
+
         # If still no results, try with keywords from the content
         if not search_results:
             # Extract key terms from content
@@ -121,20 +121,22 @@ async def handle_memory_discover_associations(
                 # If result is a memory object directly
                 memory = result
                 similarity = getattr(result, "similarity_score", 1.0)
-            
+
             if not memory:
                 continue
-                
+
             # Skip the source memory itself
             if memory.id == memory_id:
                 continue
-            
-            associations.append({
-                "memory": memory,
-                "similarity_score": similarity,
-                "associations": [],
-            })
-            
+
+            associations.append(
+                {
+                    "memory": memory,
+                    "similarity_score": similarity,
+                    "associations": [],
+                }
+            )
+
             # Stop when we have enough associations
             if len(associations) >= limit:
                 break

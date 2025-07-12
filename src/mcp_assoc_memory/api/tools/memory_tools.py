@@ -61,6 +61,27 @@ async def ensure_initialized() -> None:
 async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> MemoryResponse:
     """Store a memory with full associative capabilities"""
     try:
+        # Basic input validation
+        if not request.content or len(request.content.strip()) == 0:
+            await ctx.error("Content cannot be empty")
+            return MemoryResponse(
+                memory_id="error",
+                content="",
+                scope="error",
+                created_at=datetime.now(),
+                metadata={"error": "Content cannot be empty", "suggestions": ["Provide non-empty content for the memory"]}
+            )
+        
+        if not request.scope or len(request.scope.strip()) == 0:
+            await ctx.error("Scope cannot be empty")
+            return MemoryResponse(
+                memory_id="error",
+                content="",
+                scope="error",
+                created_at=datetime.now(),
+                metadata={"error": "Scope cannot be empty", "suggestions": ["Provide a valid scope like 'work/projects'"]}
+            )
+
         await ctx.info(f"Storing memory in scope '{request.scope}': {request.content[:50]}...")
 
         # Try advanced memory manager first, fallback to simple storage
@@ -79,7 +100,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
                 )
                 await ctx.info(f"Memory stored using advanced manager with ID: {memory.id}")
             except Exception as e:
-                await ctx.warning(f"Advanced storage failed: {e}, falling back to simple storage")
+                await ctx.warning(f"Advanced storage failed: {str(e)}, falling back to simple storage")
                 memory = None
 
         # Fallback to simple storage if advanced storage failed or unavailable
@@ -218,9 +239,28 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
             )
 
     except Exception as e:
-        await ctx.error(f"Failed to store memory: {e}")
-        # Return a minimal valid response for error case
-        return MemoryResponse(memory_id="error", content="", scope="error", created_at=datetime.now())
+        error_message = f"Failed to store memory: {str(e)}"
+        await ctx.error(error_message)
+        
+        # Provide more detailed error information
+        suggestions = [
+            "Check if the content and scope are valid",
+            "Try again in a moment if this was a temporary issue",
+            "Contact support if the problem persists"
+        ]
+        
+        return MemoryResponse(
+            memory_id="error",
+            content="",
+            scope="error",
+            created_at=datetime.now(),
+            metadata={
+                "error": "Memory storage failed",
+                "details": str(e),
+                "suggestions": suggestions,
+                "error_type": type(e).__name__
+            }
+        )
 
 
 async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Dict[str, Any]:
@@ -317,8 +357,25 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
         return response
 
     except Exception as e:
-        await ctx.error(f"Failed to search memories: {e}")
-        return {"error": str(e), "results": []}
+        error_message = f"Failed to search memories: {str(e)}"
+        await ctx.error(error_message)
+        
+        # Provide helpful error response with fallback empty results
+        return {
+            "error": "Memory search failed",
+            "details": str(e),
+            "error_type": type(e).__name__,
+            "results": [],  # Graceful fallback
+            "query": getattr(request, 'query', 'unknown'),
+            "scope": getattr(request, 'scope', 'unknown'),
+            "suggestions": [
+                "Check if the query format is valid",
+                "Try a simpler search query",
+                "Verify the scope exists using scope_list",
+                "Try again in a moment if this was a temporary issue"
+            ],
+            "fallback_used": True
+        }
 
 
 async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Context) -> Dict[str, Any]:

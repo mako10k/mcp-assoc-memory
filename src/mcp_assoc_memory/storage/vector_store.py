@@ -94,9 +94,7 @@ class ChromaVectorStore(BaseVectorStore):
                     chroma_metadata[key] = str(value)
 
             # Use synchronous API directly
-            self.collection.add(
-                ids=[memory_id], embeddings=[embedding], metadatas=[chroma_metadata]
-            )
+            self.collection.add(ids=[memory_id], embeddings=[embedding], metadatas=[chroma_metadata])
 
             logger.info(
                 "Vector stored successfully", extra={"memory_id": memory_id, "scope": metadata.get("scope", "unknown")}
