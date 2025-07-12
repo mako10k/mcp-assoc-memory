@@ -2,88 +2,94 @@
 FastMCP-compliant memory management server implementation with associative memory capabilities
 """
 
-import logging
-import json
-import gzip
-import base64
-import uuid
 import asyncio
-from typing import Any, Dict, List, Optional, Annotated
-from fastmcp import FastMCP, Context
-from pydantic import Field, BaseModel
+import base64
+import gzip
+import json
+import logging
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Annotated, Any, Dict, List, Optional
+
+from fastmcp import Context, FastMCP
+from pydantic import BaseModel, Field
+
+from .api.models import (
+    Association,
+    DiversifiedSearchRequest,
+    ErrorResponse,
+    MCPResponse,
+    Memory,
+    MemoryExportRequest,
+    MemoryExportResponse,
+    MemoryImportRequest,
+    MemoryImportResponse,
+    MemoryManageRequest,
+    MemoryMoveRequest,
+    MemoryMoveResponse,
+    MemoryResponse,
+    MemorySearchRequest,
+    MemoryStoreRequest,
+    MemorySyncRequest,
+    MemoryUpdateRequest,
+    MemoryWithAssociations,
+    PaginationInfo,
+    ScopeInfo,
+    ScopeListRequest,
+    ScopeListResponse,
+    ScopeRecommendation,
+    ScopeSuggestRequest,
+    ScopeSuggestResponse,
+    SearchResult,
+    SearchResultWithAssociations,
+    SessionInfo,
+    SessionManageRequest,
+    SessionManageResponse,
+    UnifiedSearchRequest,
+)
+from .api.tools import (
+    handle_analyze_memories_prompt,
+    handle_diversified_search,
+    handle_memory_delete,
+    handle_memory_discover_associations,
+    handle_memory_export,
+    handle_memory_get,
+    handle_memory_import,
+    handle_memory_list_all,
+    handle_memory_manage,
+    handle_memory_move,
+    handle_memory_search,
+    handle_memory_stats,
+    handle_memory_store,
+    handle_memory_sync,
+    handle_memory_update,
+    handle_scope_list,
+    handle_scope_memories,
+    handle_scope_suggest,
+    handle_session_manage,
+    handle_summarize_memory_prompt,
+    handle_unified_search,
+    set_dependencies,
+    set_prompt_dependencies,
+    set_resource_dependencies,
+    set_scope_dependencies,
+)
+from .api.utils import get_child_scopes, get_parent_scope, validate_scope_path
+from .config import get_config
+from .core.embedding_service import (
+    EmbeddingService,
+    MockEmbeddingService,
+    SentenceTransformerEmbeddingService,
+)
 
 # Import the full associative memory architecture
 from .core.memory_manager import MemoryManager
-from .core.embedding_service import EmbeddingService, MockEmbeddingService, SentenceTransformerEmbeddingService
 from .core.similarity import SimilarityCalculator
-from .storage.vector_store import ChromaVectorStore
-from .storage.metadata_store import SQLiteMetadataStore
-from .storage.graph_store import NetworkXGraphStore
-from .config import get_config
 from .simple_persistence import get_persistent_storage
-from .api.models import (
-    MemoryStoreRequest,
-    MemorySearchRequest,
-    DiversifiedSearchRequest,
-    UnifiedSearchRequest,
-    MemoryManageRequest,
-    MemorySyncRequest,
-    MemoryUpdateRequest,
-    MemoryMoveRequest,
-    ScopeListRequest,
-    ScopeSuggestRequest,
-    SessionManageRequest,
-    MemoryExportRequest,
-    MemoryImportRequest,
-    Memory,
-    SearchResult,
-    Association,
-    MemoryWithAssociations,
-    SearchResultWithAssociations,
-    ScopeInfo,
-    ScopeRecommendation,
-    SessionInfo,
-    PaginationInfo,
-    MemoryResponse,
-    ScopeListResponse,
-    ScopeSuggestResponse,
-    MemoryMoveResponse,
-    SessionManageResponse,
-    MemoryImportResponse,
-    MemoryExportResponse,
-    MCPResponse,
-    ErrorResponse,
-)
-from .api.utils import validate_scope_path, get_child_scopes, get_parent_scope
-from .api.tools import (
-    set_dependencies,
-    set_scope_dependencies,
-    set_resource_dependencies,
-    set_prompt_dependencies,
-    handle_memory_store,
-    handle_memory_search,
-    handle_diversified_search,
-    handle_unified_search,
-    handle_memory_manage,
-    handle_memory_sync,
-    handle_memory_get,
-    handle_memory_delete,
-    handle_memory_update,
-    handle_memory_discover_associations,
-    handle_memory_import,
-    handle_memory_list_all,
-    handle_scope_list,
-    handle_scope_suggest,
-    handle_memory_export,
-    handle_memory_move,
-    handle_session_manage,
-    handle_memory_stats,
-    handle_scope_memories,
-    handle_analyze_memories_prompt,
-    handle_summarize_memory_prompt,
-)
+from .storage.graph_store import NetworkXGraphStore
+from .storage.metadata_store import SQLiteMetadataStore
+from .storage.vector_store import ChromaVectorStore
 
 logger = logging.getLogger(__name__)
 

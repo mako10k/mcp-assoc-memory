@@ -3,7 +3,7 @@
 """
 
 import time
-from typing import Any, Dict, Callable
+from typing import Any, Callable, Dict
 
 
 class MetricsCollector:

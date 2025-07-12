@@ -3,10 +3,11 @@ Main entry point for MCP Associative Memory Server
 Production-ready server with environment-based configuration
 """
 
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
+
 from .server import mcp
 
 

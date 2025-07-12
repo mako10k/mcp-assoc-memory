@@ -4,19 +4,20 @@ Scope management tool handlers for MCP Associative Memory Server
 
 import logging
 from typing import Any, Dict, List
+
 from fastmcp import Context
 
 from ..models import (
-    ScopeListRequest,
-    ScopeSuggestRequest,
-    ScopeListResponse,
-    ScopeSuggestResponse,
-    ScopeInfo,
-    ScopeRecommendation,
-    MCPResponse,
     ErrorResponse,
+    MCPResponse,
+    ScopeInfo,
+    ScopeListRequest,
+    ScopeListResponse,
+    ScopeRecommendation,
+    ScopeSuggestRequest,
+    ScopeSuggestResponse,
 )
-from ..utils import validate_scope_path, get_child_scopes, get_parent_scope
+from ..utils import get_child_scopes, get_parent_scope, validate_scope_path
 
 logger = logging.getLogger(__name__)
 

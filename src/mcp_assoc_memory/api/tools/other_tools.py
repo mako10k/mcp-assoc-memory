@@ -1,19 +1,19 @@
 """Additional memory tools for MCP associative memory server."""
 
 import uuid
-from typing import Any, Dict
 from datetime import datetime, timedelta
+from typing import Any, Dict
 
 from ...core import memory_manager
+from ...simple_persistence import get_persistent_storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
 from ..models.responses import (
-    MemoryMoveResponse,
     MemoryDiscoverAssociationsResponse,
-    SessionManageResponse,
-    SessionInfo,
+    MemoryMoveResponse,
     SearchResultWithAssociations,
+    SessionInfo,
+    SessionManageResponse,
 )
-from ...simple_persistence import get_persistent_storage
 
 # Get storage
 memory_storage, persistence = get_persistent_storage()

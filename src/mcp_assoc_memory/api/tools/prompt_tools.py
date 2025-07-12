@@ -3,6 +3,7 @@ Prompt handlers for MCP Associative Memory Server
 """
 
 from typing import Any, Dict, Optional
+
 from fastmcp import Context
 
 # Global references (will be set by server.py)

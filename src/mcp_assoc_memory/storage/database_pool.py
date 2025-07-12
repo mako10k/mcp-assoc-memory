@@ -3,9 +3,11 @@ Database connection pool for optimized SQLite operations
 """
 
 import asyncio
-import aiosqlite
-from typing import AsyncContextManager, Optional
 from pathlib import Path
+from typing import Any, AsyncContextManager, Optional
+
+import aiosqlite
+
 from ..utils.logging import get_memory_logger
 
 logger = get_memory_logger(__name__)
@@ -71,9 +73,11 @@ class DatabasePool:
                             # Wait for an available connection
                             self.connection = await self.pool._pool.get()
 
+                if self.connection is None:
+                    raise RuntimeError("Failed to get database connection")
                 return self.connection
 
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
+            async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
                 if self.connection:
                     # Return connection to pool
                     try:
@@ -115,7 +119,7 @@ async def get_database_pool(database_path: str) -> DatabasePool:
     return _database_pools[database_path]
 
 
-async def close_all_pools():
+async def close_all_pools() -> None:
     """Close all database pools"""
     for pool in _database_pools.values():
         await pool.close()

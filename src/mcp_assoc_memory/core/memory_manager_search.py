@@ -4,7 +4,7 @@ Handles all search-related operations including complex queries
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
@@ -12,7 +12,7 @@ from ..utils.logging import get_memory_logger
 if TYPE_CHECKING:
     from ..core.embedding_service import EmbeddingService
     from ..core.similarity import SimilarityCalculator
-    from ..storage.base import BaseVectorStore, BaseMetadataStore
+    from ..storage.base import BaseMetadataStore, BaseVectorStore
 
 logger = get_memory_logger(__name__)
 

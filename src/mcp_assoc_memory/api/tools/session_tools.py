@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 from ...storage.simple_persistence import memory_storage, persistence
 from ..models.requests import SessionManageRequest
-from ..models.responses import SessionManageResponse, SessionInfo
+from ..models.responses import SessionInfo, SessionManageResponse
 
 
 async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict[str, Any]:

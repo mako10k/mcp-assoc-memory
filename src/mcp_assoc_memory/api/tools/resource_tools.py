@@ -3,7 +3,9 @@ Resource handlers for MCP Associative Memory Server
 """
 
 from typing import Any, Dict, Optional
+
 from fastmcp import Context
+
 from ...core.memory_manager import MemoryManager
 from ..utils import get_child_scopes
 

@@ -2,32 +2,33 @@
 Memory management tools for MCP Associative Memory Server
 """
 
-import json
-import gzip
 import base64
+import gzip
+import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Annotated
+from typing import Annotated, Any, Dict, List, Optional
+
 from fastmcp import Context
 from pydantic import Field
 
-from ..models import (
-    MemoryStoreRequest,
-    MemorySearchRequest,
-    DiversifiedSearchRequest,
-    MemoryUpdateRequest,
-    MemoryImportRequest,
-    MemoryImportResponse,
-    MemoryResponse,
-    PaginationInfo,
-    UnifiedSearchRequest,
-    MemoryManageRequest,
-    MemorySyncRequest,
-    MemoryExportRequest,
-)
+from ...config import get_config
 from ...core.memory_manager import MemoryManager
 from ...simple_persistence import get_persistent_storage
-from ...config import get_config
+from ..models import (
+    DiversifiedSearchRequest,
+    MemoryExportRequest,
+    MemoryImportRequest,
+    MemoryImportResponse,
+    MemoryManageRequest,
+    MemoryResponse,
+    MemorySearchRequest,
+    MemoryStoreRequest,
+    MemorySyncRequest,
+    MemoryUpdateRequest,
+    PaginationInfo,
+    UnifiedSearchRequest,
+)
 
 # Get the config instance
 config = get_config()

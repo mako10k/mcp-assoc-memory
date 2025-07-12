@@ -10,7 +10,7 @@ from ..models.association import Association
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
 from .base import BaseMetadataStore
-from .database_pool import get_database_pool, DatabasePool
+from .database_pool import DatabasePool, get_database_pool
 
 logger = get_memory_logger(__name__)
 

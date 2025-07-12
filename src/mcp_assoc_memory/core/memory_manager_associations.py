@@ -3,15 +3,16 @@ Memory association management - auto-association and relationship handling
 Manages semantic relationships between memories
 """
 
+from typing import TYPE_CHECKING, List, Optional
+
 import numpy as np
-from typing import List, Optional, TYPE_CHECKING
 
 from ..models.association import Association
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
 
 if TYPE_CHECKING:
-    from ..storage.base import BaseVectorStore, BaseMetadataStore, BaseGraphStore
+    from ..storage.base import BaseGraphStore, BaseMetadataStore, BaseVectorStore
     from ..utils.cache import LRUCache
 
 logger = get_memory_logger(__name__)

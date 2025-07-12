@@ -2,8 +2,8 @@
 Utility functions for MCP Associative Memory Server
 """
 
-from typing import List, Dict, Any
 import re
+from typing import Any, Dict, List
 
 
 def validate_scope_path(scope: str) -> bool:
