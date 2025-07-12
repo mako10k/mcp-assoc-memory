@@ -1,5 +1,3 @@
-
-
 import asyncio
 import json
 from datetime import datetime
@@ -12,17 +10,14 @@ from ..models.association import Association
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
 from .base import BaseMetadataStore
+from .database_pool import DatabasePool, get_database_pool
 
 logger = get_memory_logger(__name__)
 
 
 class SQLiteMetadataStore(BaseMetadataStore):
     async def search_by_tags(
-        self,
-        tags: List[str],
-        scope: Optional[str] = None,
-        match_all: bool = False,
-        limit: int = 10
+        self, tags: List[str], scope: Optional[str] = None, match_all: bool = False, limit: int = 10
     ) -> List[Memory]:
         """Tag search"""
         try:
@@ -37,12 +32,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     where_conditions.extend(tag_conditions)
                 else:
                     where_conditions.append(f"({' OR '.join(tag_conditions)})")
-            sql = f'''
+            sql = f"""
                 SELECT * FROM memories
                 WHERE {' AND '.join(where_conditions)}
                 ORDER BY created_at DESC
                 LIMIT ?
-            '''
+            """
             params.append(str(limit))
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(sql, params) as cursor:
@@ -54,20 +49,16 @@ class SQLiteMetadataStore(BaseMetadataStore):
             return []
 
     async def search_by_timerange(
-        self,
-        start_date: datetime,
-        end_date: datetime,
-        scope: Optional[str] = None,
-        limit: int = 10
+        self, start_date: datetime, end_date: datetime, scope: Optional[str] = None, limit: int = 10
     ) -> List[Memory]:
         """Time range search"""
         try:
-            sql = '''
+            sql = """
                 SELECT * FROM memories
                 WHERE JSON_EXTRACT(metadata, '$.scope') = ? AND created_at >= ? AND created_at <= ?
                 ORDER BY created_at DESC
                 LIMIT ?
-            '''
+            """
             params = [scope, start_date.isoformat(), end_date.isoformat(), str(limit)]
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(sql, params) as cursor:
@@ -85,7 +76,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         category: Optional[str] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        limit: int = 30
+        limit: int = 30,
     ) -> List[Memory]:
         """Advanced search (complex conditions)"""
         try:
@@ -106,12 +97,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
             if end_date:
                 where_conditions.append("created_at <= ?")
                 params.append(end_date.isoformat())
-            sql = f'''
+            sql = f"""
                 SELECT * FROM memories
                 WHERE {' AND '.join(where_conditions)}
                 ORDER BY created_at DESC
                 LIMIT ?
-            '''
+            """
             params.append(str(limit))
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(sql, params) as cursor:
@@ -126,10 +117,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
-                    await db.execute(
-                        "UPDATE memories SET access_count = ? WHERE id = ?",
-                        (access_count, memory_id)
-                    )
+                    await db.execute("UPDATE memories SET access_count = ? WHERE id = ?", (access_count, memory_id))
                     await db.commit()
             return True
         except Exception as e:
@@ -141,7 +129,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(
                     "SELECT * FROM associations WHERE source_memory_id = ? OR target_memory_id = ?",
-                    (memory_id, memory_id)
+                    (memory_id, memory_id),
                 ) as cursor:
                     rows = await cursor.fetchall()
                     associations = []
@@ -156,7 +144,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                             description=row[6],
                             auto_generated=bool(row[7]),
                             created_at=datetime.fromisoformat(row[8]),
-                            updated_at=datetime.fromisoformat(row[9])
+                            updated_at=datetime.fromisoformat(row[9]),
                         )
                         associations.append(association)
                     return associations
@@ -185,14 +173,14 @@ class SQLiteMetadataStore(BaseMetadataStore):
     async def cleanup_orphans(self) -> int:
         try:
             # Delete orphaned memories (those without associations)
-            sql = '''
+            sql = """
                 DELETE FROM memories
                 WHERE id NOT IN (
                     SELECT source_memory_id FROM associations
                     UNION
                     SELECT target_memory_id FROM associations
                 )
-            '''
+            """
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
                     cursor = await db.execute(sql)
@@ -219,7 +207,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         except Exception as e:
             logger.error("Failed to vacuum", error=str(e))
 
-    def _row_to_memory(self, row) -> Optional[Memory]:
+    def _row_to_memory(self, row: Any) -> Optional[Memory]:
         if not row:
             return None
         try:
@@ -229,7 +217,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
             if not scope:
                 # Fallback to legacy scope field for backward compatibility
                 scope = str(row[1]) if row[1] else "user/default"
-            
+
             return Memory(
                 id=str(row[0]),
                 scope=scope,
@@ -244,22 +232,19 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 created_at=datetime.fromisoformat(row[8]),
                 updated_at=datetime.fromisoformat(row[9]),
                 accessed_at=datetime.fromisoformat(row[10]) if row[10] else None,
-                access_count=int(row[11]) if row[11] is not None else 0
+                access_count=int(row[11]) if row[11] is not None else 0,
             )
         except Exception as e:
-            logger.error(
-                "Failed to convert row to Memory",
-                error_code="ROW_CONVERT_ERROR",
-                row=row,
-                error=str(e)
-            )
+            logger.error("Failed to convert row to Memory", error_code="ROW_CONVERT_ERROR", row=row, error=str(e))
             return None
 
-    async def get_memories_by_scope(self, scope: Optional[str] = None, limit: int = 1000, order_by: Optional[str] = None) -> List[Memory]:
+    async def get_memories_by_scope(
+        self, scope: Optional[str] = None, limit: int = 1000, order_by: Optional[str] = None
+    ) -> List[Memory]:
         """Get memories by scope"""
         async with aiosqlite.connect(self.database_path) as db:
             query = "SELECT * FROM memories WHERE 1=1"
-            params = []
+            params: List[Any] = []
             if scope:
                 # Filter by scope stored in metadata
                 query += " AND JSON_EXTRACT(metadata, '$.scope') = ?"
@@ -304,21 +289,29 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 stats["by_category"][category] = row[1]
                 stats["total"] += row[1]
         return stats
+
     """SQLite implementation of metadata store"""
 
     def __init__(self, database_path: str = "./data/memory.db"):
         self.database_path = database_path
         self.db_lock = asyncio.Lock()
+        self._pool: Optional[DatabasePool] = None
 
         # Create database directory
         Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self) -> None:
-        """Initialize database and tables"""
+        """Initialize database pool and tables"""
         try:
-            async with aiosqlite.connect(self.database_path) as db:
+            # Initialize database pool
+            self._pool = await get_database_pool(self.database_path)
+
+            # Create tables using pool connection
+            conn_manager = await self._pool.get_connection()
+            async with conn_manager as db:
                 # Memories table
-                await db.execute('''
+                await db.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS memories (
                         id TEXT PRIMARY KEY,
                         scope TEXT NOT NULL,
@@ -333,10 +326,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
                         accessed_at TEXT,
                         access_count INTEGER DEFAULT 0
                     )
-                ''')
+                """
+                )
 
                 # Associations table
-                await db.execute('''
+                await db.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS associations (
                         id TEXT PRIMARY KEY,
                         source_memory_id TEXT NOT NULL,
@@ -353,42 +348,48 @@ class SQLiteMetadataStore(BaseMetadataStore):
                         FOREIGN KEY (target_memory_id)
                             REFERENCES memories (id)
                     )
-                ''')
+                """
+                )
 
                 # Create indexes
-                await db.execute('''
+                await db.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_memories_scope
                     ON memories (scope)
-                ''')
-                await db.execute('''
+                """
+                )
+                await db.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_memories_user_project
                     ON memories (user_id, project_id)
-                ''')
-                await db.execute('''
+                """
+                )
+                await db.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_memories_created_at
                     ON memories (created_at)
-                ''')
-                await db.execute('''
+                """
+                )
+                await db.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_associations_source
                     ON associations (source_memory_id)
-                ''')
-                await db.execute('''
+                """
+                )
+                await db.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_associations_target
                     ON associations (target_memory_id)
-                ''')
+                """
+                )
 
                 await db.commit()
 
-            logger.info(
-                "SQLite metadata store initialized",
-                extra={"database_path": self.database_path}
-            )
+            logger.info("SQLite metadata store initialized", extra={"database_path": self.database_path})
 
         except Exception as e:
             logger.error(
-                "Failed to initialize SQLite metadata store: %s",
-                str(e),
-                extra={"error_code": "SQLITE_INIT_ERROR"}
+                f"Failed to initialize SQLite metadata store: {str(e)}", extra={"error_code": "SQLITE_INIT_ERROR"}
             )
             raise
 
@@ -402,16 +403,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
         try:
             async with aiosqlite.connect(self.database_path) as db:
                 # Get memory count
-                async with db.execute(
-                    "SELECT COUNT(*) FROM memories"
-                ) as cursor:
+                async with db.execute("SELECT COUNT(*) FROM memories") as cursor:
                     row = await cursor.fetchone()
                     memory_count = row[0] if row and row[0] is not None else 0
 
                 # Get association count
-                async with db.execute(
-                    "SELECT COUNT(*) FROM associations"
-                ) as cursor:
+                async with db.execute("SELECT COUNT(*) FROM associations") as cursor:
                     row = await cursor.fetchone()
                     association_count = row[0] if row and row[0] is not None else 0
 
@@ -422,12 +419,11 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     "SELECT DISTINCT JSON_EXTRACT(metadata, '$.scope') as scope FROM memories WHERE scope IS NOT NULL"
                 ) as cursor:
                     scope_rows = await cursor.fetchall()
-                
+
                 for scope_row in scope_rows:
-                    scope = scope_row[0] if scope_row[0] else 'unknown'
+                    scope = scope_row[0] if scope_row[0] else "unknown"
                     async with db.execute(
-                        "SELECT COUNT(*) FROM memories WHERE JSON_EXTRACT(metadata, '$.scope') = ?",
-                        (scope,)
+                        "SELECT COUNT(*) FROM memories WHERE JSON_EXTRACT(metadata, '$.scope') = ?", (scope,)
                     ) as cursor:
                         row = await cursor.fetchone()
                         count = row[0] if row and row[0] is not None else 0
@@ -439,7 +435,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     "total_memories": memory_count,
                     "total_associations": association_count,
                     "scope_stats": scope_stats,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.utcnow().isoformat(),
                 }
 
         except Exception as e:
@@ -447,7 +443,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 "status": "error",
                 "database_path": self.database_path,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def store_memory(self, memory: Memory) -> str:
@@ -455,65 +451,48 @@ class SQLiteMetadataStore(BaseMetadataStore):
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
-                    await db.execute('''
+                    await db.execute(
+                        """
                         INSERT OR REPLACE INTO memories (
                             id, scope, content, metadata, tags, user_id,
                             project_id, session_id, created_at, updated_at,
                             accessed_at, access_count
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        memory.id,
-                        memory.scope,
-                        memory.content,
-                        json.dumps(memory.metadata),
-                        json.dumps(memory.tags),
-                        memory.user_id,
-                        memory.project_id,
-                        memory.session_id,
-                        memory.created_at.isoformat(),
-                        memory.updated_at.isoformat(),
-                        (memory.accessed_at.isoformat()
-                         if memory.accessed_at else None),
-                        memory.access_count
-                    ))
+                    """,
+                        (
+                            memory.id,
+                            memory.scope,
+                            memory.content,
+                            json.dumps(memory.metadata),
+                            json.dumps(memory.tags),
+                            memory.user_id,
+                            memory.project_id,
+                            memory.session_id,
+                            memory.created_at.isoformat(),
+                            memory.updated_at.isoformat(),
+                            (memory.accessed_at.isoformat() if memory.accessed_at else None),
+                            memory.access_count,
+                        ),
+                    )
                     await db.commit()
 
-            logger.info(
-                "Memory stored",
-                extra_data={
-                    "memory_id": memory.id,
-                    "scope": memory.scope
-                }
-            )
+            logger.info("Memory stored", extra_data={"memory_id": memory.id, "scope": memory.scope})
 
             return memory.id
 
         except Exception as e:
-            logger.error(
-                "Failed to store memory",
-                error_code="MEMORY_STORE_ERROR",
-                memory_id=memory.id,
-                error=str(e)
-            )
+            logger.error("Failed to store memory", error_code="MEMORY_STORE_ERROR", memory_id=memory.id, error=str(e))
             raise
 
     async def get_memory(self, memory_id: str) -> Optional[Memory]:
         """Get memory"""
         try:
             async with aiosqlite.connect(self.database_path) as db:
-                async with db.execute(
-                    "SELECT * FROM memories WHERE id = ?",
-                    (memory_id,)
-                ) as cursor:
+                async with db.execute("SELECT * FROM memories WHERE id = ?", (memory_id,)) as cursor:
                     row = await cursor.fetchone()
                     return self._row_to_memory(row)
         except Exception as e:
-            logger.error(
-                "Failed to get memory",
-                error_code="MEMORY_GET_ERROR",
-                memory_id=memory_id,
-                error=str(e)
-            )
+            logger.error("Failed to get memory", error_code="MEMORY_GET_ERROR", memory_id=memory_id, error=str(e))
             return None
 
     async def update_memory(self, memory: Memory) -> bool:
@@ -521,36 +500,33 @@ class SQLiteMetadataStore(BaseMetadataStore):
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
-                    await db.execute('''
+                    await db.execute(
+                        """
                         UPDATE memories SET
-                            content = ?, metadata = ?, tags = ?,
+                            scope = ?, content = ?, metadata = ?, tags = ?, category = ?,
                             updated_at = ?, accessed_at = ?, access_count = ?
                         WHERE id = ?
-                    ''', (
-                        memory.content,
-                        json.dumps(memory.metadata),
-                        json.dumps(memory.tags),
-                        memory.updated_at.isoformat(),
-                        memory.accessed_at.isoformat() if memory.accessed_at else None,
-                        memory.access_count,
-                        memory.id
-                    ))
+                    """,
+                        (
+                            memory.scope,
+                            memory.content,
+                            json.dumps(memory.metadata),
+                            json.dumps(memory.tags),
+                            memory.category,
+                            memory.updated_at.isoformat(),
+                            memory.accessed_at.isoformat() if memory.accessed_at else None,
+                            memory.access_count,
+                            memory.id,
+                        ),
+                    )
                     await db.commit()
 
-            logger.info(
-                "Memory updated",
-                extra_data={"memory_id": memory.id}
-            )
+            logger.info("Memory updated", extra_data={"memory_id": memory.id})
 
             return True
 
         except Exception as e:
-            logger.error(
-                "Failed to update memory",
-                error_code="MEMORY_UPDATE_ERROR",
-                memory_id=memory.id,
-                error=str(e)
-            )
+            logger.error("Failed to update memory", error_code="MEMORY_UPDATE_ERROR", memory_id=memory.id, error=str(e))
             return False
 
     async def delete_memory(self, memory_id: str) -> bool:
@@ -559,33 +535,25 @@ class SQLiteMetadataStore(BaseMetadataStore):
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
                     # Also delete related associations
-                    await db.execute('''
+                    await db.execute(
+                        """
                         DELETE FROM associations
                         WHERE source_memory_id = ? OR target_memory_id = ?
-                    ''', (memory_id, memory_id))
+                    """,
+                        (memory_id, memory_id),
+                    )
 
                     # Delete memory
-                    await db.execute(
-                        "DELETE FROM memories WHERE id = ?",
-                        (memory_id,)
-                    )
+                    await db.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
 
                     await db.commit()
 
-            logger.info(
-                "Memory deleted",
-                extra_data={"memory_id": memory_id}
-            )
+            logger.info("Memory deleted", extra_data={"memory_id": memory_id})
 
             return True
 
         except Exception as e:
-            logger.error(
-                "Failed to delete memory",
-                error_code="MEMORY_DELETE_ERROR",
-                memory_id=memory_id,
-                error=str(e)
-            )
+            logger.error("Failed to delete memory", error_code="MEMORY_DELETE_ERROR", memory_id=memory_id, error=str(e))
             return False
 
     async def search_memories(
@@ -599,7 +567,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Memory]:
         """Search memories"""
         try:
@@ -639,12 +607,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     params.append(f'%"{tag}"%')
                 where_conditions.append(f"({' OR '.join(tag_conditions)})")
 
-            sql = f'''
+            sql = f"""
                 SELECT * FROM memories
                 WHERE {' AND '.join(where_conditions)}
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
-            '''
+            """
             params.append(str(limit))
             params.append(str(offset))
 
@@ -660,29 +628,17 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
                     logger.info(
                         "Memory search completed",
-                        extra_data={
-                            "scope": scope,
-                            "result_count": len(memories),
-                            "query": query
-                        }
+                        extra_data={"scope": scope, "result_count": len(memories), "query": query},
                     )
 
                     return memories
 
         except Exception as e:
-            logger.error(
-                "Failed to search memories",
-                error_code="MEMORY_SEARCH_ERROR",
-                scope=scope,
-                error=str(e)
-            )
+            logger.error("Failed to search memories", error_code="MEMORY_SEARCH_ERROR", scope=scope, error=str(e))
             return []
 
     async def get_memory_count(
-        self,
-        scope: Optional[str] = None,
-        user_id: Optional[str] = None,
-        project_id: Optional[str] = None
+        self, scope: Optional[str] = None, user_id: Optional[str] = None, project_id: Optional[str] = None
     ) -> int:
         """Get memory count"""
         try:
@@ -697,10 +653,10 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 where_conditions.append("project_id = ?")
                 params.append(project_id)
 
-            sql = f'''
+            sql = f"""
                 SELECT COUNT(*) FROM memories
                 WHERE {' AND '.join(where_conditions)}
-            '''
+            """
 
             async with aiosqlite.connect(self.database_path) as db:
                 async with db.execute(sql, params) as cursor:
@@ -711,12 +667,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                         return 0
 
         except Exception as e:
-            logger.error(
-                "Failed to get memory count",
-                error_code="MEMORY_COUNT_ERROR",
-                scope=scope,
-                error=str(e)
-            )
+            logger.error("Failed to get memory count", error_code="MEMORY_COUNT_ERROR", scope=scope, error=str(e))
             return 0
 
     async def store_association(self, association: Association) -> str:
@@ -724,30 +675,30 @@ class SQLiteMetadataStore(BaseMetadataStore):
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
-                    await db.execute('''
+                    await db.execute(
+                        """
                         INSERT OR REPLACE INTO associations (
                             id, source_memory_id, target_memory_id,
                             association_type, strength, metadata, description,
                             auto_generated, created_at, updated_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        association.id,
-                        association.source_memory_id,
-                        association.target_memory_id,
-                        association.association_type,
-                        association.strength,
-                        json.dumps(association.metadata),
-                        association.description,
-                        association.auto_generated,
-                        association.created_at.isoformat(),
-                        association.updated_at.isoformat()
-                    ))
+                    """,
+                        (
+                            association.id,
+                            association.source_memory_id,
+                            association.target_memory_id,
+                            association.association_type,
+                            association.strength,
+                            json.dumps(association.metadata),
+                            association.description,
+                            association.auto_generated,
+                            association.created_at.isoformat(),
+                            association.updated_at.isoformat(),
+                        ),
+                    )
                     await db.commit()
 
-            logger.info(
-                "Association stored",
-                extra_data={"association_id": association.id}
-            )
+            logger.info("Association stored", extra_data={"association_id": association.id})
 
             return association.id
 
@@ -756,15 +707,11 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 "Failed to store association",
                 error_code="ASSOCIATION_STORE_ERROR",
                 association_id=association.id,
-                error=str(e)
+                error=str(e),
             )
             raise
 
-    async def get_associations(
-        self,
-        memory_id: str,
-        direction: Optional[str] = None
-    ) -> List[Association]:
+    async def get_associations(self, memory_id: str, direction: Optional[str] = None) -> List[Association]:
         """Get associations"""
         try:
             if direction == "incoming":
@@ -779,10 +726,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 params.append(memory_id)
 
             async with aiosqlite.connect(self.database_path) as db:
-                async with db.execute(
-                    f"SELECT * FROM associations WHERE {where_clause}",
-                    params
-                ) as cursor:
+                async with db.execute(f"SELECT * FROM associations WHERE {where_clause}", params) as cursor:
                     rows = await cursor.fetchall()
 
                     associations = []
@@ -797,7 +741,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                             description=row[6],
                             auto_generated=bool(row[7]),
                             created_at=datetime.fromisoformat(row[8]),
-                            updated_at=datetime.fromisoformat(row[9])
+                            updated_at=datetime.fromisoformat(row[9]),
                         )
                         associations.append(association)
 
@@ -805,10 +749,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
         except Exception as e:
             logger.error(
-                "Failed to get associations",
-                error_code="ASSOCIATION_GET_ERROR",
-                memory_id=memory_id,
-                error=str(e)
+                "Failed to get associations", error_code="ASSOCIATION_GET_ERROR", memory_id=memory_id, error=str(e)
             )
             return []
 
@@ -817,16 +758,10 @@ class SQLiteMetadataStore(BaseMetadataStore):
         try:
             async with self.db_lock:
                 async with aiosqlite.connect(self.database_path) as db:
-                    await db.execute(
-                        "DELETE FROM associations WHERE id = ?",
-                        (association_id,)
-                    )
+                    await db.execute("DELETE FROM associations WHERE id = ?", (association_id,))
                     await db.commit()
 
-            logger.info(
-                "Association deleted",
-                extra_data={"association_id": association_id}
-            )
+            logger.info("Association deleted", extra_data={"association_id": association_id})
 
             return True
 
@@ -835,6 +770,88 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 "Failed to delete association",
                 error_code="ASSOCIATION_DELETE_ERROR",
                 association_id=association_id,
-                error=str(e)
+                error=str(e),
             )
+            return False
+
+    async def get_all_memories(self, limit: int = 1000) -> List[Memory]:
+        """Get all memories with limit"""
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute("SELECT * FROM memories ORDER BY created_at DESC LIMIT ?", (limit,)) as cursor:
+                    rows = await cursor.fetchall()
+                    memories = [self._row_to_memory(row) for row in rows if row]
+                    return [m for m in memories if m is not None]
+        except Exception as e:
+            logger.error("Failed to get all memories", error=str(e))
+            return []
+
+    async def get_all_scopes(self) -> List[str]:
+        """Get all unique scopes"""
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(
+                    "SELECT DISTINCT JSON_EXTRACT(metadata, '$.scope') as scope FROM memories WHERE scope IS NOT NULL"
+                ) as cursor:
+                    rows = await cursor.fetchall()
+                    return [row[0] for row in rows if row[0]]
+        except Exception as e:
+            logger.error("Failed to get all scopes", error=str(e))
+            return []
+
+    async def get_association_count(self, scope: Optional[str] = None) -> int:
+        """Get count of associations, optionally filtered by scope"""
+        try:
+            if scope:
+                # Count associations where both memories are in the specified scope
+                async with aiosqlite.connect(self.database_path) as db:
+                    async with db.execute(
+                        """
+                        SELECT COUNT(*) FROM associations a
+                        JOIN memories m1 ON a.source_memory_id = m1.id
+                        JOIN memories m2 ON a.target_memory_id = m2.id
+                        WHERE JSON_EXTRACT(m1.metadata, '$.scope') = ?
+                        AND JSON_EXTRACT(m2.metadata, '$.scope') = ?
+                    """,
+                        (scope, scope),
+                    ) as cursor:
+                        result = await cursor.fetchone()
+                        return result[0] if result else 0
+            else:
+                async with aiosqlite.connect(self.database_path) as db:
+                    async with db.execute("SELECT COUNT(*) FROM associations") as cursor:
+                        result = await cursor.fetchone()
+                        return result[0] if result else 0
+        except Exception as e:
+            logger.error("Failed to get association count", error=str(e))
+            return 0
+
+    async def update_association(self, association: Association) -> bool:
+        """Update an existing association"""
+        try:
+            async with self.db_lock:
+                async with aiosqlite.connect(self.database_path) as db:
+                    await db.execute(
+                        """
+                        UPDATE associations SET
+                            association_type = ?,
+                            strength = ?,
+                            metadata = ?,
+                            description = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                    """,
+                        (
+                            association.association_type,
+                            association.strength,
+                            json.dumps(association.metadata),
+                            association.description,
+                            association.updated_at.isoformat(),
+                            association.id,
+                        ),
+                    )
+                    await db.commit()
+            return True
+        except Exception as e:
+            logger.error("Failed to update association", error=str(e))
             return False

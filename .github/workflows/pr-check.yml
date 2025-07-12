@@ -1,0 +1,213 @@
+name: PR Quality Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [ main, develop ]
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install dependencies
+      run: |
+        poetry install --with dev
+        
+    - name: Check code formatting with black
+      run: |
+        poetry run black --check --line-length=120 src/
+        
+    - name: Check import sorting with isort
+      run: |
+        poetry run isort --check-only src/
+        
+    - name: Run flake8 linting
+      run: |
+        poetry run flake8 src/ --max-line-length=120 --extend-ignore=E203,W503 --output-file=flake8-report.txt
+        
+    - name: Upload lint reports
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: lint-reports
+        path: flake8-report.txt
+
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install dependencies
+      run: |
+        poetry install --with dev
+        
+    - name: Run mypy type checking
+      run: |
+        poetry run mypy src/mcp_assoc_memory/ --ignore-missing-imports --show-error-codes --pretty > mypy-report.txt
+        
+    - name: Upload type check reports
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: type-check-reports
+        path: mypy-report.txt
+
+  test-coverage:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install dependencies
+      run: |
+        poetry install --with dev
+        
+    - name: Run tests with coverage
+      run: |
+        poetry run pytest tests/ -v --cov=src/mcp_assoc_memory --cov-report=xml --cov-report=html --cov-fail-under=80
+        
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: |
+          coverage.xml
+          htmlcov/
+          
+    - name: Comment PR with coverage
+      uses: orgoro/coverage@v3
+      if: github.event_name == 'pull_request'
+      with:
+        coverageFile: coverage.xml
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  complexity-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install dependencies
+      run: |
+        poetry install --with dev
+        
+    - name: Install complexity tools
+      run: |
+        poetry add --group dev radon
+        
+    - name: Check cyclomatic complexity
+      run: |
+        poetry run radon cc src/ --min=B --show-complexity --output-file=complexity-report.txt
+        
+    - name: Check maintainability index
+      run: |
+        poetry run radon mi src/ --output-file=maintainability-report.txt
+        
+    - name: Upload complexity reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: complexity-reports
+        path: |
+          complexity-report.txt
+          maintainability-report.txt
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install dependencies
+      run: |
+        poetry install --with dev
+        
+    - name: Run bandit security scan
+      run: |
+        poetry run bandit -r src/ -f json -o bandit-report.json
+        
+    - name: Run safety dependency scan
+      run: |
+        poetry run safety check --json --output safety-report.json
+        
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  pr-summary:
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, type-check, test-coverage, complexity-check, security-scan]
+    if: always()
+    
+    steps:
+    - name: Create PR summary
+      run: |
+        echo "## 📋 PR Quality Check Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Lint & Format | ${{ needs.lint-and-format.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Type Check | ${{ needs.type-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Coverage | ${{ needs.test-coverage.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Complexity | ${{ needs.complexity-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security | ${{ needs.security-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY

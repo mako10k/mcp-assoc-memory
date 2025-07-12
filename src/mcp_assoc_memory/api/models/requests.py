@@ -2,15 +2,16 @@
 Request models for MCP Associative Memory Server API
 """
 
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class MemoryStoreRequest(BaseModel):
     content: str = Field(description="Memory content to store")
     scope: str = Field(
-        default="user/default", 
+        default="user/default",
         description="""Memory scope for hierarchical organization:
         
         Values & Use Cases:
@@ -25,7 +26,7 @@ class MemoryStoreRequest(BaseModel):
         
         Strategy: Use scope_suggest for automatic categorization
         Example: scope="learning/mcp/implementation" for this context""",
-        examples=["learning/programming/python", "work/project/backend", "personal/ideas"]
+        examples=["learning/programming/python", "work/project/backend", "personal/ideas"],
     )
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
     tags: Optional[List[str]] = Field(default=None, description="Memory tags")
@@ -33,8 +34,9 @@ class MemoryStoreRequest(BaseModel):
     auto_associate: bool = Field(default=True, description="Enable automatic association discovery")
     allow_duplicates: bool = Field(default=False, description="Allow storing duplicate content")
     similarity_threshold: float = Field(
-        default=0.95, 
-        ge=0.0, le=1.0, 
+        default=0.95,
+        ge=0.0,
+        le=1.0,
         description="""Duplicate detection threshold:
         
         Values & Use Cases:
@@ -44,7 +46,7 @@ class MemoryStoreRequest(BaseModel):
         
         Strategy: Keep high (0.95) unless you need strict deduplication
         Example: similarity_threshold=0.95 for most cases""",
-        examples=[0.95, 0.90, 0.85]
+        examples=[0.95, 0.90, 0.85],
     )
     minimal_response: bool = Field(
         default=False,
@@ -55,14 +57,14 @@ class MemoryStoreRequest(BaseModel):
         • False: Return complete memory data with associations (default)
         
         Strategy: Use minimal=True for storage operations, False for retrieval
-        Target: Minimal responses < 1KB vs full responses with associations"""
+        Target: Minimal responses < 1KB vs full responses with associations""",
     )
 
 
 class MemorySearchRequest(BaseModel):
     query: str = Field(description="Search query")
     scope: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Target scope for search (supports hierarchy):
         
         Examples:
@@ -72,12 +74,13 @@ class MemorySearchRequest(BaseModel):
         • None: Search across all scopes
         
         Strategy: Start broad, narrow down if too many results""",
-        examples=["learning/programming", "work/project", None]
+        examples=["learning/programming", "work/project", None],
     )
     include_child_scopes: bool = Field(default=False, description="Include child scopes in search")
     limit: int = Field(
-        default=10, 
-        ge=1, le=100, 
+        default=10,
+        ge=1,
+        le=100,
         description="""Maximum number of memories to retrieve:
         
         Values & Use Cases:
@@ -89,11 +92,12 @@ class MemorySearchRequest(BaseModel):
         Example: limit=15 for creative thinking sessions
         
         ⚠️ Performance: Higher values increase processing time""",
-        examples=[10, 15, 5]
+        examples=[10, 15, 5],
     )
     similarity_threshold: float = Field(
-        default=0.1, 
-        ge=0.0, le=1.0, 
+        default=0.1,
+        ge=0.0,
+        le=1.0,
         description="""Similarity threshold for memory matching:
         
         Values & Use Cases:
@@ -104,13 +108,14 @@ class MemorySearchRequest(BaseModel):
         
         Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
         Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
-        examples=[0.1, 0.2, 0.4]
+        examples=[0.1, 0.2, 0.4],
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
 
 
 class DiversifiedSearchRequest(BaseModel):
     """Diversified similarity search request for broader knowledge exploration"""
+
     query: str = Field(description="Search query")
     scope: Optional[str] = Field(
         default=None,
@@ -123,11 +128,12 @@ class DiversifiedSearchRequest(BaseModel):
         • None: Search across all scopes with diversity
         
         Strategy: Start broad, narrow down if too many results""",
-        examples=["learning/programming", "work/project", None]
+        examples=["learning/programming", "work/project", None],
     )
     limit: int = Field(
         default=10,
-        ge=1, le=100,
+        ge=1,
+        le=100,
         description="""Maximum number of diverse memories to retrieve:
         
         Values & Use Cases:
@@ -139,11 +145,12 @@ class DiversifiedSearchRequest(BaseModel):
         Example: limit=15 for diverse creative thinking sessions
         
         ⚠️ Performance: Higher values increase processing time""",
-        examples=[10, 15, 5]
+        examples=[10, 15, 5],
     )
     min_score: float = Field(
         default=0.1,
-        ge=0.0, le=1.0,
+        ge=0.0,
+        le=1.0,
         description="""Minimum similarity threshold for candidates:
         
         Values & Use Cases:
@@ -153,11 +160,12 @@ class DiversifiedSearchRequest(BaseModel):
         
         Strategy: Lower values for more creative, unexpected connections
         Example: min_score=0.1 for diverse brainstorming""",
-        examples=[0.1, 0.2, 0.4]
+        examples=[0.1, 0.2, 0.4],
     )
     diversity_threshold: float = Field(
         default=0.8,
-        ge=0.0, le=1.0,
+        ge=0.0,
+        le=1.0,
         description="""Similarity threshold for excluding similar items:
         
         Values & Use Cases:
@@ -167,11 +175,12 @@ class DiversifiedSearchRequest(BaseModel):
         
         Strategy: 0.8 provides good balance of relevance and diversity
         Example: diversity_threshold=0.8 for balanced diverse results""",
-        examples=[0.8, 0.7, 0.9]
+        examples=[0.8, 0.7, 0.9],
     )
     expansion_factor: float = Field(
         default=2.5,
-        ge=1.0, le=10.0,
+        ge=1.0,
+        le=10.0,
         description="""Initial expansion multiplier for candidate search:
         
         Values & Use Cases:
@@ -181,11 +190,12 @@ class DiversifiedSearchRequest(BaseModel):
         
         Strategy: 2.5 provides good balance for most use cases
         Example: expansion_factor=2.5 for standard diverse search""",
-        examples=[2.5, 3.0, 2.0]
+        examples=[2.5, 3.0, 2.0],
     )
     max_expansion_factor: float = Field(
         default=5.0,
-        ge=1.0, le=20.0,
+        ge=1.0,
+        le=20.0,
         description="""Maximum expansion when fallback is needed:
         
         Values & Use Cases:
@@ -195,7 +205,7 @@ class DiversifiedSearchRequest(BaseModel):
         
         Strategy: 5.0 provides good fallback without excessive processing
         Example: max_expansion_factor=5.0 for balanced fallback""",
-        examples=[5.0, 7.0, 3.0]
+        examples=[5.0, 7.0, 3.0],
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
 
@@ -204,7 +214,7 @@ class MemoryUpdateRequest(BaseModel):
     memory_id: str = Field(description="ID of the memory to update")
     content: Optional[str] = Field(default=None, description="New content for the memory (optional)")
     scope: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""New scope for the memory (optional):
         
         Scope Organization:
@@ -214,14 +224,13 @@ class MemoryUpdateRequest(BaseModel):
         • session/[name]: Temporary session-specific content
         
         Strategy: Use scope_suggest for recommendations if unsure
-        Example: scope="work/projects/mcp-improvements" for project organization"""
+        Example: scope="work/projects/mcp-improvements" for project organization""",
     )
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="New metadata for the memory (optional)")
     tags: Optional[List[str]] = Field(default=None, description="New tags for the memory (optional)")
     category: Optional[str] = Field(default=None, description="New category for the memory (optional)")
     preserve_associations: bool = Field(
-        default=True, 
-        description="Whether to preserve existing associations when updating content"
+        default=True, description="Whether to preserve existing associations when updating content"
     )
 
 
@@ -271,7 +280,7 @@ class MemoryMoveRequest(BaseModel):
 
 class ScopeListRequest(BaseModel):
     parent_scope: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Parent scope to filter hierarchy view:
         
         Navigation Strategy:
@@ -286,10 +295,10 @@ class ScopeListRequest(BaseModel):
         • Hierarchical browsing: Navigate from general to specific
         
         Example: parent_scope="work" to explore work-related organization""",
-        examples=[None, "work", "learning", "session"]
+        examples=[None, "work", "learning", "session"],
     )
     include_memory_counts: bool = Field(
-        default=True, 
+        default=True,
         description="""Include memory count statistics:
         
         Performance Trade-off:
@@ -301,7 +310,7 @@ class ScopeListRequest(BaseModel):
         • Quick navigation: False for faster hierarchy browsing
         • System monitoring: True for usage analytics
         
-        Example: include_memory_counts=False for rapid scope exploration"""
+        Example: include_memory_counts=False for rapid scope exploration""",
     )
 
 
@@ -323,7 +332,7 @@ class ScopeSuggestRequest(BaseModel):
         Strategy: Provide complete content rather than truncated text"""
     )
     current_scope: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Current scope context for enhanced recommendations:
         
         Context Enhancement:
@@ -338,7 +347,7 @@ class ScopeSuggestRequest(BaseModel):
         • Contextual refinement: Help system understand work flow
         
         Example: current_scope="work/projects" for project-related content""",
-        examples=[None, "work/projects", "learning", "personal"]
+        examples=[None, "work/projects", "learning", "personal"],
     )
 
 
@@ -360,7 +369,7 @@ class SessionManageRequest(BaseModel):
         Example: action="create" to start new isolated working session"""
     )
     session_id: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Custom session identifier:
         
         ID Generation:
@@ -374,10 +383,10 @@ class SessionManageRequest(BaseModel):
         • Systematic naming: Follow team conventions
         
         Example: session_id="mcp-development-session" for project work""",
-        examples=[None, "project-alpha", "meeting-notes", "experiment-001"]
+        examples=[None, "project-alpha", "meeting-notes", "experiment-001"],
     )
     max_age_days: Optional[int] = Field(
-        default=7, 
+        default=7,
         description="""Maximum age for cleanup operations (days):
         
         Cleanup Strategy:
@@ -391,13 +400,13 @@ class SessionManageRequest(BaseModel):
         • Archive before cleanup: Use higher values with periodic review
         
         Example: max_age_days=14 for bi-weekly session cleanup""",
-        examples=[1, 7, 14, 30]
+        examples=[1, 7, 14, 30],
     )
 
 
 class MemoryExportRequest(BaseModel):
     scope: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Scope to export (optional):
         
         Export Scope Strategy:
@@ -411,19 +420,12 @@ class MemoryExportRequest(BaseModel):
         • Partial sync: Specify scope for targeted export
         • Project handoff: Export specific project scope
         
-        Example: scope="work/projects/mcp-improvements" for project-specific export"""
+        Example: scope="work/projects/mcp-improvements" for project-specific export""",
     )
-    include_associations: bool = Field(
-        default=True, 
-        description="Include association relationships in export"
-    )
-    export_format: str = Field(
-        default="json", 
-        description="Export format (json, yaml)",
-        pattern="^(json|yaml)$"
-    )
+    include_associations: bool = Field(default=True, description="Include association relationships in export")
+    export_format: str = Field(default="json", description="Export format (json, yaml)", pattern="^(json|yaml)$")
     file_path: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Server-side file path for export (Pattern A):
         
         File Path Strategy:
@@ -436,17 +438,14 @@ class MemoryExportRequest(BaseModel):
         • file_path="backup/memories-2025-07-10.json": Server-side file
         • file_path="/shared/project-memories.json": Absolute path mode
         
-        Security: Server validates paths against configured allowed directories"""
+        Security: Server validates paths against configured allowed directories""",
     )
-    compression: bool = Field(
-        default=False, 
-        description="Compress export data (gzip)"
-    )
+    compression: bool = Field(default=False, description="Compress export data (gzip)")
 
 
 class MemoryImportRequest(BaseModel):
     file_path: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Server-side file path for import (Pattern A):
         
         Import Source Strategy:
@@ -457,10 +456,10 @@ class MemoryImportRequest(BaseModel):
         Examples:
         • file_path=None: Direct data import mode
         • file_path="backup/memories-2025-07-10.json": Server-side file
-        • file_path="/shared/project-memories.json": Absolute path mode"""
+        • file_path="/shared/project-memories.json": Absolute path mode""",
     )
     import_data: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Direct import data (Pattern B):
         
         Data Format:
@@ -472,10 +471,10 @@ class MemoryImportRequest(BaseModel):
         Usage Pattern:
         1. Export from source environment with file_path=None
         2. Copy export response data
-        3. Import to target environment with import_data=<copied_data>"""
+        3. Import to target environment with import_data=<copied_data>""",
     )
     merge_strategy: str = Field(
-        default="skip_duplicates", 
+        default="skip_duplicates",
         description="""How to handle duplicate memories:
         
         Merge Strategies:
@@ -487,10 +486,10 @@ class MemoryImportRequest(BaseModel):
         Use Cases:
         • skip_duplicates: Safe import without conflicts
         • overwrite: Force update from authoritative source
-        • create_versions: Preserve both local and imported versions"""
+        • create_versions: Preserve both local and imported versions""",
     )
     target_scope_prefix: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Prefix to add to imported memory scopes:
         
         Scope Mapping:
@@ -502,16 +501,14 @@ class MemoryImportRequest(BaseModel):
         • Original: "work/projects/alpha" 
         • With prefix "imported/": "imported/work/projects/alpha"
         
-        Use Cases: Isolate imported memories, avoid scope conflicts"""
+        Use Cases: Isolate imported memories, avoid scope conflicts""",
     )
-    validate_data: bool = Field(
-        default=True, 
-        description="Validate imported data structure and content"
-    )
+    validate_data: bool = Field(default=True, description="Validate imported data structure and content")
 
 
 class UnifiedSearchRequest(BaseModel):
     """Unified search request supporting both standard and diversified search modes"""
+
     query: str = Field(description="Search query")
     mode: str = Field(
         default="standard",
@@ -522,10 +519,10 @@ class UnifiedSearchRequest(BaseModel):
         • "diversified": Creative exploration with diversity filtering
         
         Strategy: Use 'standard' for targeted search, 'diversified' for brainstorming""",
-        examples=["standard", "diversified"]
+        examples=["standard", "diversified"],
     )
     scope: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="""Target scope for search (supports hierarchy):
         
         Examples:
@@ -535,12 +532,13 @@ class UnifiedSearchRequest(BaseModel):
         • None: Search across all scopes
         
         Strategy: Start broad, narrow down if too many results""",
-        examples=["learning/programming", "work/project", None]
+        examples=["learning/programming", "work/project", None],
     )
     include_child_scopes: bool = Field(default=False, description="Include child scopes in search")
     limit: int = Field(
-        default=10, 
-        ge=1, le=100, 
+        default=10,
+        ge=1,
+        le=100,
         description="""Maximum number of memories to retrieve:
         
         Values & Use Cases:
@@ -552,11 +550,12 @@ class UnifiedSearchRequest(BaseModel):
         Example: limit=15 for creative thinking sessions
         
         ⚠️ Performance: Higher values increase processing time""",
-        examples=[10, 15, 5]
+        examples=[10, 15, 5],
     )
     similarity_threshold: float = Field(
-        default=0.1, 
-        ge=0.0, le=1.0, 
+        default=0.1,
+        ge=0.0,
+        le=1.0,
         description="""Similarity threshold for memory matching:
         
         Values & Use Cases:
@@ -567,14 +566,15 @@ class UnifiedSearchRequest(BaseModel):
         
         Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
         Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
-        examples=[0.1, 0.2, 0.4]
+        examples=[0.1, 0.2, 0.4],
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
-    
+
     # Diversified search specific parameters (only used when mode="diversified")
     min_score: float = Field(
         default=0.1,
-        ge=0.0, le=1.0,
+        ge=0.0,
+        le=1.0,
         description="""Minimum similarity threshold for candidates (diversified mode only):
         
         Values & Use Cases:
@@ -584,11 +584,12 @@ class UnifiedSearchRequest(BaseModel):
         
         Strategy: Lower values for more creative, unexpected connections
         Example: min_score=0.1 for diverse brainstorming""",
-        examples=[0.1, 0.2, 0.4]
+        examples=[0.1, 0.2, 0.4],
     )
     diversity_threshold: float = Field(
         default=0.8,
-        ge=0.0, le=1.0,
+        ge=0.0,
+        le=1.0,
         description="""Similarity threshold for excluding similar items (diversified mode only):
         
         Values & Use Cases:
@@ -598,11 +599,12 @@ class UnifiedSearchRequest(BaseModel):
         
         Strategy: 0.8 provides good balance of relevance and diversity
         Example: diversity_threshold=0.8 for balanced diverse results""",
-        examples=[0.8, 0.7, 0.9]
+        examples=[0.8, 0.7, 0.9],
     )
     expansion_factor: float = Field(
         default=2.5,
-        ge=1.0, le=10.0,
+        ge=1.0,
+        le=10.0,
         description="""Initial expansion multiplier for candidate search (diversified mode only):
         
         Values & Use Cases:
@@ -612,11 +614,12 @@ class UnifiedSearchRequest(BaseModel):
         
         Strategy: 2.5 provides good balance for most use cases
         Example: expansion_factor=2.5 for standard diverse search""",
-        examples=[2.5, 3, 2]
+        examples=[2.5, 3, 2],
     )
     max_expansion_factor: float = Field(
         default=5,
-        ge=1.0, le=20.0,
+        ge=1.0,
+        le=20.0,
         description="""Maximum expansion when fallback is needed (diversified mode only):
         
         Values & Use Cases:
@@ -626,12 +629,13 @@ class UnifiedSearchRequest(BaseModel):
         
         Strategy: 5.0 provides good fallback without excessive processing
         Example: max_expansion_factor=5.0 for balanced fallback""",
-        examples=[5, 7, 3]
+        examples=[5, 7, 3],
     )
 
 
 class MemoryManageRequest(BaseModel):
     """Unified CRUD operations request model"""
+
     operation: str = Field(
         description="""CRUD operation to perform:
         
@@ -641,21 +645,15 @@ class MemoryManageRequest(BaseModel):
         • "delete": Remove memory permanently
         
         Strategy: Use 'get' for retrieval, 'update' for modifications, 'delete' for cleanup""",
-        examples=["get", "update", "delete"]
+        examples=["get", "update", "delete"],
     )
     memory_id: str = Field(description="Memory ID for the operation")
-    
+
     # Optional parameters for different operations
-    include_associations: bool = Field(
-        default=True, 
-        description="Include related memories (used for 'get' operation)"
-    )
-    
+    include_associations: bool = Field(default=True, description="Include related memories (used for 'get' operation)")
+
     # Update operation parameters (optional, only used when operation="update")
-    content: Optional[str] = Field(
-        default=None,
-        description="New content for the memory (update operation only)"
-    )
+    content: Optional[str] = Field(default=None, description="New content for the memory (update operation only)")
     scope: Optional[str] = Field(
         default=None,
         description="""New scope for the memory (update operation only):
@@ -667,28 +665,22 @@ class MemoryManageRequest(BaseModel):
         • session/[name]: Temporary session-specific content
         
         Strategy: Use scope_suggest for recommendations if unsure
-        Example: scope="work/projects/mcp-improvements" for project organization"""
+        Example: scope="work/projects/mcp-improvements" for project organization""",
     )
-    tags: Optional[List[str]] = Field(
-        default=None,
-        description="New tags for the memory (update operation only)"
-    )
-    category: Optional[str] = Field(
-        default=None,
-        description="New category for the memory (update operation only)"
-    )
+    tags: Optional[List[str]] = Field(default=None, description="New tags for the memory (update operation only)")
+    category: Optional[str] = Field(default=None, description="New category for the memory (update operation only)")
     metadata: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="New metadata for the memory (update operation only)"
+        default=None, description="New metadata for the memory (update operation only)"
     )
     preserve_associations: bool = Field(
         default=True,
-        description="Whether to preserve existing associations when updating content (update operation only)"
+        description="Whether to preserve existing associations when updating content (update operation only)",
     )
 
 
 class MemorySyncRequest(BaseModel):
     """Unified import/export operations request model"""
+
     operation: str = Field(
         description="""Sync operation to perform:
         
@@ -697,9 +689,9 @@ class MemorySyncRequest(BaseModel):
         • "import": Restore memories from file or direct data
         
         Strategy: Use 'export' for backup/sharing, 'import' for restore/merge""",
-        examples=["export", "import"]
+        examples=["export", "import"],
     )
-    
+
     # Common parameters
     scope: Optional[str] = Field(
         default=None,
@@ -716,7 +708,7 @@ class MemorySyncRequest(BaseModel):
         • "imported/": Prefix all imported scopes
         • "backup/2025-07-10/": Add dated prefix
         
-        Example: scope="work/projects/mcp-improvements" for project-specific sync"""
+        Example: scope="work/projects/mcp-improvements" for project-specific sync""",
     )
     file_path: Optional[str] = Field(
         default=None,
@@ -730,23 +722,16 @@ class MemorySyncRequest(BaseModel):
         Examples:
         • file_path=None: Direct data exchange mode
         • file_path="backup/memories-2025-07-11.json": Server-side file
-        • file_path="/shared/project-memories.json": Absolute path mode"""
+        • file_path="/shared/project-memories.json": Absolute path mode""",
     )
-    
+
     # Export-specific parameters
     include_associations: bool = Field(
-        default=True,
-        description="Include association relationships in export (export operation only)"
+        default=True, description="Include association relationships in export (export operation only)"
     )
-    compression: bool = Field(
-        default=False,
-        description="Compress export data with gzip (export operation only)"
-    )
-    export_format: str = Field(
-        default="json",
-        description="Export format: json or yaml (export operation only)"
-    )
-    
+    compression: bool = Field(default=False, description="Compress export data with gzip (export operation only)")
+    export_format: str = Field(default="json", description="Export format: json or yaml (export operation only)")
+
     # Import-specific parameters
     import_data: Optional[str] = Field(
         default=None,
@@ -761,7 +746,7 @@ class MemorySyncRequest(BaseModel):
         Usage Pattern:
         1. Export from source environment with file_path=None
         2. Copy export response data
-        3. Import to target environment with import_data=<copied_data>"""
+        3. Import to target environment with import_data=<copied_data>""",
     )
     merge_strategy: str = Field(
         default="skip_duplicates",
@@ -776,9 +761,8 @@ class MemorySyncRequest(BaseModel):
         Use Cases:
         • skip_duplicates: Safe import without conflicts
         • overwrite: Force update from authoritative source
-        • create_versions: Preserve both local and imported versions"""
+        • create_versions: Preserve both local and imported versions""",
     )
     validate_data: bool = Field(
-        default=True,
-        description="Validate imported data structure and content (import operation only)"
+        default=True, description="Validate imported data structure and content (import operation only)"
     )

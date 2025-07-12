@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class Memory:
     """Memory record with scope-based organization"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     scope: str = "user/default"  # Hierarchical scope (replaces domain)
     content: str = ""
@@ -71,7 +72,7 @@ class Memory:
             access_count=data.get("access_count", 0),
         )
 
-    def update_access(self):
+    def update_access(self) -> None:
         """アクセス情報を更新"""
         self.accessed_at = datetime.utcnow()
         self.access_count += 1
@@ -80,6 +81,7 @@ class Memory:
 @dataclass
 class MemorySearchResult:
     """Memory search result"""
+
     memory: Memory
     similarity_score: float
     match_type: str  # "semantic", "keyword", "tag"
@@ -89,6 +91,7 @@ class MemorySearchResult:
 @dataclass
 class MemoryStats:
     """Memory statistics"""
+
     total_count: int = 0
     scope_counts: Dict[str, int] = field(default_factory=dict)  # Changed from domain_counts
     tag_counts: Dict[str, int] = field(default_factory=dict)

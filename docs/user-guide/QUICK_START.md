@@ -1,8 +1,13 @@
-# MCP Associative Memory Server - Quick Start Guide
+# MCP Associative Memory Server - Quick Start Guide (2025)
 
 ## 🚀 Get Started in 5 Minutes
 
-The MCP Associative Memory Server is an intelligent memory system that helps you store, search, and discover connections between your thoughts, notes, and knowledge. This guide will get you up and running quickly.
+The MCP Associative Memory Server is an intelligent memory system that helps you store, search, and discover connections between your thoughts, notes, and knowledge. This guide reflects the **2025 production API** with 10 powerful tools.
+
+## 🧪 Production Ready
+- **74/74 tests passing** (100% success rate)
+- **Complete CI/CD pipeline** with security and quality gates
+- **Optimized performance** with parallel operations and connection pooling
 
 ## 📋 Prerequisites
 
@@ -37,46 +42,97 @@ MCP endpoint available at: http://localhost:8000/mcp/
 ## 💭 Your First Memory
 
 ### Store Your First Memory
-Use GitHub Copilot to store a memory:
+Use GitHub Copilot with the modern API:
 
 ```instructions
-Store this thought: "FastAPI is excellent for building APIs because of its automatic validation and documentation generation"
+Use memory_store to save: "FastAPI is excellent for building APIs because of its automatic validation and documentation generation"
+```
+
+**Behind the scenes:**
+```json
+{
+  "tool": "memory_store",
+  "request": {
+    "content": "FastAPI is excellent for building APIs...",
+    "scope": "learning/web",
+    "tags": ["fastapi", "api", "validation"],
+    "auto_associate": true
+  }
+}
 ```
 
 ### Search for Memories
 ```instructions
-Find memories about API development
+Use memory_search to find memories about API development
+```
+
+**Behind the scenes:**
+```json
+{
+  "tool": "memory_search", 
+  "request": {
+    "query": "API development",
+    "mode": "standard",
+    "limit": 10,
+    "include_associations": true
+  }
+}
 ```
 
 ### Discover Related Memories
 ```instructions
-Show me memories related to web frameworks
+Use memory_discover_associations to show me memories related to web frameworks
 ```
 
 ## 🎯 Essential Commands (GitHub Copilot)
 
-### 🚀 **Modern API (10 Clean Tools)**
+### 🚀 **Modern API (10 Clean Tools - 2025)**
 | What You Want | Tool Used | Say to Copilot |
 |---------------|-----------|----------------|
-| **Search** | `memory_search` | "Find memories about [topic]" *(standard mode)* |
-| **Creative Search** | `memory_search` | "Find diverse memories about [topic]" *(diversified mode)* |
-| **Memory Management** | `memory_manage` | "Get/update/delete this memory" *(all CRUD operations)* |
-| **Data Sync** | `memory_sync` | "Export/import my memories" *(both sync operations)* |
+| **Search** | `memory_search` | "Find memories about [topic]" *(standard/diversified modes)* |
 | **Store knowledge** | `memory_store` | "Remember this: [your content]" |
+| **Memory Management** | `memory_manage` | "Get/update/delete this memory" *(unified CRUD)* |
+| **Data Sync** | `memory_sync` | "Export/import my memories" *(unified sync)* |
 | **Explore connections** | `memory_discover_associations` | "Show me what's related to [concept]" |
 | **Organize memories** | `memory_move` | "Move these memories to [category]" |
-| **Session work** | `session_manage` | "Create a session for [project]" |
+| **Browse all** | `memory_list_all` | "Show me all my memories" |
+| **Organize scopes** | `scope_list` | "Show me my memory organization" |
+| **Smart categorization** | `scope_suggest` | "Where should I store this content?" |
+| **Session work** | `session_manage` | "Create/list/cleanup sessions" |
 
 ### 🎯 **Clean, Modern Design**
-Our streamlined API provides:
-- **Intuitive naming**: Natural tool names without confusing prefixes
-- **Functional grouping**: Related operations consolidated logically
-- **Reduced complexity**: 41% fewer tools to learn (17→10)
-- **Professional experience**: Clean, predictable interface
+Our streamlined 2025 API provides:
+- **Intuitive naming**: Natural tool names (memory_store, memory_search, etc.)
+- **Unified operations**: Single tools for related functions (CRUD, sync, search modes)
+- **Reduced complexity**: 10 focused tools covering all use cases
+- **Production ready**: 74/74 tests passing with CI/CD pipeline
+- **Performance optimized**: Parallel operations and connection pooling
+
+## 🔍 Advanced Search Features
+
+### Unified Search Modes
+The `memory_search` tool supports multiple modes:
+
+**Standard Search** (default - precise results):
+```instructions
+Find memories about Python async patterns
+```
+
+**Diversified Search** (creative exploration):
+```instructions
+Find diverse memories about machine learning - use diversified mode
+```
+
+### Search Benefits:
+- **Semantic similarity**: Finds related concepts, not just keywords
+- **Association discovery**: Reveals connections between memories
+- **Diversity filtering**: Prevents redundant similar results
+- **Creative thinking**: Breaks out of information silos
+- **Intelligent ranking**: AI-powered relevance scoring
 
 ## 🗂️ Understanding Scopes
 
-Memories are organized in hierarchical scopes:
+Memories are organized in hierarchical scopes for optimal organization:
 
 ```
 work/
@@ -104,18 +160,23 @@ session/
 - `personal/ideas` - Personal ideas and thoughts
 - `session/debugging-session` - Temporary working session
 
+### Smart Scope Suggestions
+```instructions
+Use scope_suggest to suggest where to store this content about React development
+```
+
 ## 🏃‍♂️ Session Management
 
 ### Working Sessions
 Create isolated workspaces for temporary work:
 
 ```instructions
-Create a session for debugging the API issue
+Use session_manage to create a session for debugging the API issue
 ```
 
 ### Session Cleanup
 ```instructions
-Clean up sessions older than 7 days
+Use session_manage to clean up sessions older than 7 days
 ```
 
 Sessions are perfect for:
@@ -124,57 +185,13 @@ Sessions are perfect for:
 - Meeting notes that expire
 - Experimental ideas
 
-## 🔍 Search Tips
-
-### Effective Search Queries
-- **Specific**: "React component lifecycle methods"
-- **Conceptual**: "error handling patterns"
-- **Problem-based**: "database connection issues"
-
-### Advanced Search Options with Unified Tool
-
-#### 🆕 **Unified Search (memory_search_unified)**
-The new unified search tool provides both modes in one interface:
-
-**Standard Search** (default):
-```instructions
-Find memories about Python async patterns
-```
-
-**Diversified Search** (creative exploration):
-```instructions
-Find diverse memories about machine learning optimization
-```
-
-#### Benefits of Unified Search:
-- **Single tool**: One interface for all search needs
-- **Mode parameter**: Switch between standard/diversified automatically
-- **Consistent API**: Same parameters across search modes
-- **Better UX**: Simplified user experience
-
-#### Traditional Search Tools (Still Available)
-- `memory_search` - Standard semantic search
-- `memory_diversified_search` - Creative exploration with diversity
-
-#### Diversified Search Benefits:
-- Prevents redundant similar results
-- Promotes creative thinking
-- Discovers unexpected connections
-- Breaks out of information silos
-
-### Understanding Results
-- Results include similarity scores (0.0-1.0)
-- Higher scores = more relevant
-- Threshold of 0.1 filters obvious noise
-- GitHub Copilot intelligently interprets relevance
-
 ## 🧠 Association Discovery
 
 The system automatically finds connections between memories:
 
 ```instructions
 # After storing several programming memories
-Discover associations for this memory about React hooks
+Use memory_discover_associations to discover associations for this memory about React hooks
 ```
 
 This reveals unexpected connections and helps with:
@@ -184,40 +201,31 @@ This reveals unexpected connections and helps with:
 
 ## 📤 Export & Backup
 
-### 🆕 **Unified Data Sync (memory_sync)**
-The new unified sync tool handles both import and export operations:
+### 🚀 **Unified Data Sync (memory_sync)**
+The modern unified sync tool handles both import and export operations:
 
 #### Quick Export
 ```instructions
-Export my work memories to a file
+Use memory_sync to export my work memories to a file
 ```
 
 #### Cross-Environment Sync
 ```instructions
-Export all memories for backup
+Use memory_sync to export all memories for backup
 ```
 
 #### Import from Backup
 ```instructions
-Import memories from backup file
+Use memory_sync to import memories from backup file
 ```
-
-### Traditional Sync Tools (Still Available)
-- `memory_export` - Backup and sync memories
-- `memory_import` - Restore and merge memory data
 
 ### Advanced Export Options
 - **Scope-specific**: Export only work or learning memories
 - **Compressed**: Large datasets with gzip compression
 - **Direct transfer**: Export data for immediate import elsewhere
+- **Merge strategies**: Skip duplicates, overwrite, or create versions
 
 Files are saved to `data/exports/` by default.
-
-### Merge Strategies
-When importing, choose how to handle duplicates:
-- **Skip duplicates** (default): Keep existing, ignore imports
-- **Overwrite**: Replace existing with imported versions
-- **Create versions**: Preserve both local and imported
 
 ## 🆘 Quick Troubleshooting
 

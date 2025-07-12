@@ -5,6 +5,12 @@
         },
         "AssocMemory": {
             "url": "http://localhost:8000/mcp/"
+        },
+        "ShellServer": {
+            "command": "npm",
+            "args": ["start"],
+            "cwd": "${workspaceFolder}/../mcp-shell-server"
         }
+
     }
 }

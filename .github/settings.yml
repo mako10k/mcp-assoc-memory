@@ -1,0 +1,128 @@
+# Repository settings for automated CI/CD
+repository:
+  name: mcp-assoc-memory
+  description: "Model Context Protocol (MCP) Associative Memory Server with semantic search and memory associations"
+  homepage: https://github.com/mako10k/mcp-assoc-memory
+  topics:
+    - mcp
+    - memory
+    - semantic-search
+    - associations
+    - python
+    - ai
+    - llm
+  private: false
+  has_issues: true
+  has_projects: true
+  has_wiki: true
+  has_downloads: true
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: true
+  allow_auto_merge: true
+  delete_branch_on_merge: true
+  
+  # Branch protection settings
+  security_and_analysis:
+    secret_scanning:
+      status: enabled
+    secret_scanning_push_protection:
+      status: enabled
+    dependabot_security_updates:
+      status: enabled
+
+# Branch protection rules
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "test (3.11)"
+          - "test (3.12)"
+          - "security"
+          - "build"
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        restrict_pushes: true
+      restrictions: null
+      allow_force_pushes: false
+      allow_deletions: false
+      
+  - name: develop
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "lint-and-format"
+          - "type-check"
+          - "test-coverage"
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: false
+      restrictions: null
+      allow_force_pushes: false
+      allow_deletions: false
+
+# Labels for issue and PR management
+labels:
+  # Type labels
+  - name: bug
+    color: d73a4a
+    description: Something isn't working
+  - name: enhancement
+    color: a2eeef
+    description: New feature or request
+  - name: documentation
+    color: 0075ca
+    description: Improvements or additions to documentation
+  - name: maintenance
+    color: fbca04
+    description: Maintenance and technical debt
+    
+  # Priority labels
+  - name: priority/critical
+    color: b60205
+    description: Critical priority
+  - name: priority/high
+    color: d93f0b
+    description: High priority
+  - name: priority/medium
+    color: fbca04
+    description: Medium priority
+  - name: priority/low
+    color: 0e8a16
+    description: Low priority
+    
+  # Status labels
+  - name: status/in-progress
+    color: yellow
+    description: Currently being worked on
+  - name: status/blocked
+    color: red
+    description: Blocked by dependencies
+  - name: status/ready-for-review
+    color: green
+    description: Ready for code review
+    
+  # Component labels  
+  - name: component/core
+    color: 1d76db
+    description: Core memory manager functionality
+  - name: component/api
+    color: 1d76db
+    description: API and tools
+  - name: component/storage
+    color: 1d76db
+    description: Storage backends
+  - name: component/testing
+    color: 1d76db
+    description: Testing infrastructure
+  - name: component/ci-cd
+    color: 1d76db
+    description: CI/CD and automation

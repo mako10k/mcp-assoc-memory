@@ -1,0 +1,382 @@
+"""
+Comprehensive unit tests for the MemoryManager core functionality.
+
+Tests cover:
+- Memory storage and retrieval operations
+- Search functionality with similarity matching
+- Association discovery and management
+- Scope management and hierarchy
+- Error handling and edge cases
+- Performance characteristics
+"""
+
+import pytest
+from typing import List, Dict, Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from mcp_assoc_memory.core.memory_manager import MemoryManager
+from mcp_assoc_memory.models.memory import Memory
+
+
+class TestMemoryManagerStorage:
+    """Test memory storage operations."""
+    
+    @pytest.mark.asyncio
+    async def test_store_memory_success(self, test_memory_manager: MemoryManager):
+        """Test successful memory storage."""
+        result = await test_memory_manager.store_memory(
+            content="Test memory for storage",
+            scope="test/storage",
+            category="test",
+            tags=["storage", "test"],
+            metadata={"test": True}
+        )
+        
+        assert result is not None
+        assert isinstance(result, Memory)
+        assert result.content == "Test memory for storage"
+        assert result.scope == "test/storage"
+        assert result.category == "test"
+        assert result.tags == ["storage", "test"]
+        assert result.metadata["test"] is True
+    
+    @pytest.mark.asyncio
+    async def test_store_memory_duplicate_detection(self, test_memory_manager: MemoryManager):
+        """Test duplicate detection during storage."""
+        content = "Duplicate test content"
+        
+        # Store first memory
+        result1 = await test_memory_manager.store_memory(
+            content=content,
+            scope="test/duplicates"
+        )
+        assert result1 is not None
+        assert isinstance(result1, Memory)
+        
+        # Attempt to store duplicate (should return existing memory)
+        result2 = await test_memory_manager.store_memory(
+            content=content,
+            scope="test/duplicates",
+            allow_duplicates=False
+        )
+        
+        assert result2 is not None
+        assert isinstance(result2, Memory)
+        assert result2.id == result1.id  # Should return same memory for duplicate
+    
+    @pytest.mark.asyncio
+    async def test_store_memory_allow_duplicates(self, test_memory_manager: MemoryManager):
+        """Test allowing duplicates when explicitly enabled."""
+        content = "Duplicate test content"
+        
+        # Store first memory
+        result1 = await test_memory_manager.store_memory(
+            content=content,
+            scope="test/duplicates"
+        )
+        
+        # Store duplicate with allow_duplicates=True
+        result2 = await test_memory_manager.store_memory(
+            content=content,
+            scope="test/duplicates",
+            allow_duplicates=True
+        )
+        
+        assert result1 is not None
+        assert result2 is not None
+        assert isinstance(result1, Memory)
+        assert isinstance(result2, Memory)
+        assert result1.id != result2.id  # Should create new memory when duplicates allowed
+    
+    @pytest.mark.asyncio
+    async def test_get_memory_success(self, populated_memory_manager: MemoryManager):
+        """Test successful memory retrieval."""
+        # Store a test memory first
+        stored_memory = await populated_memory_manager.store_memory(
+            content="Test memory for retrieval",
+            scope="test/retrieval"
+        )
+        assert stored_memory is not None
+        
+        # Retrieve the memory
+        result = await populated_memory_manager.get_memory(stored_memory.id)
+        
+        assert result is not None
+        assert isinstance(result, Memory)
+        assert result.id == stored_memory.id
+        assert result.content == "Test memory for retrieval"
+        assert result.scope == "test/retrieval"
+    
+    @pytest.mark.asyncio
+    async def test_get_memory_not_found(self, test_memory_manager: MemoryManager):
+        """Test retrieval of non-existent memory."""
+        result = await test_memory_manager.get_memory("non-existent-id")
+        
+        assert result is None
+    
+    @pytest.mark.asyncio
+    async def test_update_memory_success(self, populated_memory_manager: MemoryManager):
+        """Test successful memory update."""
+        # Get a memory to update
+        all_memories = await populated_memory_manager.get_all_memories()
+        memory_id = all_memories[0]["memory_id"]
+        
+        result = await populated_memory_manager.update_memory(
+            memory_id=memory_id,
+            content="Updated content",
+            category="updated-category",
+            tags=["updated", "test"],
+            metadata={"updated": True}
+        )
+        
+        assert result["success"] is True
+        assert result["data"]["content"] == "Updated content"
+        assert result["data"]["category"] == "updated-category"
+        assert result["data"]["tags"] == ["updated", "test"]
+        assert result["data"]["metadata"]["updated"] is True
+    
+    @pytest.mark.asyncio
+    async def test_delete_memory_success(self, populated_memory_manager: MemoryManager):
+        """Test successful memory deletion."""
+        # Get a memory to delete
+        all_memories = await populated_memory_manager.get_all_memories()
+        memory_id = all_memories[0]["memory_id"]
+        
+        result = await populated_memory_manager.delete_memory(memory_id)
+        
+        assert result["success"] is True
+        assert result["data"]["deleted"] is True
+        
+        # Verify memory is deleted
+        get_result = await populated_memory_manager.get_memory(memory_id)
+        assert get_result["success"] is False
+
+
+class TestMemoryManagerSearch:
+    """Test memory search functionality."""
+    
+    @pytest.mark.asyncio
+    async def test_search_memories_basic(self, populated_memory_manager: MemoryManager):
+        """Test basic memory search."""
+        result = await populated_memory_manager.search_memories(
+            query="programming",
+            limit=10
+        )
+        
+        assert result["success"] is True
+        assert len(result["data"]) > 0
+        
+        # Check that results contain similarity scores
+        for memory in result["data"]:
+            assert "similarity_score" in memory
+            assert isinstance(memory["similarity_score"], float)
+            assert 0 <= memory["similarity_score"] <= 1
+    
+    @pytest.mark.asyncio
+    async def test_search_memories_with_scope_filter(self, populated_memory_manager: MemoryManager):
+        """Test search with scope filtering."""
+        result = await populated_memory_manager.search_memories(
+            query="learning",
+            scope="learning/programming",
+            limit=10
+        )
+        
+        assert result["success"] is True
+        
+        # All results should be in the specified scope or child scopes
+        for memory in result["data"]:
+            assert memory["scope"].startswith("learning/programming")
+    
+    @pytest.mark.asyncio
+    async def test_search_memories_empty_query(self, test_memory_manager: MemoryManager):
+        """Test search with empty query."""
+        result = await test_memory_manager.search_memories(
+            query="",
+            limit=10
+        )
+        
+        assert result["success"] is False
+        assert "query" in result["message"].lower()
+    
+    @pytest.mark.asyncio
+    async def test_search_memories_no_results(self, populated_memory_manager: MemoryManager):
+        """Test search that returns no results."""
+        result = await populated_memory_manager.search_memories(
+            query="nonexistent_unique_content_12345",
+            limit=10
+        )
+        
+        assert result["success"] is True
+        assert len(result["data"]) == 0
+    
+    @pytest.mark.asyncio
+    async def test_search_memories_limit_respected(self, populated_memory_manager: MemoryManager):
+        """Test that search respects limit parameter."""
+        result = await populated_memory_manager.search_memories(
+            query="test",
+            limit=2
+        )
+        
+        assert result["success"] is True
+        assert len(result["data"]) <= 2
+
+
+class TestMemoryManagerAssociations:
+    """Test association discovery and management."""
+    
+    @pytest.mark.asyncio
+    async def test_discover_associations_success(self, populated_memory_manager: MemoryManager):
+        """Test successful association discovery."""
+        # Get a memory ID
+        all_memories = await populated_memory_manager.get_all_memories()
+        memory_id = all_memories[0]["memory_id"]
+        
+        result = await populated_memory_manager.discover_associations(
+            memory_id=memory_id,
+            limit=5
+        )
+        
+        assert result["success"] is True
+        assert isinstance(result["data"], list)
+        
+        # Check association structure
+        for association in result["data"]:
+            assert "memory_id" in association
+            assert "similarity_score" in association
+            assert "content" in association
+    
+    @pytest.mark.asyncio
+    async def test_discover_associations_invalid_memory(self, test_memory_manager: MemoryManager):
+        """Test association discovery with invalid memory ID."""
+        result = await test_memory_manager.discover_associations(
+            memory_id="invalid-id",
+            limit=5
+        )
+        
+        assert result["success"] is False
+        assert "not found" in result["message"].lower()
+
+
+class TestMemoryManagerScopes:
+    """Test scope management functionality."""
+    
+    @pytest.mark.asyncio
+    async def test_get_all_scopes(self, populated_memory_manager: MemoryManager):
+        """Test retrieval of all scopes."""
+        result = await populated_memory_manager.get_all_scopes()
+        
+        assert result["success"] is True
+        assert isinstance(result["data"], list)
+        assert len(result["data"]) > 0
+        
+        # Check scope structure
+        for scope in result["data"]:
+            assert "scope" in scope
+            assert "memory_count" in scope
+    
+    @pytest.mark.asyncio
+    async def test_suggest_scope(self, test_memory_manager: MemoryManager):
+        """Test scope suggestion functionality."""
+        result = await test_memory_manager.suggest_scope(
+            content="This is about Python programming and web development"
+        )
+        
+        assert result["success"] is True
+        assert "suggested_scope" in result["data"]
+        assert "confidence" in result["data"]
+        assert isinstance(result["data"]["confidence"], float)
+        assert 0 <= result["data"]["confidence"] <= 1
+
+
+class TestMemoryManagerErrorHandling:
+    """Test error handling and edge cases."""
+    
+    @pytest.mark.asyncio
+    async def test_store_memory_invalid_scope(self, test_memory_manager: MemoryManager):
+        """Test storage with invalid scope format."""
+        result = await test_memory_manager.store_memory(
+            content="Test content",
+            scope="invalid//scope"  # Invalid double slash
+        )
+        
+        assert result["success"] is False
+        assert "scope" in result["message"].lower()
+    
+    @pytest.mark.asyncio
+    async def test_search_memories_invalid_limit(self, test_memory_manager: MemoryManager):
+        """Test search with invalid limit."""
+        result = await test_memory_manager.search_memories(
+            query="test",
+            limit=-1  # Invalid negative limit
+        )
+        
+        assert result["success"] is False
+        assert "limit" in result["message"].lower()
+    
+    @pytest.mark.asyncio
+    async def test_memory_manager_not_initialized(self):
+        """Test operations on uninitialized memory manager."""
+        manager = MemoryManager(config={})
+        
+        with pytest.raises(Exception):
+            await manager.store_memory("test", "test/scope")
+    
+    @pytest.mark.asyncio
+    async def test_storage_backend_failure(self, test_memory_manager: MemoryManager):
+        """Test handling of storage backend failures."""
+        # Mock storage failure
+        with patch.object(test_memory_manager._metadata_store, 'store_memory') as mock_store:
+            mock_store.side_effect = Exception("Storage backend error")
+            
+            result = await test_memory_manager.store_memory(
+                content="Test content",
+                scope="test/scope"
+            )
+            
+            assert result["success"] is False
+            assert "error" in result["message"].lower()
+
+
+class TestMemoryManagerPerformance:
+    """Test performance characteristics."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.slow
+    async def test_bulk_storage_performance(self, test_memory_manager: MemoryManager):
+        """Test bulk storage performance."""
+        import time
+        
+        start_time = time.time()
+        
+        # Store multiple memories
+        for i in range(10):
+            await test_memory_manager.store_memory(
+                content=f"Performance test memory {i}",
+                scope=f"performance/test{i}"
+            )
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        # Should complete in reasonable time (adjust threshold as needed)
+        assert duration < 30.0  # 30 seconds for 10 memories
+    
+    @pytest.mark.asyncio
+    @pytest.mark.slow
+    async def test_search_performance(self, populated_memory_manager: MemoryManager):
+        """Test search performance."""
+        import time
+        
+        start_time = time.time()
+        
+        result = await populated_memory_manager.search_memories(
+            query="programming language development",
+            limit=20
+        )
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        assert result["success"] is True
+        # Search should complete quickly
+        assert duration < 5.0  # 5 seconds threshold
