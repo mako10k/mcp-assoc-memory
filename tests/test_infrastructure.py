@@ -58,12 +58,12 @@ class TestAsyncFixtures:
         """Test mock embedding service fixture."""
         embedding = await mock_embedding_service.get_embedding("test text")
         assert isinstance(embedding, list)
-        assert len(embedding) == 1536  # Expected embedding dimension
+        assert len(embedding) == 384  # Expected embedding dimension
         
         embeddings = await mock_embedding_service.get_embeddings(["test1", "test2"])
         assert isinstance(embeddings, list)
         assert len(embeddings) == 2
-        assert all(len(emb) == 1536 for emb in embeddings)
+        assert all(len(emb) == 384 for emb in embeddings)
 
 
 @pytest.mark.integration

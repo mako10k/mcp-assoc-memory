@@ -21,6 +21,12 @@
 
 <!-- ユーザーはここに新しいバックログ項目を追加してください -->
 <!-- Copilot will process and remove items from this section -->
+## [High] 検索結果が0件のときの応答の改善
+**Type**: enhancement
+**Sprint**: 2
+**Description**: 検索結果が0件のときの応答で、他のスコープであれば検索結果がありそうな場合はそのスコープ候補を5件くらい返信に含める
+**Context**: 例えば、workスコープで検索して0件だった場合、learningスコープであれば結果があるかもしれないことを返信に含める
+
 
 <!-- All items from this section have been processed and moved to associative memory -->
 <!-- Next sprint items are stored in work/backlog/{priority} scopes -->

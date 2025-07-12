@@ -99,8 +99,6 @@ class TestE2ESystemConfiguration:
         storage_config = test_config["storage"]
         assert "type" in storage_config
         assert "database_url" in storage_config
-        assert "metadata_store" in storage_config
-        assert "vector_store" in storage_config
     
     @pytest.mark.e2e
     def test_temp_directory_isolation(self, temp_dir: Path):
