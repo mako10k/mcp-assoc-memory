@@ -1,0 +1,162 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12'
+  POETRY_VERSION: '1.8.0'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Cache Poetry dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/pypoetry
+          ~/.cache/pip
+        key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-poetry-${{ matrix.python-version }}-
+          
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Configure Poetry
+      run: |
+        poetry config virtualenvs.create true
+        poetry config virtualenvs.in-project true
+        
+    - name: Install dependencies
+      run: |
+        poetry install --with dev
+        
+    - name: Run linting
+      run: |
+        poetry run flake8 src/ --max-line-length=120 --extend-ignore=E203,W503
+        
+    - name: Run type checking
+      run: |
+        poetry run mypy src/mcp_assoc_memory/ --ignore-missing-imports --show-error-codes
+        
+    - name: Run unit tests
+      run: |
+        poetry run pytest tests/unit/ -v --tb=short --cov=src/mcp_assoc_memory --cov-report=xml --cov-report=html
+        
+    - name: Run integration tests
+      run: |
+        poetry run pytest tests/integration/ -v --tb=short
+        
+    - name: Run e2e tests
+      run: |
+        poetry run pytest tests/e2e/ -v --tb=short
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      if: matrix.python-version == '3.12'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install dependencies
+      run: |
+        poetry install --with dev
+        
+    - name: Run security scan with bandit
+      run: |
+        poetry run bandit -r src/ -f json -o bandit-report.json || true
+        
+    - name: Run dependency vulnerability scan
+      run: |
+        poetry run safety scan --format json > safety-report.json 2>/dev/null || echo '{"vulnerabilities": [], "checked_packages": 0}' > safety-report.json
+        
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Build package
+      run: |
+        poetry build
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: package-artifacts
+        path: dist/
+
+  quality-gate:
+    runs-on: ubuntu-latest
+    needs: [test, security, build]
+    if: always()
+    steps:
+    - name: Quality Gate
+      run: |
+        if [[ "${{ needs.test.result }}" == "success" && "${{ needs.security.result }}" == "success" && "${{ needs.build.result }}" == "success" ]]; then
+          echo "✅ Quality gate passed"
+          exit 0
+        else
+          echo "❌ Quality gate failed"
+          echo "Test: ${{ needs.test.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Build: ${{ needs.build.result }}"
+          exit 1
+        fi

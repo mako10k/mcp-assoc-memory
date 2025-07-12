@@ -58,6 +58,10 @@ dev = [
     "pre-commit>=3.3.0",
     "httpx>=0.24.0",
     "websockets>=11.0.0",
+    "bandit>=1.7.0",
+    "safety>=2.3.0",
+    "radon>=6.0.0",
+    "codecov>=2.1.0",
 ]
 
 test = [
