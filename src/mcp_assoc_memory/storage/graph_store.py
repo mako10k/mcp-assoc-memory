@@ -112,7 +112,8 @@ class NetworkXGraphStore(BaseGraphStore):
                     # 型安全: set/generator/iterableのみリスト化、そうでなければ空リスト
                     if hasattr(comms, "__iter__") and not isinstance(comms, (str, bytes, int, float, complex, bool)):
                         try:
-                            communities = [list(c) for c in comms]  # type: ignore
+                            # NetworkX community detection returns generator of node sets
+                            communities = [list(c) for c in comms]  # type: ignore[arg-type]
                         except Exception:
                             communities = []
                     else:
@@ -235,7 +236,7 @@ class NetworkXGraphStore(BaseGraphStore):
             # グラフの連結性チェック
             if self.graph.number_of_nodes() > 0:
                 # 最大弱連結成分のサイズ
-                largest_component = max(
+                largest_component: set[str] = max(
                     nx.weakly_connected_components(self.graph),
                     key=len,
                     default=set()
@@ -331,7 +332,7 @@ class NetworkXGraphStore(BaseGraphStore):
             )
             return False
 
-    async def add_association_edge(self, association: Association) -> bool:
+    async def add_association_edge(self, association: Association) -> None:
         """関連性エッジを追加"""
         try:
             async with self.graph_lock:
@@ -363,8 +364,6 @@ class NetworkXGraphStore(BaseGraphStore):
                 }
             )
 
-            return True
-
         except Exception as e:
             logger.error(
                 "Failed to add association edge",
@@ -372,7 +371,6 @@ class NetworkXGraphStore(BaseGraphStore):
                 association_id=association.id,
                 error=str(e)
             )
-            return False
 
     async def remove_association_edge(self, association_id: str) -> bool:
         """関連性エッジを削除"""
@@ -413,25 +411,29 @@ class NetworkXGraphStore(BaseGraphStore):
     async def get_neighbors(
         self,
         memory_id: str,
-        max_depth: int = 2,
-        max_neighbors: int = 20
+        depth: int = 1,
+        min_strength: float = 0.0
     ) -> List[Dict[str, Any]]:
         """近隣記憶を取得"""
         try:
             if memory_id not in self.graph:
                 return []
 
-            neighbors = []
+            neighbors: List[Dict[str, Any]] = []
             visited = set()
+            
+            # Default max neighbors and max depth for compatibility
+            max_neighbors = 20
+            max_depth = min(depth + 1, 3)  # Convert depth to max_depth
 
             # BFS で近隣ノードを探索
             queue = [(memory_id, 0)]
             visited.add(memory_id)
 
             while queue and len(neighbors) < max_neighbors:
-                current_id, depth = queue.pop(0)
+                current_id, current_depth = queue.pop(0)
 
-                if depth >= max_depth:
+                if current_depth >= max_depth:
                     continue
 
                 # 隣接ノードを取得
@@ -449,21 +451,28 @@ class NetworkXGraphStore(BaseGraphStore):
                             edge_data.values(),
                             key=lambda x: x.get('strength', 0)
                         )
+                        
+                        edge_strength = best_edge.get('strength', 0)
+                        
+                        # min_strength でフィルタリング
+                        if edge_strength < min_strength:
+                            continue
 
                         # ノード情報を取得
                         node_data = self.graph.nodes[neighbor_id]
 
                         neighbor_info = {
                             "memory_id": neighbor_id,
-                            "depth": depth + 1,
-                            "association_strength": best_edge.get(
-                                'strength',
-                                0),
+                            "depth": current_depth + 1,
+                            "association_strength": edge_strength,
                             "association_type": best_edge.get('association_type'),
                             "node_data": node_data}
 
                         neighbors.append(neighbor_info)
-                        queue.append((neighbor_id, depth + 1))
+                        
+                        # 深度制限内であれば次のレベルを探索
+                        if current_depth + 1 < max_depth:
+                            queue.append((neighbor_id, current_depth + 1))
 
             # 関連強度でソート
             neighbors.sort(
@@ -571,7 +580,7 @@ class NetworkXGraphStore(BaseGraphStore):
                     stats["largest_component_size"] = 0
 
                 # 関連タイプ別統計
-                type_stats = {}
+                type_stats: Dict[str, int] = {}
                 for u, v, data in self.graph.edges(data=True):
                     assoc_type = data.get('association_type', 'unknown')
                     type_stats[assoc_type] = type_stats.get(assoc_type, 0) + 1
@@ -594,7 +603,8 @@ class NetworkXGraphStore(BaseGraphStore):
             async with self.graph_lock:
                 orphaned_nodes = []
                 for node in self.graph.nodes():
-                    deg = self.graph.degree(node)  # type: ignore
+                    # NetworkX degree() method returns int but mypy incorrectly sees it as property
+                    deg = self.graph.degree(node)  # type: ignore[operator]
                     if deg == 0:
                         orphaned_nodes.append(node)
 

@@ -174,12 +174,7 @@ class AssociationEngine:
                 return self._calculate_causal_strength(
                     memory1, embedding1, memory2, embedding2
                 )
-
-            else:
-                logger.warning(
-                    f"Unknown association type: {association_type}"
-                )
-                return 0.0
+            # All enum values are covered above - this should never be reached
 
         except Exception as e:
             logger.error(
@@ -432,13 +427,13 @@ class AssociationEngine:
             }
 
         # タイプ別統計
-        by_type = {}
+        by_type: Dict[str, int] = {}
         for assoc in associations:
             assoc_type = assoc.association_type
             by_type[assoc_type] = by_type.get(assoc_type, 0) + 1
 
         # 強度レベル別統計
-        by_strength_level = {}
+        by_strength_level: Dict[str, int] = {}
         for assoc in associations:
             level = self.get_association_strength_level(assoc.strength)
             level_name = level.name.lower()

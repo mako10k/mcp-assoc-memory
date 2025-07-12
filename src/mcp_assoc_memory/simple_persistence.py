@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class SimplePersistence:
                     memory_data['created_at'] = datetime.fromisoformat(memory_data['created_at'])
                     
             logger.info(f"Loaded {len(data)} memories from {self.storage_file}")
-            return data
+            return dict(data)  # Ensure proper type casting
             
         except Exception as e:
             logger.error(f"Failed to load memories from {self.storage_file}: {e}")
@@ -84,7 +84,7 @@ class SimplePersistence:
 
 
 # Usage example for server.py integration:
-def get_persistent_storage():
+def get_persistent_storage() -> Tuple[Dict[str, Any], "SimplePersistence"]:
     """Get persistent storage instance"""
     persistence = SimplePersistence()
     return persistence.load_memories(), persistence

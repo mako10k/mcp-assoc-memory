@@ -71,7 +71,7 @@ class Memory:
             access_count=data.get("access_count", 0),
         )
 
-    def update_access(self):
+    def update_access(self) -> None:
         """アクセス情報を更新"""
         self.accessed_at = datetime.utcnow()
         self.access_count += 1

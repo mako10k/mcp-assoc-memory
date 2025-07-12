@@ -47,7 +47,7 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
                 export_memories.append(memory_data)
         
         # Prepare export data structure
-        export_data = {
+        export_data: Dict[str, Any] = {
             "format_version": "1.0",
             "export_timestamp": datetime.now().isoformat(),
             "export_scope": request.scope,
@@ -72,14 +72,18 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
             if request.include_associations:
                 # Get associations from advanced storage if available
                 try:
-                    memory = await memory_manager.get_memory(memory_data["memory_id"])
-                    if memory:
-                        associations = await memory_manager.get_associations(memory.id, limit=10)
-                        memory_export["associations"] = [assoc.id for assoc in associations]
-                except:
+                    # TODO: Access memory manager from context
+                    # memory = await memory_manager.get_memory(memory_data["memory_id"])
+                    # if memory:
+                    #     associations = await memory_manager.get_associations(memory.id, limit=10)
+                    #     memory_export["associations"] = [assoc.id for assoc in associations]
+                    memory_export["associations"] = []  # Placeholder
+                except Exception:
                     memory_export["associations"] = []
             
-            export_data["memories"].append(memory_export)
+            memories_list = export_data["memories"]
+            if isinstance(memories_list, list):
+                memories_list.append(memory_export)
         
         # Convert to JSON
         json_data = json.dumps(export_data, indent=2, ensure_ascii=False)
@@ -128,16 +132,18 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
             
             return MemoryExportResponse(
                 success=True,
-                exported_count=len(export_memories),
-                export_scope=request.scope,
-                file_path=str(file_path),
-                export_size=export_size,
-                compression_used=compression_used,
-                metadata={
+                message=f"Exported {len(export_memories)} memories to file",
+                data={
+                    "scope": request.scope,
+                    "export_size": export_size,
+                    "compression_used": compression_used,
                     "format_version": "1.0",
                     "export_format": request.export_format,
                     "timestamp": datetime.now().isoformat()
-                }
+                },
+                file_path=str(file_path),
+                exported_count=len(export_memories),
+                export_format=request.export_format
             ).model_dump()
         
         # Handle direct data export (Pattern B)
@@ -146,16 +152,18 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
             
             return MemoryExportResponse(
                 success=True,
-                exported_count=len(export_memories),
-                export_scope=request.scope,
-                export_data=final_data,
-                export_size=export_size,
-                compression_used=compression_used,
-                metadata={
+                message=f"Exported {len(export_memories)} memories as direct data",
+                data={
+                    "scope": request.scope,
+                    "export_size": export_size,
+                    "compression_used": compression_used,
                     "format_version": "1.0",
                     "export_format": request.export_format,
                     "timestamp": datetime.now().isoformat()
-                }
+                },
+                export_data=final_data,
+                exported_count=len(export_memories),
+                export_format=request.export_format
             ).model_dump()
             
     except Exception as e:
@@ -176,10 +184,15 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Any) -> Dict[s
         
         return MemoryImportResponse(
             success=True,
+            message="Memory import functionality (placeholder)",
+            data={
+                "operation": "import_placeholder",
+                "timestamp": datetime.now().isoformat()
+            },
             imported_count=0,
             skipped_count=0,
-            updated_count=0,
-            errors=[]
+            error_count=0,
+            import_summary={}
         ).model_dump()
         
     except Exception as e:

@@ -13,7 +13,7 @@ memory_storage: Optional[Dict[str, Any]] = None
 persistence = None
 
 
-def set_dependencies(mm: MemoryManager, ms: Dict[str, Any], p):
+def set_dependencies(mm: MemoryManager, ms: Dict[str, Any], p: Any) -> None:
     """Set global dependencies from server.py"""
     global memory_manager, memory_storage, persistence
     memory_manager = mm

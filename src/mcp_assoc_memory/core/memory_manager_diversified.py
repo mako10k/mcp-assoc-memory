@@ -3,16 +3,50 @@ Diversified memory search algorithms - for broader knowledge exploration
 Implements diversity-based result filtering for creative exploration
 """
 
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple, Dict, Any, TYPE_CHECKING, Union
 
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
+
+if TYPE_CHECKING:
+    from ..core.embedding_service import EmbeddingService
+    from ..storage.base import BaseVectorStore
 
 logger = get_memory_logger(__name__)
 
 
 class MemoryManagerDiversified:
-    """Diversified search algorithms"""
+    """Diversified search algorithms mixin - requires MemoryManagerCore inheritance"""
+    
+    # Type annotations for inherited attributes
+    embedding_service: "EmbeddingService"
+    vector_store: "BaseVectorStore"
+    
+    # Method stubs for inherited methods
+    async def get_memory(self, memory_id: str) -> Optional[Memory]:
+        """Stub - implemented in MemoryManagerCore"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerCore")
+    
+    async def find_similar_memories(
+        self, reference_id: str, scope: Optional[str] = None,
+        limit: int = 10, min_score: float = 0.7
+    ) -> List[Dict[str, Any]]:
+        """Stub - implemented in MemoryManagerSearch"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerSearch")
+
+    async def search_by_tags(
+        self, tags: List[str], scope: Optional[str] = None,
+        match_all: bool = False, limit: int = 10
+    ) -> List[Memory]:
+        """Stub - implemented in MemoryManagerSearch"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerSearch")
+
+    async def search_by_category(
+        self, category: str, scope: Optional[str] = None,
+        limit: int = 10
+    ) -> List[Memory]:
+        """Stub - implemented in MemoryManagerSearch"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerSearch")
 
     async def diversified_similarity_search(
         self,
@@ -102,7 +136,7 @@ class MemoryManagerDiversified:
 
     async def _get_similarity_candidates(
         self,
-        query_embedding,
+        query_embedding: Union[List[float], Any],  # Allow numpy arrays too
         scope: Optional[str],
         limit: int,
         min_score: float
@@ -112,9 +146,9 @@ class MemoryManagerDiversified:
             # Convert embedding to list format for vector store
             try:
                 if hasattr(query_embedding, 'tolist'):
-                    embedding_list = query_embedding.tolist()
+                    embedding_list = query_embedding.tolist()  # type: ignore[attr-defined]
                 elif hasattr(query_embedding, 'flatten'):
-                    embedding_list = query_embedding.flatten().tolist()
+                    embedding_list = query_embedding.flatten().tolist()  # type: ignore[attr-defined]
                 else:
                     # Try to convert numpy array or other array-like objects
                     import numpy as np
@@ -134,7 +168,7 @@ class MemoryManagerDiversified:
                 scope=scope,
                 include_child_scopes=False,
                 limit=limit,
-                min_score=min_score
+                min_similarity=min_score
             )
             
             # Filter by minimum score
@@ -158,7 +192,7 @@ class MemoryManagerDiversified:
     ) -> List[Tuple[Memory, float]]:
         """Apply diversity filtering to candidates"""
         try:
-            diverse_results = []
+            diverse_results: List[Tuple[Memory, float]] = []
             exclude_set: Set[str] = set()
             
             # Sort candidates by similarity score (descending)

@@ -2,11 +2,11 @@
 メトリクス収集基盤
 """
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Callable
 
 
 class MetricsCollector:
-    def __init__(self):
+    def __init__(self) -> None:
         self.metrics: Dict[str, Any] = {}
 
     def record(self, name: str, value: Any) -> None:
@@ -15,10 +15,10 @@ class MetricsCollector:
     def increment(self, name: str, amount: int = 1) -> None:
         self.metrics[name] = self.metrics.get(name, 0) + amount
 
-    def timer(self, name: str):
+    def timer(self, name: str) -> Callable[[], None]:
         start = time.time()
 
-        def done():
+        def done() -> None:
             self.metrics[name] = time.time() - start
         return done
 

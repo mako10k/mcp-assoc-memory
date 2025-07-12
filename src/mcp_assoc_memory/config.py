@@ -150,7 +150,7 @@ class Config:
 
         return config
 
-    def _load_from_env(self):
+    def _load_from_env(self) -> None:
         """Load configuration from environment variables"""
         # Database configuration
         self.database.type = os.getenv("DB_TYPE", self.database.type)
@@ -204,7 +204,7 @@ class Config:
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
         self.debug_mode = os.getenv("DEBUG", "false").lower() == "true"
 
-    def _load_from_file(self, config_path: str):
+    def _load_from_file(self, config_path: str) -> None:
         """Load configuration from file"""
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
@@ -216,7 +216,7 @@ class Config:
         except Exception as e:
             logger.warning(f"Failed to load configuration file: {e}")
 
-    def _merge_config(self, config_data: Dict[str, Any]):
+    def _merge_config(self, config_data: Dict[str, Any]) -> None:
         """Merge configuration data (transport uses dataclass regeneration for strict reflection)"""
         for section, values in config_data.items():
             if section == "transport" and isinstance(values, dict):
@@ -228,7 +228,7 @@ class Config:
                     if hasattr(section_obj, key):
                         setattr(section_obj, key, value)
 
-    def _validate(self):
+    def _validate(self) -> None:
         """Validate configuration values"""
         # Create data directory
         Path(self.storage.data_dir).mkdir(parents=True, exist_ok=True)

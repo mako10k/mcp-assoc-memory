@@ -35,15 +35,15 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict
             await ctx.info(f"Created session: {session_id}")
             
             return SessionManageResponse(
-                action="create",
-                session_id=session_id,
-                active_sessions=[SessionInfo(
+                success=True,
+                message=f"Session {session_id} created successfully",
+                data={"session_id": session_id, "scope": session_scope},
+                session=SessionInfo(
                     session_id=session_id,
-                    scope=session_scope,
                     memory_count=1,
                     created_at=datetime.now(),
-                    last_updated=datetime.now()
-                )]
+                    last_activity=datetime.now()
+                )
             ).model_dump()
         
         elif request.action == "list":
@@ -69,10 +69,9 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict
             active_sessions = [
                 SessionInfo(
                     session_id=session_id,
-                    scope=data["scope"],
                     memory_count=len(data["memories"]),
                     created_at=data["created_at"],
-                    last_updated=data["last_updated"]
+                    last_activity=data["last_updated"]
                 )
                 for session_id, data in session_scopes.items()
             ]
@@ -80,8 +79,10 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict
             await ctx.info(f"Found {len(active_sessions)} active sessions")
             
             return SessionManageResponse(
-                action="list",
-                active_sessions=active_sessions
+                success=True,
+                message=f"Found {len(active_sessions)} active sessions",
+                data={"session_count": len(active_sessions)},
+                sessions=active_sessions
             ).model_dump()
         
         elif request.action == "cleanup":
@@ -106,9 +107,10 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict
             await ctx.info(f"Cleaned up {cleaned_count} old session memories")
             
             return SessionManageResponse(
-                action="cleanup",
-                active_sessions=[],
-                cleaned_sessions=cleaned_count
+                success=True,
+                message=f"Cleaned up {cleaned_count} old session memories",
+                data={"cleaned_count": cleaned_count},
+                cleaned_sessions=[]  # TODO: Return actual cleaned session IDs
             ).model_dump()
         
         else:

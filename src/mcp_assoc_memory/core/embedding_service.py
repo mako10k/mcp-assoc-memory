@@ -43,7 +43,7 @@ class EmbeddingService:
                     "Embedding cache hit",
                     extra_data={"cache_key": cache_key[:16] + "..."}
                 )
-                return embedding
+                return embedding  # type: ignore[no-any-return]
             else:
                 # 期限切れエントリを削除
                 self.cache.delete(cache_key)
@@ -97,8 +97,8 @@ class EmbeddingService:
         """キャッシュ統計を取得"""
         return {
             "cache_size": len(self.cache.cache),
-            "cache_max_size": self.cache.max_size,
-            "cache_hit_ratio": self.cache.get_hit_ratio()
+            "cache_max_size": self.cache.capacity,
+            "cache_hit_ratio": getattr(self.cache, 'get_hit_ratio', lambda: 0.0)()
         }
 
 
@@ -109,21 +109,21 @@ class OpenAIEmbeddingService(EmbeddingService):
         self,
         api_key: str,
         model: str = "text-embedding-3-small",
-        **kwargs
-    ):
+        **kwargs: Any
+    ) -> None:
         super().__init__(**kwargs)
         self.api_key = api_key
         self.model = model
-        self._client = None
+        self._client: Optional[Any] = None
 
-    async def _check_api_key(self):
+    async def _check_api_key(self) -> None:
         """APIキーの有効性を起動時に検証（embedding生成を1回試行）"""
         try:
             await self._generate_embedding("APIキー検証用テキスト")
         except Exception as e:
             raise RuntimeError(f"OpenAI APIキーが不正です: {e}")
 
-    async def _get_client(self):
+    async def _get_client(self) -> Any:
         """OpenAI クライアントを遅延初期化"""
         if self._client is None:
             try:
@@ -188,14 +188,14 @@ class SentenceTransformerEmbeddingService(EmbeddingService):
         self,
         model_name: str = "all-MiniLM-L6-v2",
         device: str = "cpu",
-        **kwargs
-    ):
+        **kwargs: Any
+    ) -> None:
         super().__init__(**kwargs)
         self.model_name = model_name
         self.device = device
-        self._model = None
+        self._model: Optional[Any] = None
 
-    async def _get_model(self):
+    async def _get_model(self) -> Any:
         """モデルを遅延初期化"""
         if self._model is None:
             try:
@@ -258,7 +258,7 @@ class SentenceTransformerEmbeddingService(EmbeddingService):
 class MockEmbeddingService(EmbeddingService):
     """テスト用モック埋め込みサービス"""
 
-    def __init__(self, embedding_dim: int = 384, **kwargs):
+    def __init__(self, embedding_dim: int = 384, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.embedding_dim = embedding_dim
 

@@ -82,10 +82,11 @@ class BaseVectorStore(BaseStorage):
     async def search_similar(
         self,
         query_embedding: List[float],
-        scope: Optional[str] = None,  # Changed from domain to scope
+        scope: Optional[str] = None,
         limit: int = 10,
         min_similarity: float = 0.0,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        include_child_scopes: bool = False
     ) -> List[Dict[str, Any]]:
         """Search similar vectors"""
         pass
@@ -271,6 +272,26 @@ class BaseMetadataStore(BaseStorage):
     @abstractmethod
     async def delete_association(self, association_id: str) -> bool:
         """関連性を削除"""
+        pass
+
+    @abstractmethod
+    async def get_all_scopes(self) -> List[str]:
+        """全スコープを取得"""
+        pass
+
+    @abstractmethod
+    async def get_all_memories(self, limit: int = 1000) -> List[Memory]:
+        """全記憶を取得"""
+        pass
+
+    @abstractmethod
+    async def get_association_count(self, scope: Optional[str] = None) -> int:
+        """関連性の数を取得"""
+        pass
+
+    @abstractmethod
+    async def update_association(self, association: Association) -> bool:
+        """関連性を更新"""
         pass
 
 

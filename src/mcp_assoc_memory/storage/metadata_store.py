@@ -219,7 +219,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         except Exception as e:
             logger.error("Failed to vacuum", error=str(e))
 
-    def _row_to_memory(self, row) -> Optional[Memory]:
+    def _row_to_memory(self, row: Any) -> Optional[Memory]:
         if not row:
             return None
         try:
@@ -259,7 +259,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         """Get memories by scope"""
         async with aiosqlite.connect(self.database_path) as db:
             query = "SELECT * FROM memories WHERE 1=1"
-            params = []
+            params: List[Any] = []
             if scope:
                 # Filter by scope stored in metadata
                 query += " AND JSON_EXTRACT(metadata, '$.scope') = ?"
@@ -386,8 +386,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
         except Exception as e:
             logger.error(
-                "Failed to initialize SQLite metadata store: %s",
-                str(e),
+                f"Failed to initialize SQLite metadata store: {str(e)}",
                 extra={"error_code": "SQLITE_INIT_ERROR"}
             )
             raise

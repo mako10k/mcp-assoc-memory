@@ -37,8 +37,8 @@ class ChromaVectorStore(BaseVectorStore):
         self.persist_directory = persist_directory
         self.host = host
         self.port = port
-        self.client = None
-        self.collection = None  # Single collection for all memories
+        self.client: Optional[Any] = None
+        self.collection: Optional[Any] = None  # Single collection for all memories
 
     async def initialize(self) -> None:
         """Initialize ChromaDB client with single collection"""
@@ -61,17 +61,20 @@ class ChromaVectorStore(BaseVectorStore):
 
             # Initialize single collection for all memories
             collection_name = "memories"
+            if self.client is None:
+                raise RuntimeError("ChromaDB client not initialized")
+                
             try:
                 self.collection = await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: self.client.get_collection(collection_name)
+                    lambda: self.client.get_collection(collection_name)  # type: ignore
                 )
                 logger.info(f"Using existing collection: {collection_name}")
             except Exception:
                 # Create new collection with cosine distance
                 self.collection = await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: self.client.create_collection(
+                    lambda: self.client.create_collection(  # type: ignore
                         name=collection_name,
                         metadata={
                             "description": "Unified memory collection with scope-based organization",
@@ -101,9 +104,12 @@ class ChromaVectorStore(BaseVectorStore):
         memory_id: str,
         embedding: Any,
         metadata: Dict[str, Any]
-    ) -> bool:
+    ) -> None:
         """Store vector in ChromaDB"""
         try:
+            if self.collection is None:
+                raise RuntimeError("ChromaDB collection not initialized")
+                
             # Prepare metadata (ChromaDB requires string values)
             chroma_metadata = {}
             for key, value in metadata.items():
@@ -114,7 +120,7 @@ class ChromaVectorStore(BaseVectorStore):
 
             await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.collection.add(
+                lambda: self.collection.add(  # type: ignore
                     ids=[memory_id],
                     embeddings=[embedding],
                     metadatas=[chroma_metadata]
@@ -128,7 +134,6 @@ class ChromaVectorStore(BaseVectorStore):
                     "scope": metadata.get("scope", "unknown")
                 }
             )
-            return True
 
         except Exception as e:
             logger.error(
@@ -137,14 +142,14 @@ class ChromaVectorStore(BaseVectorStore):
                 memory_id=memory_id,
                 error=str(e)
             )
-            return False
 
     async def get_embedding(self, memory_id: str) -> Optional[Any]:
         """Get embedding by memory ID"""
         try:
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.collection.get(ids=[memory_id], include=["embeddings"])
+                lambda: self.collection.  # type: ignore
+                get(ids=[memory_id], include=["embeddings"])
             )
             if result["embeddings"] and result["embeddings"][0]:
                 return result["embeddings"][0]
@@ -162,7 +167,8 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.collection.delete(ids=[memory_id])
+                lambda: self.collection.  # type: ignore
+                delete(ids=[memory_id])
             )
             logger.info(
                 "Vector deleted successfully",
@@ -179,11 +185,12 @@ class ChromaVectorStore(BaseVectorStore):
 
     async def search_similar(
         self,
-        embedding: Any,
+        query_embedding: List[float],
         scope: Optional[str] = None,
-        include_child_scopes: bool = False,
         limit: int = 10,
-        min_score: float = 0.1
+        min_similarity: float = 0.1,
+        filters: Optional[Dict[str, Any]] = None,
+        include_child_scopes: bool = False
     ) -> List[Dict[str, Any]]:
         """Search for similar vectors with hierarchical scope support"""
         try:
@@ -203,8 +210,9 @@ class ChromaVectorStore(BaseVectorStore):
 
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.collection.query(
-                    query_embeddings=[embedding],
+                lambda: self.collection.  # type: ignore
+                query(
+                    query_embeddings=[query_embedding],
                     n_results=int(limit * 3) if include_child_scopes else int(limit),  # Ensure integers
                     where=where_clause,
                     include=["metadatas", "distances"]
@@ -238,16 +246,21 @@ class ChromaVectorStore(BaseVectorStore):
                     
                     if scope and include_child_scopes:
                         # Check if result scope is under the requested scope hierarchy
-                        scope_match = (result_scope == scope or 
-                                     result_scope.startswith(scope + "/") or
-                                     scope.startswith(result_scope + "/"))
+                        if isinstance(result_scope, str) and isinstance(scope, str):
+                            scope_match = (
+                                result_scope == scope
+                                or result_scope.startswith(scope + "/")
+                                or scope.startswith(result_scope + "/")
+                            )
+                        else:
+                            scope_match = False
                     elif scope and not include_child_scopes:
                         # Exact scope match (already handled by where_clause, but double-check)
                         scope_match = (result_scope == scope)
                     
                     logger.info(f"[DEBUG] Processing result: memory_id={memory_id}, scope={result_scope}, similarity={similarity:.3f}, scope_match={scope_match}")
                     
-                    if similarity >= min_score and scope_match:
+                    if similarity >= min_similarity and scope_match:
                         results.append({
                             "id": None,  # For compatibility
                             "memory_id": memory_id,
@@ -276,13 +289,14 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.collection.get(include=["metadatas"])
+                lambda: self.collection.  # type: ignore
+                get(include=["metadatas"])
             )
             
             total_count = len(result["ids"]) if result["ids"] else 0
             
             # Count by scope
-            scope_counts = {}
+            scope_counts: Dict[str, int] = {}
             if result["metadatas"]:
                 for metadata in result["metadatas"]:
                     scope = metadata.get("scope", "unknown")
@@ -312,7 +326,8 @@ class ChromaVectorStore(BaseVectorStore):
 
             await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.collection.update(
+                lambda: self.collection.  # type: ignore
+                update(
                     ids=[memory_id],
                     metadatas=[chroma_metadata]
                 )

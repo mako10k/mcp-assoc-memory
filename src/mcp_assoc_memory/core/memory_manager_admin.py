@@ -5,16 +5,48 @@ Handles system administration, monitoring, and maintenance operations
 
 import asyncio
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
+
+if TYPE_CHECKING:
+    from ..storage.base import BaseMetadataStore, BaseVectorStore, BaseGraphStore
+    from ..utils.cache import LRUCache
 
 logger = get_memory_logger(__name__)
 
 
 class MemoryManagerAdmin:
-    """Administrative and management functions"""
+    """Administrative and management functions mixin - requires MemoryManagerCore inheritance"""
+    
+    # Type annotations for inherited attributes
+    metadata_store: "BaseMetadataStore"
+    vector_store: "BaseVectorStore"
+    graph_store: "BaseGraphStore"
+    memory_cache: "LRUCache"
+    association_cache: "LRUCache"
+    
+    # Method stubs for inherited methods
+    async def update_memory(self, memory_id: str, **kwargs: Any) -> Optional[Memory]:
+        """Stub - implemented in MemoryManagerCore"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerCore")
+    
+    async def get_associations(self, memory_id: str, **kwargs: Any) -> List[Any]:
+        """Stub - implemented in MemoryManagerAssociations"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerAssociations")
+    
+    async def check_content_duplicate(self, content: str, **kwargs: Any) -> Optional[Memory]:
+        """Stub - implemented in MemoryManagerCore"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerCore")
+    
+    async def store_memory(self, content: str, **kwargs: Any) -> Memory:
+        """Stub - implemented in MemoryManagerCore"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerCore")
+    
+    async def create_manual_association(self, **kwargs: Any) -> bool:
+        """Stub - implemented in MemoryManagerAssociations"""
+        raise NotImplementedError("This method should be inherited from MemoryManagerAssociations")
 
     async def memory_map(self, scope: Optional[str] = None) -> Dict[str, Any]:
         """Get memory map (visualization data)"""
@@ -76,7 +108,7 @@ class MemoryManagerAdmin:
         """Get category distribution chart data"""
         try:
             memories = await self.metadata_store.get_memories_by_scope(scope)
-            category_counts = {}
+            category_counts: Dict[str, int] = {}
             
             for memory in memories:
                 category = memory.category or "uncategorized"
@@ -115,13 +147,13 @@ class MemoryManagerAdmin:
             # Cache hit rates
             memory_cache_stats = {
                 "size": len(self.memory_cache.cache),
-                "max_size": self.memory_cache.max_size,
+                "max_size": self.memory_cache.capacity,
                 "hit_rate": getattr(self.memory_cache, 'hit_rate', 0.0)
             }
             
             association_cache_stats = {
                 "size": len(self.association_cache.cache),
-                "max_size": self.association_cache.max_size,
+                "max_size": self.association_cache.capacity,
                 "hit_rate": getattr(self.association_cache, 'hit_rate', 0.0)
             }
             
@@ -234,11 +266,11 @@ class MemoryManagerAdmin:
             cache_stats = {
                 "memory_cache": {
                     "size": len(self.memory_cache.cache),
-                    "max_size": self.memory_cache.max_size
+                    "max_size": self.memory_cache.capacity
                 },
                 "association_cache": {
                     "size": len(self.association_cache.cache),
-                    "max_size": self.association_cache.max_size
+                    "max_size": self.association_cache.capacity
                 }
             }
 
@@ -276,13 +308,13 @@ class MemoryManagerAdmin:
             avg_content_length = total_content_length / total_count if total_count > 0 else 0
             
             # Category distribution
-            categories = {}
+            categories: Dict[str, int] = {}
             for memory in memories:
                 cat = memory.category or "uncategorized"
                 categories[cat] = categories.get(cat, 0) + 1
             
             # Tag distribution
-            tags = {}
+            tags: Dict[str, int] = {}
             for memory in memories:
                 for tag in memory.tags:
                     tags[tag] = tags.get(tag, 0) + 1
@@ -327,7 +359,9 @@ class MemoryManagerAdmin:
                     memory_associations = await self.get_associations(memory.id)
                     associations.extend([assoc.to_dict() for assoc in memory_associations])
                 export_data["associations"] = associations
-                export_data["export_info"]["association_count"] = len(associations)
+                export_info = export_data["export_info"]
+                if isinstance(export_info, dict):
+                    export_info["association_count"] = len(associations)
             
             # Write to file if path provided
             if file_path:
@@ -377,7 +411,7 @@ class MemoryManagerAdmin:
                     if merge_strategy == "skip_duplicates":
                         existing = await self.check_content_duplicate(
                             memory_data["content"],
-                            memory_data["scope"]
+                            scope=memory_data["scope"]
                         )
                         if existing:
                             skipped_duplicates += 1
@@ -405,11 +439,11 @@ class MemoryManagerAdmin:
             for assoc_data in associations_data:
                 try:
                     success = await self.create_manual_association(
-                        assoc_data["source_memory_id"],
-                        assoc_data["target_memory_id"],
-                        assoc_data.get("association_type", "imported"),
-                        assoc_data.get("strength", 1.0),
-                        assoc_data.get("metadata")
+                        source_memory_id=assoc_data["source_memory_id"],
+                        target_memory_id=assoc_data["target_memory_id"],
+                        association_type=assoc_data.get("association_type", "imported"),
+                        strength=assoc_data.get("strength", 1.0),
+                        metadata=assoc_data.get("metadata")
                     )
                     
                     if success:

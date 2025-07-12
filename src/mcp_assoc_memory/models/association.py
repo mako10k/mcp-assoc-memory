@@ -70,11 +70,11 @@ class AssociationGraph:
     # association_id -> association
     edges: Dict[str, Association] = field(default_factory=dict)
 
-    def add_memory(self, memory_id: str, metadata: Dict[str, Any] = None):
+    def add_memory(self, memory_id: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """記憶ノードを追加"""
         self.nodes[memory_id] = metadata or {}
 
-    def add_association(self, association: Association):
+    def add_association(self, association: Association) -> None:
         """関連性エッジを追加"""
         self.edges[association.id] = association
 

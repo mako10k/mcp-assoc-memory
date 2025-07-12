@@ -70,13 +70,10 @@
         {
             "label": "Lint: Run flake8",
             "type": "shell",
-            "command": "flake8",
+            "command": "sh",
             "args": [
-                "src/",
-                "--output-file=.copilot-temp/flake8-report.txt",
-                "--format=%(path)s:%(row)d:%(col)d: %(code)s %(text)s",
-                "--max-line-length=120",
-                "--extend-ignore=E203,W503"
+                "-c",
+                "flake8 src/ --format=\"%(path)s:%(row)d:%(col)d: %(code)s %(text)s\" --max-line-length=120 --extend-ignore=E203,W503 > .copilot-temp/flake8-report.txt 2>&1 && echo \"Flake8 analysis completed. Report saved to .copilot-temp/flake8-report.txt\""
             ],
             "group": "test",
             "presentation": {
@@ -103,13 +100,10 @@
         {
             "label": "Lint: Run mypy",
             "type": "shell",
-            "command": "mypy",
+            "command": "sh",
             "args": [
-                "src/mcp_assoc_memory/",
-                "--output=.copilot-temp/mypy-report.txt",
-                "--ignore-missing-imports",
-                "--show-error-codes",
-                "--pretty"
+                "-c",
+                "mypy src/mcp_assoc_memory/ --ignore-missing-imports --show-error-codes --pretty > .copilot-temp/mypy-report.txt 2>&1 && echo \"Mypy analysis completed. Report saved to .copilot-temp/mypy-report.txt\""
             ],
             "group": "test",
             "presentation": {
@@ -139,7 +133,7 @@
             "command": "sh",
             "args": [
                 "-c",
-                "black src/ --line-length=120 --diff > .copilot-temp/black-diff.txt 2>&1 && black src/ --line-length=120 && echo 'Black formatting completed. Diff saved to .copilot-temp/black-diff.txt'"
+                "black src/ --line-length=120 --diff > .copilot-temp/black-diff.txt 2>&1 && black src/ --line-length=120 && echo \"Black formatting completed. Diff saved to .copilot-temp/black-diff.txt\""
             ],
             "group": "build",
             "presentation": {
@@ -158,7 +152,7 @@
             "command": "sh",
             "args": [
                 "-c",
-                "isort src/ --diff > .copilot-temp/isort-diff.txt 2>&1 && isort src/ && echo 'Import sorting completed. Diff saved to .copilot-temp/isort-diff.txt'"
+                "isort src/ --diff > .copilot-temp/isort-diff.txt 2>&1 && isort src/ && echo \"Import sorting completed. Diff saved to .copilot-temp/isort-diff.txt\""
             ],
             "group": "build",
             "presentation": {
@@ -244,6 +238,41 @@
             "type": "shell",
             "command": "${workspaceFolder}/scripts/mcp_test_server_daemon.sh",
             "args": ["status"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test: Run Local Type Verification",
+            "type": "shell",
+            "command": "python",
+            "args": [".copilot-temp/test-local-only-00002.py"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test: All Quality Checks",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Lint: Run flake8",
+                "Lint: Run mypy",
+                "Test: Run Local Type Verification"
+            ],
             "group": "test",
             "presentation": {
                 "echo": true,

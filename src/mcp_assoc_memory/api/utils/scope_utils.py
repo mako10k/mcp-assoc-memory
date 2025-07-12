@@ -86,7 +86,7 @@ def build_scope_hierarchy(all_scopes: List[str]) -> Dict[str, Dict[str, Any]]:
     Returns:
         Nested dictionary representing scope hierarchy
     """
-    hierarchy = {}
+    hierarchy: Dict[str, Any] = {}
     
     for scope in sorted(all_scopes):
         parts = scope.split('/')

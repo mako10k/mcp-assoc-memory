@@ -31,7 +31,7 @@ persistence = None
 _initialized = False
 
 
-def set_dependencies(mm: MemoryManager, ms: Dict[str, Any], p):
+def set_dependencies(mm: MemoryManager, ms: Dict[str, Any], p: Any) -> None:
     """Set global dependencies from server.py"""
     global memory_manager, memory_storage, persistence
     memory_manager = mm
@@ -39,7 +39,7 @@ def set_dependencies(mm: MemoryManager, ms: Dict[str, Any], p):
     persistence = p
 
 
-async def ensure_initialized():
+async def ensure_initialized() -> None:
     """Ensure memory manager is initialized"""
     global _initialized
     if not _initialized and memory_manager:
@@ -783,7 +783,7 @@ async def handle_memory_import(
 async def handle_memory_list_all(
     page: int = 1,
     per_page: int = 10,
-    ctx: Context = None
+    ctx: Optional[Context] = None
 ) -> Dict[str, Any]:
     """List all memories with pagination (for debugging)"""
     try:

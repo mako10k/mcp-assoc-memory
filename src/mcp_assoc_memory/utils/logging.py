@@ -7,11 +7,13 @@ from typing import Any, Dict, Optional, Tuple
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
 
 
-class StructuredLogger(logging.Logger):
+class StructuredLogger:
+    """Structured logger wrapper that handles custom parameters"""
+    
     def __init__(self, name: str = "mcp_assoc_memory"):
-        super().__init__(name)
-        self.setLevel(logging.DEBUG)
-        self.propagate = True
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(logging.DEBUG)
+        self._logger.propagate = True
 
         # ルートロガーもDEBUG/StreamHandler必須
         root_logger = logging.getLogger()
@@ -28,17 +30,17 @@ class StructuredLogger(logging.Logger):
             handler.setLevel(logging.DEBUG)
 
         # 自分自身のハンドラもDEBUG
-        for handler in self.handlers:
+        for handler in self._logger.handlers:
             handler.setLevel(logging.DEBUG)
-        if not self.handlers:
+        if not self._logger.handlers:
             sh = logging.StreamHandler()
             sh.setLevel(logging.DEBUG)
             formatter = logging.Formatter(
                 '[%(asctime)s][%(levelname)s][%(name)s] %(message)s'
             )
             sh.setFormatter(formatter)
-            self.addHandler(sh)
-        for handler in self.handlers:
+            self._logger.addHandler(sh)
+        for handler in self._logger.handlers:
             handler.setLevel(logging.DEBUG)
 
     def log(self, level: str, message: str, **kwargs: Any) -> None:
@@ -68,7 +70,8 @@ class StructuredLogger(logging.Logger):
                 extended_message += f" [Error: {error}]"
             message = extended_message
         
-        super().log(getattr(logging, level.upper(), logging.INFO), message, extra=extra if extra else None)
+        super_log = self._logger.log
+        super_log(getattr(logging, level.upper(), logging.INFO), message, extra=extra if extra else None)
 
     def info(self, message: str, **kwargs: Any) -> None:
         self.log("info", message, **kwargs)
@@ -118,24 +121,24 @@ class LoggerWrapper:
         
         return message, extra if extra else None
     
-    def info(self, message: str, *args, **kwargs: Any) -> None:
+    def info(self, message: str, *args: Any, **kwargs: Any) -> None:
         formatted_msg, extra = self._format_message(message, **kwargs)
         self._logger.info(formatted_msg, *args, extra=extra)
     
-    def debug(self, message: str, *args, **kwargs: Any) -> None:
+    def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
         formatted_msg, extra = self._format_message(message, **kwargs)
         self._logger.debug(formatted_msg, *args, extra=extra)
     
-    def warning(self, message: str, *args, **kwargs: Any) -> None:
+    def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
         formatted_msg, extra = self._format_message(message, **kwargs)
         self._logger.warning(formatted_msg, *args, extra=extra)
     
-    def error(self, message: str, *args, **kwargs: Any) -> None:
+    def error(self, message: str, *args: Any, **kwargs: Any) -> None:
         formatted_msg, extra = self._format_message(message, **kwargs)
         self._logger.error(formatted_msg, *args, extra=extra)
 
 
-def get_memory_logger(name: str = "mcp_assoc_memory"):
+def get_memory_logger(name: str = "mcp_assoc_memory") -> StructuredLogger:
     """カスタムパラメータ対応ロガーを返す"""
     logger = logging.getLogger(name)
     if not logger.handlers:
@@ -147,4 +150,4 @@ def get_memory_logger(name: str = "mcp_assoc_memory"):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     logger.propagate = True
-    return LoggerWrapper(logger)
+    return StructuredLogger(name)

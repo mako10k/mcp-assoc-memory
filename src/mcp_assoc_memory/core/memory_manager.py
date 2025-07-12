@@ -24,14 +24,14 @@ class MemoryManager(
 ):
     """
     Unified Memory Manager integrating all functionality
-    
+
     This class combines all memory management capabilities:
     - Core CRUD operations (MemoryManagerCore)
-    - Search functionality (MemoryManagerSearch) 
+    - Search functionality (MemoryManagerSearch)
     - Association management (MemoryManagerAssociations)
     - Diversified search algorithms (MemoryManagerDiversified)
     - Administrative functions (MemoryManagerAdmin)
-    
+
     Usage:
         memory_manager = MemoryManager(
             vector_store=vector_store,
@@ -39,9 +39,9 @@ class MemoryManager(
             graph_store=graph_store,
             embedding_service=embedding_service
         )
-        
+
         await memory_manager.initialize()
-        
+
         # All functionality is now available:
         memory = await memory_manager.store_memory(content="example")
         results = await memory_manager.search_memories("query")
@@ -59,10 +59,10 @@ class MemoryManager(
     ):
         """
         Initialize unified memory manager
-        
+
         Args:
             vector_store: Vector storage backend
-            metadata_store: Metadata storage backend  
+            metadata_store: Metadata storage backend
             graph_store: Graph storage backend
             embedding_service: Embedding generation service
             similarity_calculator: Similarity calculation service (optional)
@@ -76,16 +76,15 @@ class MemoryManager(
             embedding_service=embedding_service,
             similarity_calculator=similarity_calculator
         )
-        
+
         # All other mixins inherit the same attributes
         # No additional initialization needed for mixins
-        
     async def health_check(self) -> dict:
         """Comprehensive health check for all components"""
         try:
             core_health = await self.get_statistics()
             performance_metrics = await self.get_performance_metrics()
-            
+
             return {
                 "status": "healthy",
                 "components": {
@@ -94,7 +93,7 @@ class MemoryManager(
                 },
                 "integrated_modules": [
                     "MemoryManagerCore",
-                    "MemoryManagerSearch", 
+                    "MemoryManagerSearch",
                     "MemoryManagerAssociations",
                     "MemoryManagerDiversified",
                     "MemoryManagerAdmin"

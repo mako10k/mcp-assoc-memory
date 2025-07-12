@@ -2,15 +2,15 @@
 LRUCache実装
 """
 from collections import OrderedDict
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 
 class LRUCache:
     def __init__(self, max_size: int = 128, ttl_seconds: Optional[float] = None):
-        self.cache = OrderedDict()
+        self.cache: OrderedDict[str, Any] = OrderedDict()
         self.capacity = max_size
         self.ttl_seconds = ttl_seconds
-        self.expiry = dict()  # key: expire_time
+        self.expiry: Dict[str, float] = dict()  # key: expire_time
         self.hits = 0
         self.misses = 0
 

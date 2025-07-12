@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # Module-level dependencies (set by server initialization)
 memory_manager = None
 
-def set_dependencies(mm):
+def set_dependencies(mm: Any) -> None:
     """Set module dependencies from server initialization"""
     global memory_manager
     memory_manager = mm

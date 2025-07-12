@@ -11,7 +11,7 @@ memory_storage: Optional[Dict[str, Any]] = None
 persistence = None
 
 
-def set_dependencies(mm: Any, ms: Dict[str, Any], p):
+def set_dependencies(mm: Any, ms: Dict[str, Any], p: Any) -> None:
     """Set global dependencies from server.py"""
     global memory_manager, memory_storage, persistence
     memory_manager = mm
@@ -22,7 +22,7 @@ def set_dependencies(mm: Any, ms: Dict[str, Any], p):
 async def handle_analyze_memories_prompt(
     scope: str = "user/default",
     include_child_scopes: bool = True,
-    ctx: Context = None
+    ctx: Optional[Context] = None
 ) -> str:
     """Generate memory analysis prompt"""
     if ctx:
@@ -65,7 +65,7 @@ Please provide the analysis in a structured format."""
 async def handle_summarize_memory_prompt(
     memory_id: str,
     context_scope: str = "",
-    ctx: Context = None
+    ctx: Optional[Context] = None
 ) -> str:
     """Generate memory summary prompt"""
     if ctx:

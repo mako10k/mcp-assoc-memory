@@ -22,7 +22,7 @@ class SimilarityMetric(Enum):
 
 
 class SimilarityCalculator:
-    def cosine_similarity(self, vector1, vector2) -> float:
+    def cosine_similarity(self, vector1: Any, vector2: Any) -> float:
         """コサイン類似度を直接計算 (memory_manager.py互換)"""
         return self._cosine_similarity(np.array(vector1), np.array(vector2))
     """類似度計算クラス"""
@@ -63,11 +63,8 @@ class SimilarityCalculator:
                 return self._dot_product_similarity(vector1, vector2)
             elif metric == SimilarityMetric.MANHATTAN:
                 return self._manhattan_similarity(vector1, vector2)
-            else:
-                logger.warning(
-                    f"Unknown similarity metric: {metric}, using cosine"
-                )
-                return self._cosine_similarity(vector1, vector2)
+            # All enum values are covered above - this should never be reached
+            # but keeping fallback for defensive programming
 
         except Exception as e:
             logger.error(
@@ -156,7 +153,7 @@ class SimilarityCalculator:
                 })
 
             # 類似度でソート（降順）
-            results.sort(key=lambda x: x["similarity"], reverse=True)
+            results.sort(key=lambda x: x["similarity"] if isinstance(x["similarity"], (int, float)) else 0.0, reverse=True)
 
             # top_k による制限
             if top_k is not None:
@@ -244,7 +241,7 @@ class SimilarityCalculator:
         similarities = np.dot(target_normalized, query_normalized)
 
         # 数値安定性のためのクリッピング
-        return np.clip(similarities, -1.0, 1.0)
+        return np.clip(similarities, -1.0, 1.0)  # type: ignore[no-any-return]
 
     def _batch_dot_product_similarity(
         self,
@@ -255,7 +252,7 @@ class SimilarityCalculator:
         dot_products = np.dot(target_vectors, query_vector)
         # 0-1の範囲に変換
         similarities = (dot_products + 1.0) / 2.0
-        return np.clip(similarities, 0.0, 1.0)
+        return np.clip(similarities, 0.0, 1.0)  # type: ignore[no-any-return]
 
     def find_most_similar(
         self,

@@ -1,6 +1,7 @@
-# Copilot Backlog Queue
+# Copilot Backlog ## User Backlog Items (Add new items here)
 
-**Instructions for Users:**
+<!-- ユーザーはここに新しいバックログ項目を追加してください -->
+<!-- Copilot will process and remove items from this section -->nstructions for Users:**
 - Add new backlog items below using the specified format
 - Copilot will periodically process these items and move them to associative memory
 - Processed items will be automatically removed from this file
@@ -25,6 +26,21 @@
 
 ## Processing Log
 <!-- Copilot maintenance log - do not edit manually -->
+
+**2025-07-12 (Round 3)**: Processed 1 backlog item into associative memory
+- [High] Add Cyclomatic complexity checking → work/backlog/high
+
+**2025-07-12 (Round 2)**: Processed 7 backlog items into associative memory
+- [High] Install TEST framework and add test rule → work/backlog/high
+- [High] Making rule for Force Linting after each commit → work/backlog/high
+- [High] Making rule for git commit and push → work/backlog/high
+- [High] Create documentation for Copilot internal API → work/backlog/high
+- [High] Simplify source code structure → work/backlog/high
+- [Medium] Recheck "# type: ignore" comments → work/backlog/medium
+- [High] Prevent arbitrary degradation execution → work/backlog/high
+
+**2025-07-12**: Processed 1 high-priority backlog item into associative memory
+- [High] Install TEST framework → work/backlog/high
 
 **2025-01-10**: Processed 3 backlog items into associative memory
 - [Medium] Tool Consolidation Phase 1 → work/backlog/medium

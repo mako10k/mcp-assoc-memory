@@ -1,7 +1,7 @@
 """
 入力値検証ユーティリティ
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class ValidationError(Exception):
@@ -14,7 +14,7 @@ def validate_required_fields(data: Dict[str, Any], required_fields: list[str]) -
             raise ValidationError(f"Missing required field: {field}")
 
 
-def scope_value(scope):
+def scope_value(scope: Optional[str]) -> str:
     """Convert scope to consistent string format"""
     if scope is None:
         return "user/default"

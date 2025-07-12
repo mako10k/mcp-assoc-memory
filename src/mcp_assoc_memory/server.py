@@ -66,7 +66,7 @@ from .api.tools import (
 logger = logging.getLogger(__name__)
 
 # FastMCP server instance
-mcp = FastMCP(name="AssocMemoryServer")
+mcp: FastMCP = FastMCP(name="AssocMemoryServer")
 
 # Initialize the associative memory system
 config = get_config()
@@ -453,7 +453,7 @@ async def memory_discover_associations(
     memory_id: str,
     limit: int = 10,
     similarity_threshold: float = 0.1,
-    ctx: Context = None
+    ctx: Optional[Context] = None
 ):
     """Discover semantic associations for a specific memory"""
     return await handle_memory_discover_associations(memory_id, ctx, limit, similarity_threshold)
