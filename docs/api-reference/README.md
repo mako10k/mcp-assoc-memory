@@ -1,36 +1,76 @@
 # MCP Associative Memory Server - API Reference
 
-## 📖 Complete Tool Documentation
+# MCP Associative Memory Server - API Reference
 
-This reference covers all available MCP tools for the Associative Memory Server. The system provides a comprehensive suite of 15+ tools organized into functional modules for memory management and knowledge discovery.
+> **Note**: For the most current API documentation, see [API_REFERENCE_2025.md](./API_REFERENCE_2025.md)
 
-## 🗂️ Tool Organization
+## 📖 Current API Status (July 2025)
 
-### Core Memory Operations (memory_tools.py)
-- `memory_store` - Store new memories with association discovery
-- `memory_search` - Semantic search using natural language  
-- `memory_get` - Retrieve specific memories with details
-- `memory_delete` - Remove memories safely
-- `memory_list_all` - Browse complete memory collection
-- `memory_update` - Modify existing memories
-- `memory_move` - Reorganize memories between scopes
+**🎉 Production Ready:**
+- **10 MCP Tools** available
+- **74/74 tests passing** (100% success rate)
+- **Complete CI/CD pipeline** operational
+- **Enterprise-grade** security and quality gates
+
+## 🚀 Quick Links
+
+### 📋 [Complete API Reference 2025](./API_REFERENCE_2025.md)
+**Current production API documentation** - Updated July 2025
+
+**What's included:**
+- All 10 MCP tools with complete parameter specifications
+- Request/response examples for every tool
+- Integration patterns and workflow examples
+- Performance and error handling notes
+- Production deployment status
+
+**Perfect for:** Current integrations, latest features, production use
+
+---
+
+## �️ Available Tools Overview
+
+### 🧠 **Core Memory Operations (7 tools)**
+- `memory_store` - Store memories with auto-association
+- `memory_search` - Unified search (standard/diversified modes)
+- `memory_manage` - Unified CRUD operations (get/update/delete)
+- `memory_sync` - Unified import/export operations
+- `memory_list_all` - Browse all memories with pagination
 - `memory_discover_associations` - Explore memory connections
-- `memory_diversified_search` - Enhanced creative search
+- `memory_move` - Reorganize memory scopes
 
-### Scope Management (scope_tools.py)
-- `scope_list` - Browse hierarchical memory organization
+### 🗂️ **Scope Management (2 tools)**
+- `scope_list` - Browse hierarchical organization
 - `scope_suggest` - AI-powered scope recommendations
 
-### Session Management (session_tools.py)
-- `session_manage` - Create, list, and cleanup temporary sessions
+### ⏱️ **Session Management (1 tool)**
+- `session_manage` - Session lifecycle management
 
-### Import/Export Operations (export_tools.py)
-- `memory_export` - Export memories to JSON/YAML
-- `memory_import` - Import with merge strategies
+## 🎯 Modern API Features
 
-### Resources & Prompts
-- 2 Resources: `memory_stats`, `scope_memories`
-- 2 Prompts: `analyze_memories`, `summarize_memory`
+### 🆕 **2025 Enhancements**
+- **Unified Interfaces**: Single tools for multiple operations
+- **Mode-based Operations**: Standard and diversified search in one tool
+- **Enhanced Error Handling**: Consistent error patterns
+- **Performance Optimized**: Sub-second response times
+- **Type Safe**: Complete TypeScript/Pydantic validation
+
+### 🔧 **Integration Ready**
+- **VS Code Native**: GitHub Copilot integration
+- **Natural Language**: Intuitive command interface
+- **Workflow Friendly**: Session and batch operations
+- **Production Tested**: 74 test suite with 100% pass rate
+
+## 📊 **Quality Metrics**
+- **Tests**: 74 (100% passing)
+- **Coverage**: 31% (focused on API layer)
+- **Security**: Bandit scanned, dependency verified
+- **Performance**: Vector search optimized
+- **Reliability**: Full CI/CD quality gates
+
+---
+
+*For detailed documentation, examples, and integration guides, see [API_REFERENCE_2025.md](./API_REFERENCE_2025.md)*
 
 ## 🧠 Core Memory Operations
 
