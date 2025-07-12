@@ -54,8 +54,16 @@ async def ensure_initialized() -> None:
     """Ensure memory manager is initialized"""
     global _initialized
     if not _initialized and memory_manager:
-        await memory_manager.initialize()
-        _initialized = True
+        try:
+            await memory_manager.initialize()
+            _initialized = True
+            # Verify vector store is properly initialized
+            if memory_manager.vector_store.collection is None:
+                raise RuntimeError("Vector store collection not initialized after initialization")
+        except Exception as e:
+            # Reset flag to allow retry
+            _initialized = False
+            raise RuntimeError(f"Memory manager initialization failed: {e}")
 
 
 async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> MemoryResponse:

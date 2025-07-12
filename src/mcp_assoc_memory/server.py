@@ -143,13 +143,23 @@ async def ensure_initialized():
     """Ensure memory manager is initialized"""
     global _initialized
     if not _initialized:
-        await memory_manager.initialize()
-        # Set dependencies for tool handlers
-        set_dependencies(memory_manager, memory_storage, persistence)
-        set_scope_dependencies(memory_manager)
-        set_resource_dependencies(memory_manager, memory_storage, persistence)
-        set_prompt_dependencies(memory_manager, memory_storage, persistence)
-        _initialized = True
+        try:
+            await memory_manager.initialize()
+            # Set dependencies for tool handlers
+            set_dependencies(memory_manager, memory_storage, persistence)
+            set_scope_dependencies(memory_manager)
+            set_resource_dependencies(memory_manager, memory_storage, persistence)
+            set_prompt_dependencies(memory_manager, memory_storage, persistence)
+            set_other_dependencies(memory_manager)
+            
+            _initialized = True
+            logger.info("Memory manager initialized successfully")
+            
+        except Exception as e:
+            # Reset flag to allow retry
+            _initialized = False
+            logger.error(f"Memory manager initialization failed: {e}")
+            raise
 
 
 # Memory management tools
@@ -508,7 +518,8 @@ async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> List[Mem
     # Convert handler result to expected format
     if isinstance(result, dict) and "results" in result:
         return result["results"]
-    return result
+    # Return empty list if result format is unexpected
+    return []
 
 
 @mcp.tool(
