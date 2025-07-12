@@ -195,28 +195,39 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-# Keep directory structure but ignore actual data files
-data/*.db
-data/*.sqlite
+# Global ignore patterns first
+*.db
+*.sqlite
+*.sqlite3
+*.gml
+/chroma_db/
+vector_store/
+memory_data/
+
+# Specific data directory ignore patterns
 data/*.json
 data/*.pkl
+data/*.sqlite*
+data/*.db*
 data/chroma_db/*
 data/test_chroma_db/*
+data/exports/*.json
+data/imports/*.json
+data/performance_test/*
+
+# Source data (should not be tracked)
+src/data/
+
+# Keep directory structure - exceptions must come AFTER ignore patterns
 !data/.gitkeep
 !data/*/
 !data/*/.gitkeep
+!data/performance_test/.gitkeep
 
 # Keep logs directory but ignore log files
 logs/*.log
 logs/*.pid
 !logs/.gitkeep
-
-*.db
-*.sqlite
-# Only ignore chroma_db in root, not in data/
-/chroma_db/
-vector_store/
-memory_data/
 
 # API Keys and secrets
 .env.secret
