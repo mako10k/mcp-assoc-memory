@@ -1,0 +1,670 @@
+"""
+End-to-end tests for the MCP Associative Memory system.
+
+Tests the complete system functionality including:
+- Full MCP server integration
+- Real-world usage scenarios
+- Performance under realistic load
+- Error recovery and resilience
+- Data persistence and consistency
+"""
+
+import asyncio
+import json
+import pytest
+import tempfile
+from pathlib import Path
+from typing import Dict, List
+from unittest.mock import patch
+
+from mcp_assoc_memory.core.memory_manager import MemoryManager
+# Note: Server integration tests may require additional setup
+
+
+class TestE2EBasicOperations:
+    """End-to-end tests for basic memory operations."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    async def test_complete_memory_lifecycle(self, test_config: Dict):
+        """Test complete memory lifecycle: store -> search -> update -> delete."""
+        # Create memory manager
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            # Store initial memory
+            store_result = await manager.store_memory(
+                content="E2E test memory about machine learning fundamentals",
+                scope="e2e/ml",
+                category="machine-learning",
+                tags=["ml", "fundamentals", "e2e"],
+                metadata={"test_type": "e2e", "stage": "store"}
+            )
+            
+            assert store_result["success"] is True
+            memory_id = store_result["data"]["memory_id"]
+            
+            # Search for the memory
+            search_result = await manager.search_memories(
+                query="machine learning fundamentals",
+                limit=10
+            )
+            
+            assert search_result["success"] is True
+            assert len(search_result["data"]) > 0
+            
+            # Verify the stored memory is found
+            found = any(m["memory_id"] == memory_id for m in search_result["data"])
+            assert found, "Stored memory not found in search results"
+            
+            # Update the memory
+            update_result = await manager.update_memory(
+                memory_id=memory_id,
+                content="Updated E2E test memory about advanced machine learning",
+                category="advanced-ml",
+                tags=["ml", "advanced", "e2e", "updated"],
+                metadata={"test_type": "e2e", "stage": "update"}
+            )
+            
+            assert update_result["success"] is True
+            assert update_result["data"]["content"] == "Updated E2E test memory about advanced machine learning"
+            assert update_result["data"]["category"] == "advanced-ml"
+            
+            # Verify update persistence
+            get_result = await manager.get_memory(memory_id)
+            assert get_result["success"] is True
+            assert get_result["data"]["content"] == "Updated E2E test memory about advanced machine learning"
+            
+            # Test associations
+            associations_result = await manager.discover_associations(
+                memory_id=memory_id,
+                limit=5
+            )
+            
+            assert associations_result["success"] is True
+            
+            # Delete the memory
+            delete_result = await manager.delete_memory(memory_id)
+            
+            assert delete_result["success"] is True
+            
+            # Verify deletion
+            get_deleted_result = await manager.get_memory(memory_id)
+            assert get_deleted_result["success"] is False
+            
+        finally:
+            await manager.close()
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    async def test_scope_hierarchy_operations(self, test_config: Dict):
+        """Test scope hierarchy and organization."""
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            # Store memories in hierarchical scopes
+            memories = [
+                ("Root level programming concept", "programming"),
+                ("Python basics", "programming/python"),
+                ("Python web development", "programming/python/web"),
+                ("FastAPI framework", "programming/python/web/fastapi"),
+                ("JavaScript basics", "programming/javascript"),
+                ("React framework", "programming/javascript/react")
+            ]
+            
+            stored_ids = []
+            for content, scope in memories:
+                result = await manager.store_memory(content=content, scope=scope)
+                assert result["success"] is True
+                stored_ids.append(result["data"]["memory_id"])
+            
+            # Test scope-based search
+            python_results = await manager.search_memories(
+                query="Python",
+                scope="programming/python",
+                include_child_scopes=True,
+                limit=10
+            )
+            
+            assert python_results["success"] is True
+            # Should find memories from programming/python and its children
+            python_scopes = [m["scope"] for m in python_results["data"]]
+            assert any("programming/python" in scope for scope in python_scopes)
+            
+            # Test scope listing
+            scopes_result = await manager.get_all_scopes()
+            assert scopes_result["success"] is True
+            
+            # Verify hierarchical structure
+            scope_names = [s["scope"] for s in scopes_result["data"]]
+            assert "programming" in scope_names
+            assert "programming/python" in scope_names
+            assert "programming/python/web" in scope_names
+            
+        finally:
+            await manager.close()
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    async def test_association_discovery_workflow(self, test_config: Dict):
+        """Test association discovery across related content."""
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            # Store related memories
+            related_contents = [
+                "Python is a programming language used for web development",
+                "Django is a Python web framework for rapid development",
+                "FastAPI is a modern Python framework for building APIs",
+                "Web development involves creating applications for the internet",
+                "APIs enable communication between different software systems"
+            ]
+            
+            stored_memories = []
+            for i, content in enumerate(related_contents):
+                result = await manager.store_memory(
+                    content=content,
+                    scope=f"e2e/associations/{i}",
+                    category="web-development",
+                    tags=["python", "web", "development"]
+                )
+                assert result["success"] is True
+                stored_memories.append(result["data"])
+            
+            # Test association discovery
+            first_memory_id = stored_memories[0]["memory_id"]
+            associations_result = await manager.discover_associations(
+                memory_id=first_memory_id,
+                limit=10,
+                similarity_threshold=0.1
+            )
+            
+            assert associations_result["success"] is True
+            assert len(associations_result["data"]) > 0
+            
+            # Verify associations contain related content
+            association_contents = [a["content"] for a in associations_result["data"]]
+            assert any("Django" in content for content in association_contents)
+            assert any("FastAPI" in content for content in association_contents)
+            
+        finally:
+            await manager.close()
+
+
+class TestE2EPerformance:
+    """End-to-end performance tests."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    @pytest.mark.slow
+    async def test_bulk_operations_performance(self, test_config: Dict):
+        """Test performance with bulk operations."""
+        import time
+        
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            num_memories = 50
+            
+            # Bulk storage test
+            start_time = time.time()
+            
+            stored_ids = []
+            for i in range(num_memories):
+                result = await manager.store_memory(
+                    content=f"Performance test memory {i} with various content about topic {i % 10}",
+                    scope=f"performance/bulk/{i % 5}",
+                    category=f"category{i % 3}",
+                    tags=[f"tag{i % 7}", f"performance", f"bulk"]
+                )
+                assert result["success"] is True
+                stored_ids.append(result["data"]["memory_id"])
+            
+            storage_time = time.time() - start_time
+            
+            # Should complete bulk storage in reasonable time
+            assert storage_time < 60.0  # 60 seconds for 50 memories
+            
+            # Bulk search test
+            start_time = time.time()
+            
+            search_queries = [
+                "performance test memory",
+                "topic content various",
+                "bulk storage test",
+                "category performance",
+                "memory content topic"
+            ]
+            
+            for query in search_queries:
+                result = await manager.search_memories(
+                    query=query,
+                    limit=20
+                )
+                assert result["success"] is True
+            
+            search_time = time.time() - start_time
+            
+            # Should complete bulk searches quickly
+            assert search_time < 30.0  # 30 seconds for 5 searches
+            
+            # Test large result set retrieval
+            start_time = time.time()
+            
+            large_search_result = await manager.search_memories(
+                query="performance",
+                limit=100
+            )
+            
+            large_search_time = time.time() - start_time
+            
+            assert large_search_result["success"] is True
+            assert large_search_time < 10.0  # 10 seconds for large search
+            
+        finally:
+            await manager.close()
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    @pytest.mark.slow
+    async def test_concurrent_operations(self, test_config: Dict):
+        """Test concurrent operations performance."""
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            # Concurrent storage operations
+            async def store_memory_concurrent(index: int):
+                return await manager.store_memory(
+                    content=f"Concurrent test memory {index}",
+                    scope=f"concurrent/test{index % 10}",
+                    category="concurrent",
+                    tags=["concurrent", f"batch{index % 5}"]
+                )
+            
+            # Run concurrent storage
+            import time
+            start_time = time.time()
+            
+            tasks = [store_memory_concurrent(i) for i in range(20)]
+            results = await asyncio.gather(*tasks)
+            
+            concurrent_time = time.time() - start_time
+            
+            # All operations should succeed
+            assert all(r["success"] for r in results)
+            
+            # Should complete concurrent operations efficiently
+            assert concurrent_time < 30.0  # 30 seconds for 20 concurrent operations
+            
+            # Concurrent search operations
+            async def search_concurrent(query: str):
+                return await manager.search_memories(
+                    query=query,
+                    limit=10
+                )
+            
+            start_time = time.time()
+            
+            search_tasks = [
+                search_concurrent("concurrent test"),
+                search_concurrent("memory batch"),
+                search_concurrent("test concurrent"),
+                search_concurrent("batch memory")
+            ]
+            search_results = await asyncio.gather(*search_tasks)
+            
+            search_concurrent_time = time.time() - start_time
+            
+            # All searches should succeed
+            assert all(r["success"] for r in search_results)
+            
+            # Should complete concurrent searches quickly
+            assert search_concurrent_time < 15.0  # 15 seconds for 4 concurrent searches
+            
+        finally:
+            await manager.close()
+
+
+class TestE2EErrorRecovery:
+    """Test error recovery and resilience."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    async def test_storage_failure_recovery(self, test_config: Dict):
+        """Test recovery from storage failures."""
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            # Store some initial data
+            initial_result = await manager.store_memory(
+                content="Initial memory before failure",
+                scope="recovery/test"
+            )
+            assert initial_result["success"] is True
+            
+            # Simulate storage failure and recovery
+            with patch.object(manager._metadata_store, 'store_memory') as mock_store:
+                # First call fails
+                mock_store.side_effect = Exception("Simulated storage failure")
+                
+                failure_result = await manager.store_memory(
+                    content="Memory during failure",
+                    scope="recovery/failure"
+                )
+                assert failure_result["success"] is False
+                
+                # Remove the mock to simulate recovery
+                mock_store.side_effect = None
+                mock_store.return_value = None
+            
+            # Verify system can recover
+            recovery_result = await manager.store_memory(
+                content="Memory after recovery",
+                scope="recovery/after"
+            )
+            assert recovery_result["success"] is True
+            
+            # Verify initial data is still accessible
+            search_result = await manager.search_memories(
+                query="Initial memory before failure",
+                limit=5
+            )
+            assert search_result["success"] is True
+            assert len(search_result["data"]) > 0
+            
+        finally:
+            await manager.close()
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    async def test_invalid_data_handling(self, test_config: Dict):
+        """Test handling of invalid data inputs."""
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            # Test various invalid inputs
+            invalid_cases = [
+                {
+                    "content": "",  # Empty content
+                    "scope": "test/empty",
+                    "expected_error": "content"
+                },
+                {
+                    "content": "Valid content",
+                    "scope": "",  # Empty scope
+                    "expected_error": "scope"
+                },
+                {
+                    "content": "Valid content",
+                    "scope": "invalid//scope",  # Invalid scope format
+                    "expected_error": "scope"
+                },
+                {
+                    "content": "Valid content",
+                    "scope": "test/valid",
+                    "tags": "invalid_tags",  # Tags should be list
+                    "expected_error": "tags"
+                }
+            ]
+            
+            for case in invalid_cases:
+                result = await manager.store_memory(**{k: v for k, v in case.items() if k != "expected_error"})
+                assert result["success"] is False
+                assert case["expected_error"] in result["message"].lower()
+            
+            # Verify system is still functional after invalid inputs
+            valid_result = await manager.store_memory(
+                content="Valid memory after invalid inputs",
+                scope="test/valid"
+            )
+            assert valid_result["success"] is True
+            
+        finally:
+            await manager.close()
+
+
+class TestE2EDataPersistence:
+    """Test data persistence and consistency."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    async def test_data_persistence_across_restarts(self, temp_dir: Path):
+        """Test that data persists across system restarts."""
+        # Create persistent configuration
+        persistent_config = {
+            "storage": {
+                "type": "sqlite",
+                "database_url": f"sqlite:///{temp_dir / 'persistent_test.db'}",
+                "metadata_store": {
+                    "type": "sqlite",
+                    "database_url": f"sqlite:///{temp_dir / 'persistent_metadata.db'}"
+                },
+                "vector_store": {
+                    "type": "chromadb",
+                    "persist_directory": str(temp_dir / "persistent_chroma_db"),
+                    "collection_name": "persistent_memories"
+                }
+            },
+            "embedding": {
+                "provider": "openai",
+                "model": "text-embedding-3-small",
+                "api_key": "test-key"
+            }
+        }
+        
+        # First session: store data
+        manager1 = MemoryManager(config=persistent_config)
+        await manager1.initialize()
+        
+        test_memories = [
+            {
+                "content": "Persistent memory 1 about Python programming",
+                "scope": "persistent/python",
+                "category": "programming"
+            },
+            {
+                "content": "Persistent memory 2 about data science",
+                "scope": "persistent/data-science",
+                "category": "science"
+            }
+        ]
+        
+        stored_ids = []
+        for memory_data in test_memories:
+            result = await manager1.store_memory(**memory_data)
+            assert result["success"] is True
+            stored_ids.append(result["data"]["memory_id"])
+        
+        await manager1.close()
+        
+        # Second session: verify data persistence
+        manager2 = MemoryManager(config=persistent_config)
+        await manager2.initialize()
+        
+        try:
+            # Verify stored memories exist
+            for memory_id in stored_ids:
+                result = await manager2.get_memory(memory_id)
+                assert result["success"] is True
+                assert result["data"]["memory_id"] == memory_id
+            
+            # Verify search still works
+            search_result = await manager2.search_memories(
+                query="Python programming",
+                limit=10
+            )
+            assert search_result["success"] is True
+            assert len(search_result["data"]) > 0
+            
+            # Verify scopes are preserved
+            scopes_result = await manager2.get_all_scopes()
+            assert scopes_result["success"] is True
+            scope_names = [s["scope"] for s in scopes_result["data"]]
+            assert "persistent/python" in scope_names
+            assert "persistent/data-science" in scope_names
+            
+        finally:
+            await manager2.close()
+
+
+class TestE2ERealWorldScenarios:
+    """Test real-world usage scenarios."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    async def test_knowledge_management_workflow(self, test_config: Dict):
+        """Test a complete knowledge management workflow."""
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            # Simulate learning session: store related knowledge
+            learning_content = [
+                {
+                    "content": "Machine learning is a subset of artificial intelligence that focuses on algorithms that can learn from data",
+                    "scope": "learning/ml/basics",
+                    "category": "definition",
+                    "tags": ["ml", "ai", "definition"]
+                },
+                {
+                    "content": "Supervised learning uses labeled training data to learn a mapping from inputs to outputs",
+                    "scope": "learning/ml/supervised",
+                    "category": "concept",
+                    "tags": ["supervised", "learning", "training"]
+                },
+                {
+                    "content": "Neural networks are computing systems inspired by biological neural networks",
+                    "scope": "learning/ml/neural-networks",
+                    "category": "technology",
+                    "tags": ["neural-networks", "computing", "biology"]
+                }
+            ]
+            
+            # Store learning content
+            for content in learning_content:
+                result = await manager.store_memory(**content)
+                assert result["success"] is True
+            
+            # Research phase: find related information
+            research_queries = [
+                "machine learning algorithms",
+                "supervised learning training data",
+                "neural networks computing"
+            ]
+            
+            research_results = []
+            for query in research_queries:
+                result = await manager.search_memories(
+                    query=query,
+                    scope="learning/ml",
+                    include_child_scopes=True,
+                    limit=5
+                )
+                assert result["success"] is True
+                research_results.extend(result["data"])
+            
+            # Knowledge connection: discover associations
+            if research_results:
+                first_memory_id = research_results[0]["memory_id"]
+                associations_result = await manager.discover_associations(
+                    memory_id=first_memory_id,
+                    limit=10
+                )
+                assert associations_result["success"] is True
+            
+            # Organization: verify scope structure
+            scopes_result = await manager.get_all_scopes()
+            assert scopes_result["success"] is True
+            
+            # Check hierarchical organization
+            ml_scopes = [s for s in scopes_result["data"] if s["scope"].startswith("learning/ml")]
+            assert len(ml_scopes) >= 3  # basics, supervised, neural-networks
+            
+        finally:
+            await manager.close()
+    
+    @pytest.mark.asyncio
+    @pytest.mark.e2e
+    async def test_collaborative_knowledge_building(self, test_config: Dict):
+        """Test collaborative knowledge building scenario."""
+        manager = MemoryManager(config=test_config)
+        await manager.initialize()
+        
+        try:
+            # Simulate multiple contributors adding knowledge
+            contributors = {
+                "developer": [
+                    {
+                        "content": "FastAPI is a modern Python web framework for building APIs",
+                        "scope": "team/web-development/fastapi",
+                        "category": "framework",
+                        "tags": ["fastapi", "python", "api"],
+                        "metadata": {"contributor": "developer", "expertise": "backend"}
+                    }
+                ],
+                "data_scientist": [
+                    {
+                        "content": "FastAPI integrates well with ML models for serving predictions",
+                        "scope": "team/ml-ops/fastapi",
+                        "category": "integration",
+                        "tags": ["fastapi", "ml", "deployment"],
+                        "metadata": {"contributor": "data_scientist", "expertise": "ml-ops"}
+                    }
+                ],
+                "architect": [
+                    {
+                        "content": "FastAPI provides automatic API documentation and validation",
+                        "scope": "team/architecture/api-design",
+                        "category": "best-practice",
+                        "tags": ["fastapi", "documentation", "validation"],
+                        "metadata": {"contributor": "architect", "expertise": "architecture"}
+                    }
+                ]
+            }
+            
+            # Store contributions from different team members
+            all_memory_ids = []
+            for contributor, memories in contributors.items():
+                for memory in memories:
+                    result = await manager.store_memory(**memory)
+                    assert result["success"] is True
+                    all_memory_ids.append(result["data"]["memory_id"])
+            
+            # Cross-team knowledge discovery
+            fastapi_knowledge = await manager.search_memories(
+                query="FastAPI",
+                limit=20
+            )
+            assert fastapi_knowledge["success"] is True
+            assert len(fastapi_knowledge["data"]) >= 3
+            
+            # Verify diverse perspectives are captured
+            contributors_found = set()
+            for memory in fastapi_knowledge["data"]:
+                if "metadata" in memory and "contributor" in memory["metadata"]:
+                    contributors_found.add(memory["metadata"]["contributor"])
+            
+            assert len(contributors_found) >= 2  # Multiple contributors
+            
+            # Test cross-domain associations
+            if all_memory_ids:
+                associations_result = await manager.discover_associations(
+                    memory_id=all_memory_ids[0],
+                    limit=10
+                )
+                assert associations_result["success"] is True
+                
+                # Should find connections across different domains
+                association_scopes = [a["scope"] for a in associations_result["data"]]
+                unique_domains = set(scope.split("/")[1] for scope in association_scopes if "/" in scope)
+                assert len(unique_domains) >= 1  # Cross-domain connections
+            
+        finally:
+            await manager.close()

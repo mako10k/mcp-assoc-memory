@@ -135,15 +135,25 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --strict-markers --strict-config"
+addopts = "-ra -q --strict-markers --strict-config --cov=src --cov-report=term-missing --cov-report=html"
 testpaths = ["tests"]
 markers = [
     "asyncio: mark tests as async",
+    "unit: mark tests as unit tests",
+    "integration: mark tests as integration tests", 
+    "e2e: mark tests as end-to-end tests",
+    "slow: mark tests as slow running",
+    "performance: mark tests as performance tests"
 ]
 asyncio_mode = "auto"
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# Filter warnings
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
 
 [tool.coverage.run]
 source = ["src"]

@@ -250,10 +250,176 @@
             "problemMatcher": []
         },
         {
-            "label": "Test: Run Local Type Verification",
+            "label": "Test: Run Unit Tests",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-m", "unit", "--tb=short", "--maxfail=10", "-v"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": {
+                "owner": "pytest",
+                "fileLocation": "relative",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(FAILED|ERROR)\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            }
+        },
+        {
+            "label": "Test: Run Integration Tests",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-m", "integration", "--tb=short", "--maxfail=5", "-v"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": {
+                "owner": "pytest",
+                "fileLocation": "relative",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(FAILED|ERROR)\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            }
+        },
+        {
+            "label": "Test: Run All Tests with Coverage",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "--tb=short", "--cov=src", "--cov-report=term-missing", "--cov-report=html", "-v"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": {
+                "owner": "pytest",
+                "fileLocation": "relative",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(FAILED|ERROR)\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            }
+        },
+        {
+            "label": "Test: Run Quick Tests (Unit Only)",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-m", "unit", "--tb=line", "--maxfail=10", "-q"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": {
+                "owner": "pytest",
+                "fileLocation": "relative",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(FAILED|ERROR)\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            }
+        },
+        {
+            "label": "Test: Run E2E Tests",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-m", "e2e and not slow", "--tb=short", "--maxfail=3", "-v"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": {
+                "owner": "pytest",
+                "fileLocation": "relative",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(FAILED|ERROR)\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            }
+        },
+        {
+            "label": "Test: Check Setup",
+            "type": "shell",
+            "command": "python",
+            "args": ["-c", "import pytest, pytest_asyncio, pytest_cov, pytest_mock; print('✅ All test dependencies available')"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test: Local Type Verification",
             "type": "shell",
             "command": "python",
             "args": [".copilot-temp/test-local-only-00002.py"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test: Complete Test Suite",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Test: Check Setup",
+                "Test: Run Unit Tests",
+                "Test: Run Integration Tests",
+                "Test: Run E2E Tests"
+            ],
             "group": "test",
             "presentation": {
                 "echo": true,
@@ -271,7 +437,7 @@
             "dependsOn": [
                 "Lint: Run flake8",
                 "Lint: Run mypy",
-                "Test: Run Local Type Verification"
+                "Test: Complete Test Suite"
             ],
             "group": "test",
             "presentation": {
