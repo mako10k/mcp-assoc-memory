@@ -7,10 +7,14 @@ from typing import Any, Dict, List
 from fastmcp import Context
 
 from ..models import (
-    ScopeListRequest, ScopeSuggestRequest,
-    ScopeListResponse, ScopeSuggestResponse,
-    ScopeInfo, ScopeRecommendation,
-    MCPResponse, ErrorResponse
+    ScopeListRequest,
+    ScopeSuggestRequest,
+    ScopeListResponse,
+    ScopeSuggestResponse,
+    ScopeInfo,
+    ScopeRecommendation,
+    MCPResponse,
+    ErrorResponse,
 )
 from ..utils import validate_scope_path, get_child_scopes, get_parent_scope
 
@@ -18,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Module-level dependencies (set by server initialization)
 memory_manager = None
+
 
 def set_dependencies(mm: Any) -> None:
     """Set module dependencies from server initialization"""
@@ -30,10 +35,7 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
     try:
         if memory_manager is None:
             return ErrorResponse(
-                success=False,
-                error="Memory manager not initialized",
-                message="Internal server error",
-                data={}
+                success=False, error="Memory manager not initialized", message="Internal server error", data={}
             )
 
         # Get all scopes from memory manager
@@ -48,7 +50,7 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
                     success=False,
                     error="INVALID_SCOPE",
                     message=f"Invalid parent scope format: {parent_scope}",
-                    data={}
+                    data={},
                 )
             filtered_scopes = get_child_scopes(parent_scope, all_scopes)
         else:
@@ -65,12 +67,14 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
                     logger.warning(f"Failed to get memory count for scope {scope}: {e}")
                     memory_count = 0
 
-            scope_infos.append(ScopeInfo(
-                scope=scope,
-                memory_count=memory_count,
-                parent_scope=get_parent_scope(scope),
-                has_children=any(s.startswith(scope + "/") for s in all_scopes if s != scope)
-            ))
+            scope_infos.append(
+                ScopeInfo(
+                    scope=scope,
+                    memory_count=memory_count,
+                    parent_scope=get_parent_scope(scope),
+                    has_children=any(s.startswith(scope + "/") for s in all_scopes if s != scope),
+                )
+            )
 
         # Sort by scope name for consistent ordering
         scope_infos.sort(key=lambda x: x.scope)
@@ -78,20 +82,13 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
         return ScopeListResponse(
             success=True,
             message=f"Retrieved {len(scope_infos)} scopes",
-            data={
-                "scopes": scope_infos,
-                "parent_scope": parent_scope,
-                "total_count": len(scope_infos)
-            }
+            data={"scopes": scope_infos, "parent_scope": parent_scope, "total_count": len(scope_infos)},
         )
 
     except Exception as e:
         logger.error(f"Error in scope_list: {e}", exc_info=True)
         return ErrorResponse(
-            success=False,
-            error="SCOPE_LIST_ERROR",
-            message=f"Failed to list scopes: {str(e)}",
-            data={}
+            success=False, error="SCOPE_LIST_ERROR", message=f"Failed to list scopes: {str(e)}", data={}
         )
 
 
@@ -100,10 +97,7 @@ async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Sc
     try:
         if memory_manager is None:
             return ErrorResponse(
-                success=False,
-                error="Memory manager not initialized",
-                message="Internal server error",
-                data={}
+                success=False, error="Memory manager not initialized", message="Internal server error", data={}
             )
 
         content = request.content.lower()
@@ -113,92 +107,84 @@ async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Sc
         suggestions = []
 
         # Technical content patterns
-        if any(keyword in content for keyword in ['python', 'javascript', 'typescript', 'java', 'c++', 'rust', 'go']):
-            suggestions.append(ScopeRecommendation(
-                scope="learning/programming",
-                confidence=0.9,
-                reasoning="Programming language mentioned"
-            ))
+        if any(keyword in content for keyword in ["python", "javascript", "typescript", "java", "c++", "rust", "go"]):
+            suggestions.append(
+                ScopeRecommendation(
+                    scope="learning/programming", confidence=0.9, reasoning="Programming language mentioned"
+                )
+            )
 
-        if any(keyword in content for keyword in ['api', 'rest', 'graphql', 'endpoint', 'http']):
-            suggestions.append(ScopeRecommendation(
-                scope="learning/api-design",
-                confidence=0.8,
-                reasoning="API-related content detected"
-            ))
+        if any(keyword in content for keyword in ["api", "rest", "graphql", "endpoint", "http"]):
+            suggestions.append(
+                ScopeRecommendation(
+                    scope="learning/api-design", confidence=0.8, reasoning="API-related content detected"
+                )
+            )
 
         # Work-related patterns
-        if any(keyword in content for keyword in ['meeting', 'standup', 'retrospective', 'planning']):
-            suggestions.append(ScopeRecommendation(
-                scope="work/meetings",
-                confidence=0.9,
-                reasoning="Meeting-related content"
-            ))
+        if any(keyword in content for keyword in ["meeting", "standup", "retrospective", "planning"]):
+            suggestions.append(
+                ScopeRecommendation(scope="work/meetings", confidence=0.9, reasoning="Meeting-related content")
+            )
 
-        if any(keyword in content for keyword in ['project', 'deadline', 'milestone', 'task']):
-            suggestions.append(ScopeRecommendation(
-                scope="work/projects",
-                confidence=0.8,
-                reasoning="Project management content"
-            ))
+        if any(keyword in content for keyword in ["project", "deadline", "milestone", "task"]):
+            suggestions.append(
+                ScopeRecommendation(scope="work/projects", confidence=0.8, reasoning="Project management content")
+            )
 
-        if any(keyword in content for keyword in ['bug', 'issue', 'error', 'debug', 'fix']):
-            suggestions.append(ScopeRecommendation(
-                scope="work/debugging",
-                confidence=0.85,
-                reasoning="Debugging or issue resolution"
-            ))
+        if any(keyword in content for keyword in ["bug", "issue", "error", "debug", "fix"]):
+            suggestions.append(
+                ScopeRecommendation(scope="work/debugging", confidence=0.85, reasoning="Debugging or issue resolution")
+            )
 
         # Personal content patterns
-        if any(keyword in content for keyword in ['personal', 'private', 'diary', 'journal']):
-            suggestions.append(ScopeRecommendation(
-                scope="personal/thoughts",
-                confidence=0.9,
-                reasoning="Personal content detected"
-            ))
+        if any(keyword in content for keyword in ["personal", "private", "diary", "journal"]):
+            suggestions.append(
+                ScopeRecommendation(scope="personal/thoughts", confidence=0.9, reasoning="Personal content detected")
+            )
 
-        if any(keyword in content for keyword in ['idea', 'innovation', 'brainstorm', 'concept']):
-            suggestions.append(ScopeRecommendation(
-                scope="personal/ideas",
-                confidence=0.8,
-                reasoning="Creative or idea content"
-            ))
+        if any(keyword in content for keyword in ["idea", "innovation", "brainstorm", "concept"]):
+            suggestions.append(
+                ScopeRecommendation(scope="personal/ideas", confidence=0.8, reasoning="Creative or idea content")
+            )
 
         # Learning patterns
-        if any(keyword in content for keyword in ['learn', 'study', 'tutorial', 'course', 'training']):
-            suggestions.append(ScopeRecommendation(
-                scope="learning/general",
-                confidence=0.8,
-                reasoning="Learning-related content"
-            ))
+        if any(keyword in content for keyword in ["learn", "study", "tutorial", "course", "training"]):
+            suggestions.append(
+                ScopeRecommendation(scope="learning/general", confidence=0.8, reasoning="Learning-related content")
+            )
 
         # Context-aware suggestions
         if current_scope:
             # If we're in a work context, suggest work-related scopes
             if current_scope.startswith("work/"):
                 if not any(s.scope.startswith("work/") for s in suggestions):
-                    suggestions.append(ScopeRecommendation(
-                        scope="work/general",
-                        confidence=0.6,
-                        reasoning="Contextual suggestion based on current work scope"
-                    ))
+                    suggestions.append(
+                        ScopeRecommendation(
+                            scope="work/general",
+                            confidence=0.6,
+                            reasoning="Contextual suggestion based on current work scope",
+                        )
+                    )
 
             # If we're in a learning context, suggest learning-related scopes
             elif current_scope.startswith("learning/"):
                 if not any(s.scope.startswith("learning/") for s in suggestions):
-                    suggestions.append(ScopeRecommendation(
-                        scope="learning/general",
-                        confidence=0.6,
-                        reasoning="Contextual suggestion based on current learning scope"
-                    ))
+                    suggestions.append(
+                        ScopeRecommendation(
+                            scope="learning/general",
+                            confidence=0.6,
+                            reasoning="Contextual suggestion based on current learning scope",
+                        )
+                    )
 
         # Default fallback
         if not suggestions:
-            suggestions.append(ScopeRecommendation(
-                scope="user/default",
-                confidence=0.5,
-                reasoning="Default scope for unclassified content"
-            ))
+            suggestions.append(
+                ScopeRecommendation(
+                    scope="user/default", confidence=0.5, reasoning="Default scope for unclassified content"
+                )
+            )
 
         # Sort by confidence (highest first)
         suggestions.sort(key=lambda x: x.confidence, reverse=True)
@@ -215,15 +201,12 @@ async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Sc
                 "confidence": primary.confidence,
                 "reasoning": primary.reasoning,
                 "alternatives": alternatives,
-                "current_scope": current_scope
-            }
+                "current_scope": current_scope,
+            },
         )
 
     except Exception as e:
         logger.error(f"Error in scope_suggest: {e}", exc_info=True)
         return ErrorResponse(
-            success=False,
-            error="SCOPE_SUGGEST_ERROR",
-            message=f"Failed to suggest scope: {str(e)}",
-            data={}
+            success=False, error="SCOPE_SUGGEST_ERROR", message=f"Failed to suggest scope: {str(e)}", data={}
         )

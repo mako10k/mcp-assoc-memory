@@ -14,20 +14,20 @@ def setup_logging():
     """Setup logging configuration based on environment variables."""
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     log_file = os.getenv("LOG_FILE")
-    
+
     # Configure logging
     logging_config = {
         "level": getattr(logging, log_level, logging.INFO),
         "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        "datefmt": "%Y-%m-%d %H:%M:%S"
+        "datefmt": "%Y-%m-%d %H:%M:%S",
     }
-    
+
     if log_file:
         # Ensure log directory exists
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         logging_config["filename"] = log_file
-    
+
     logging.basicConfig(**logging_config)
 
 
@@ -44,29 +44,25 @@ def main():
     """Main entry point."""
     # Setup logging
     setup_logging()
-    
+
     # Get configuration
     config = get_server_config()
-    
+
     # Log startup information
     logger = logging.getLogger(__name__)
     logger.info("Starting MCP Associative Memory Server")
     logger.info(f"Server configuration: {config}")
-    
+
     # Ensure required directories exist
     data_dir = Path(os.getenv("DATA_DIR", "./data"))
     logs_dir = Path(os.getenv("LOGS_DIR", "./logs"))
-    
+
     data_dir.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
-    
+
     try:
         # Start server with HTTP transport
-        mcp.run(
-            transport="http",
-            host=config["host"],
-            port=config["port"]
-        )
+        mcp.run(transport="http", host=config["host"], port=config["port"])
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
     except Exception as e:

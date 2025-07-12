@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DatabaseConfig:
     """Database configuration"""
+
     type: str = "sqlite"  # sqlite, postgresql
     path: str = "data/memory.db"  # For SQLite
     host: str = "localhost"  # For PostgreSQL
@@ -29,6 +30,7 @@ class DatabaseConfig:
 @dataclass
 class EmbeddingConfig:
     """Embedding configuration"""
+
     provider: str = "openai"  # openai, sentence_transformers, local
     model: str = "text-embedding-3-small"
     api_key: str = ""
@@ -39,12 +41,13 @@ class EmbeddingConfig:
 @dataclass
 class StorageConfig:
     """Storage configuration"""
+
     data_dir: str = "data"
     vector_store_type: str = "chromadb"  # chromadb, faiss, local
     graph_store_type: str = "networkx"  # networkx, neo4j
     backup_enabled: bool = True
     backup_interval_hours: int = 24
-    
+
     # File sync configuration
     export_dir: str = "exports"  # Directory for memory exports
     import_dir: str = "imports"  # Directory for memory imports
@@ -56,6 +59,7 @@ class StorageConfig:
 @dataclass
 class SecurityConfig:
     """Security configuration"""
+
     auth_enabled: bool = False
     api_key_required: bool = False
     jwt_secret: str = ""
@@ -66,6 +70,7 @@ class SecurityConfig:
 @dataclass
 class TransportConfig:
     """Transport configuration"""
+
     stdio_enabled: bool = True
     http_enabled: bool = True
     sse_enabled: bool = True
@@ -79,6 +84,7 @@ class TransportConfig:
 @dataclass
 class Config:
     """Main configuration class"""
+
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
@@ -89,11 +95,7 @@ class Config:
     debug_mode: bool = False
 
     @classmethod
-    def load(
-        cls,
-        config_path: Optional[str] = None,
-        cli_args: Optional[dict] = None
-    ) -> "Config":
+    def load(cls, config_path: Optional[str] = None, cli_args: Optional[dict] = None) -> "Config":
         """
         Load configuration (CLI > environment variables > config.json > defaults)
         Specification:
@@ -159,16 +161,12 @@ class Config:
         self.database.port = int(os.getenv("DB_PORT", str(self.database.port)))
         self.database.database = os.getenv("DB_NAME", self.database.database)
         self.database.username = os.getenv("DB_USER", self.database.username)
-        self.database.password = os.getenv(
-            "DB_PASSWORD", self.database.password)
+        self.database.password = os.getenv("DB_PASSWORD", self.database.password)
 
         # Embedding configuration
-        self.embedding.provider = os.getenv(
-            "EMBEDDING_PROVIDER", self.embedding.provider)
-        self.embedding.model = os.getenv(
-            "EMBEDDING_MODEL", self.embedding.model)
-        self.embedding.api_key = os.getenv(
-            "OPENAI_API_KEY", self.embedding.api_key)
+        self.embedding.provider = os.getenv("EMBEDDING_PROVIDER", self.embedding.provider)
+        self.embedding.model = os.getenv("EMBEDDING_MODEL", self.embedding.model)
+        self.embedding.api_key = os.getenv("OPENAI_API_KEY", self.embedding.api_key)
 
         # Storage configuration
         self.storage.data_dir = os.getenv("DATA_DIR", self.storage.data_dir)
@@ -179,26 +177,15 @@ class Config:
         self.storage.max_import_size_mb = int(os.getenv("MAX_IMPORT_SIZE_MB", str(self.storage.max_import_size_mb)))
 
         # Security configuration
-        self.security.auth_enabled = os.getenv(
-            "AUTH_ENABLED", "false").lower() == "true"
-        self.security.api_key_required = os.getenv(
-            "API_KEY_REQUIRED", "false").lower() == "true"
-        self.security.jwt_secret = os.getenv(
-            "JWT_SECRET", self.security.jwt_secret)
+        self.security.auth_enabled = os.getenv("AUTH_ENABLED", "false").lower() == "true"
+        self.security.api_key_required = os.getenv("API_KEY_REQUIRED", "false").lower() == "true"
+        self.security.jwt_secret = os.getenv("JWT_SECRET", self.security.jwt_secret)
 
         # Transport configuration
-        self.transport.http_host = os.getenv(
-            "HTTP_HOST", self.transport.http_host)
-        self.transport.http_port = int(
-            os.getenv(
-                "HTTP_PORT", str(
-                    self.transport.http_port)))
-        self.transport.sse_host = os.getenv(
-            "SSE_HOST", self.transport.sse_host)
-        self.transport.sse_port = int(
-            os.getenv(
-                "SSE_PORT", str(
-                    self.transport.sse_port)))
+        self.transport.http_host = os.getenv("HTTP_HOST", self.transport.http_host)
+        self.transport.http_port = int(os.getenv("HTTP_PORT", str(self.transport.http_port)))
+        self.transport.sse_host = os.getenv("SSE_HOST", self.transport.sse_host)
+        self.transport.sse_port = int(os.getenv("SSE_PORT", str(self.transport.sse_port)))
 
         # Other settings
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
@@ -207,7 +194,7 @@ class Config:
     def _load_from_file(self, config_path: str) -> None:
         """Load configuration from file"""
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
 
             # Merge configuration (file takes priority)

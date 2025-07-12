@@ -1,6 +1,7 @@
 """
 入力値検証ユーティリティ
 """
+
 from typing import Any, Dict, Optional
 
 

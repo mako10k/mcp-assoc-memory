@@ -16,11 +16,7 @@ from .memory_manager_search import MemoryManagerSearch
 
 
 class MemoryManager(
-    MemoryManagerCore,
-    MemoryManagerSearch,
-    MemoryManagerAssociations,
-    MemoryManagerDiversified,
-    MemoryManagerAdmin
+    MemoryManagerCore, MemoryManagerSearch, MemoryManagerAssociations, MemoryManagerDiversified, MemoryManagerAdmin
 ):
     """
     Unified Memory Manager integrating all functionality
@@ -55,7 +51,7 @@ class MemoryManager(
         metadata_store: BaseMetadataStore,
         graph_store: BaseGraphStore,
         embedding_service: EmbeddingService,
-        similarity_calculator: Optional[SimilarityCalculator] = None
+        similarity_calculator: Optional[SimilarityCalculator] = None,
     ):
         """
         Initialize unified memory manager
@@ -74,11 +70,12 @@ class MemoryManager(
             metadata_store=metadata_store,
             graph_store=graph_store,
             embedding_service=embedding_service,
-            similarity_calculator=similarity_calculator
+            similarity_calculator=similarity_calculator,
         )
 
         # All other mixins inherit the same attributes
         # No additional initialization needed for mixins
+
     async def health_check(self) -> dict:
         """Comprehensive health check for all components"""
         try:
@@ -87,52 +84,76 @@ class MemoryManager(
 
             return {
                 "status": "healthy",
-                "components": {
-                    "core": core_health,
-                    "performance": performance_metrics
-                },
+                "components": {"core": core_health, "performance": performance_metrics},
                 "integrated_modules": [
                     "MemoryManagerCore",
                     "MemoryManagerSearch",
                     "MemoryManagerAssociations",
                     "MemoryManagerDiversified",
-                    "MemoryManagerAdmin"
-                ]
+                    "MemoryManagerAdmin",
+                ],
             }
         except Exception as e:
-            return {
-                "status": "unhealthy",
-                "error": str(e)
-            }
+            return {"status": "unhealthy", "error": str(e)}
 
     def get_available_methods(self) -> dict:
         """Get all available methods organized by module"""
         return {
             "core": [
-                "store_memory", "get_memory", "update_memory", "delete_memory",
-                "check_content_duplicate", "initialize", "close"
+                "store_memory",
+                "get_memory",
+                "update_memory",
+                "delete_memory",
+                "check_content_duplicate",
+                "initialize",
+                "close",
             ],
             "search": [
-                "search_memories", "semantic_search", "search_by_tags",
-                "search_by_timerange", "advanced_search", "find_similar_memories",
-                "search_by_scope_pattern", "full_text_search", "search_by_metadata",
-                "search_recently_accessed", "search_by_category", "fuzzy_search"
+                "search_memories",
+                "semantic_search",
+                "search_by_tags",
+                "search_by_timerange",
+                "advanced_search",
+                "find_similar_memories",
+                "search_by_scope_pattern",
+                "full_text_search",
+                "search_by_metadata",
+                "search_recently_accessed",
+                "search_by_category",
+                "fuzzy_search",
             ],
             "associations": [
-                "get_associations", "create_manual_association", "delete_association",
-                "update_association_strength", "get_related_memories", "rebuild_associations"
+                "get_associations",
+                "create_manual_association",
+                "delete_association",
+                "update_association_strength",
+                "get_related_memories",
+                "rebuild_associations",
             ],
             "diversified": [
-                "diversified_similarity_search", "diverse_tag_search",
-                "diverse_category_search", "explore_knowledge_space"
+                "diversified_similarity_search",
+                "diverse_tag_search",
+                "diverse_category_search",
+                "explore_knowledge_space",
             ],
             "admin": [
-                "memory_map", "scope_graph", "timeline", "category_chart",
-                "stats_dashboard", "get_performance_metrics", "move_memories_to_scope",
-                "batch_update_memories", "get_statistics", "get_memory_stats",
-                "export_memories", "import_memories", "change_memory_scope",
-                "batch_delete_memories", "cleanup_database", "get_all_scopes"
-            ]
+                "memory_map",
+                "scope_graph",
+                "timeline",
+                "category_chart",
+                "stats_dashboard",
+                "get_performance_metrics",
+                "move_memories_to_scope",
+                "batch_update_memories",
+                "get_statistics",
+                "get_memory_stats",
+                "export_memories",
+                "import_memories",
+                "change_memory_scope",
+                "batch_delete_memories",
+                "cleanup_database",
+                "get_all_scopes",
+            ],
         }
 
 

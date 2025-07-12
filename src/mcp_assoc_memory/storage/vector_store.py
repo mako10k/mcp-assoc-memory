@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 try:
     import chromadb
     from chromadb.config import Settings
+
     CHROMADB_AVAILABLE = True
 except ImportError:
     CHROMADB_AVAILABLE = False
@@ -23,16 +24,10 @@ class ChromaVectorStore(BaseVectorStore):
     """ChromaDB implementation with single collection and scope-based organization"""
 
     def __init__(
-        self,
-        persist_directory: str = "./data/chroma_db",
-        host: Optional[str] = None,
-        port: Optional[int] = None
+        self, persist_directory: str = "./data/chroma_db", host: Optional[str] = None, port: Optional[int] = None
     ):
         if not CHROMADB_AVAILABLE:
-            raise ImportError(
-                "ChromaDB is not installed. "
-                "Install it with: pip install chromadb"
-            )
+            raise ImportError("ChromaDB is not installed. " "Install it with: pip install chromadb")
 
         self.persist_directory = persist_directory
         self.host = host
@@ -45,29 +40,21 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             if self.host and self.port:
                 # Remote connection
-                self.client = chromadb.HttpClient(
-                    host=self.host,
-                    port=self.port
-                )
+                self.client = chromadb.HttpClient(host=self.host, port=self.port)
             else:
                 # Local persistence
                 self.client = chromadb.PersistentClient(
-                    path=self.persist_directory,
-                    settings=Settings(
-                        anonymized_telemetry=False,
-                        allow_reset=True
-                    )
+                    path=self.persist_directory, settings=Settings(anonymized_telemetry=False, allow_reset=True)
                 )
 
             # Initialize single collection for all memories
             collection_name = "memories"
             if self.client is None:
                 raise RuntimeError("ChromaDB client not initialized")
-                
+
             try:
                 self.collection = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: self.client.get_collection(collection_name)  # type: ignore
+                    None, lambda: self.client.get_collection(collection_name)  # type: ignore
                 )
                 logger.info(f"Using existing collection: {collection_name}")
             except Exception:
@@ -78,9 +65,9 @@ class ChromaVectorStore(BaseVectorStore):
                         name=collection_name,
                         metadata={
                             "description": "Unified memory collection with scope-based organization",
-                            "hnsw:space": "cosine"  # Use cosine distance as per design spec
+                            "hnsw:space": "cosine",  # Use cosine distance as per design spec
                         },
-                    )
+                    ),
                 )
                 logger.info(f"Created new collection: {collection_name} with cosine distance")
 
@@ -99,17 +86,12 @@ class ChromaVectorStore(BaseVectorStore):
             logger.error(f"store_embedding error: {e}")
             return False
 
-    async def store_vector(
-        self,
-        memory_id: str,
-        embedding: Any,
-        metadata: Dict[str, Any]
-    ) -> None:
+    async def store_vector(self, memory_id: str, embedding: Any, metadata: Dict[str, Any]) -> None:
         """Store vector in ChromaDB"""
         try:
             if self.collection is None:
                 raise RuntimeError("ChromaDB collection not initialized")
-                
+
             # Prepare metadata (ChromaDB requires string values)
             chroma_metadata = {}
             for key, value in metadata.items():
@@ -121,35 +103,22 @@ class ChromaVectorStore(BaseVectorStore):
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: self.collection.add(  # type: ignore
-                    ids=[memory_id],
-                    embeddings=[embedding],
-                    metadatas=[chroma_metadata]
-                )
+                    ids=[memory_id], embeddings=[embedding], metadatas=[chroma_metadata]
+                ),
             )
 
             logger.info(
-                "Vector stored successfully",
-                extra={
-                    "memory_id": memory_id,
-                    "scope": metadata.get("scope", "unknown")
-                }
+                "Vector stored successfully", extra={"memory_id": memory_id, "scope": metadata.get("scope", "unknown")}
             )
 
         except Exception as e:
-            logger.error(
-                "Failed to store vector",
-                error_code="VECTOR_STORE_ERROR",
-                memory_id=memory_id,
-                error=str(e)
-            )
+            logger.error("Failed to store vector", error_code="VECTOR_STORE_ERROR", memory_id=memory_id, error=str(e))
 
     async def get_embedding(self, memory_id: str) -> Optional[Any]:
         """Get embedding by memory ID"""
         try:
             result = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: self.collection.  # type: ignore
-                get(ids=[memory_id], include=["embeddings"])
+                None, lambda: self.collection.get(ids=[memory_id], include=["embeddings"])  # type: ignore
             )
             if result["embeddings"] and result["embeddings"][0]:
                 return result["embeddings"][0]
@@ -166,19 +135,13 @@ class ChromaVectorStore(BaseVectorStore):
         """Delete vector from ChromaDB"""
         try:
             await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: self.collection.  # type: ignore
-                delete(ids=[memory_id])
+                None, lambda: self.collection.delete(ids=[memory_id])  # type: ignore
             )
-            logger.info(
-                "Vector deleted successfully",
-                extra={"memory_id": memory_id}
-            )
+            logger.info("Vector deleted successfully", extra={"memory_id": memory_id})
             return True
         except Exception as e:
             logger.debug(
-                "Vector not found for deletion (this is normal)",
-                extra={"memory_id": memory_id, "error": str(e)}
+                "Vector not found for deletion (this is normal)", extra={"memory_id": memory_id, "error": str(e)}
             )
             # Return True because the vector doesn't exist (desired state)
             return True
@@ -190,7 +153,7 @@ class ChromaVectorStore(BaseVectorStore):
         limit: int = 10,
         min_similarity: float = 0.1,
         filters: Optional[Dict[str, Any]] = None,
-        include_child_scopes: bool = False
+        include_child_scopes: bool = False,
     ) -> List[Dict[str, Any]]:
         """Search for similar vectors with hierarchical scope support"""
         try:
@@ -206,27 +169,30 @@ class ChromaVectorStore(BaseVectorStore):
                     where_clause = {"scope": scope}
 
             # Log debug info
-            logger.info(f"[DEBUG] search_similar: scope={scope}, include_child_scopes={include_child_scopes}, where_clause={where_clause}")
+            logger.info(
+                f"[DEBUG] search_similar: scope={scope}, include_child_scopes={include_child_scopes}, where_clause={where_clause}"
+            )
 
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.collection.  # type: ignore
-                query(
+                lambda: self.collection.query(  # type: ignore
                     query_embeddings=[query_embedding],
                     n_results=int(limit * 3) if include_child_scopes else int(limit),  # Ensure integers
                     where=where_clause,
-                    include=["metadatas", "distances"]
-                )
+                    include=["metadatas", "distances"],
+                ),
             )
 
-            logger.info(f"[DEBUG] ChromaDB raw results count: {len(result['ids'][0]) if result['ids'] and result['ids'][0] else 0}")
+            logger.info(
+                f"[DEBUG] ChromaDB raw results count: {len(result['ids'][0]) if result['ids'] and result['ids'][0] else 0}"
+            )
 
             # Convert and filter results
             results = []
             if result["ids"] and result["ids"][0]:
                 for i, memory_id in enumerate(result["ids"][0]):
                     distance = result["distances"][0][i]
-                    
+
                     # Handle cosine distance properly
                     # ChromaDB cosine distance: 0 = identical, 2 = opposite
                     # Convert to similarity: 1 = identical, 0 = opposite
@@ -237,13 +203,13 @@ class ChromaVectorStore(BaseVectorStore):
                     else:
                         # Standard cosine distance to similarity conversion
                         similarity = 1.0 - distance
-                    
+
                     metadata = result["metadatas"][0][i] if result["metadatas"] and result["metadatas"][0] else {}
-                    
+
                     # Apply hierarchical scope filtering if needed
                     result_scope = metadata.get("scope", "")
                     scope_match = True
-                    
+
                     if scope and include_child_scopes:
                         # Check if result scope is under the requested scope hierarchy
                         if isinstance(result_scope, str) and isinstance(scope, str):
@@ -256,30 +222,38 @@ class ChromaVectorStore(BaseVectorStore):
                             scope_match = False
                     elif scope and not include_child_scopes:
                         # Exact scope match (already handled by where_clause, but double-check)
-                        scope_match = (result_scope == scope)
-                    
-                    logger.info(f"[DEBUG] Processing result: memory_id={memory_id}, scope={result_scope}, similarity={similarity:.3f}, scope_match={scope_match}")
-                    
+                        scope_match = result_scope == scope
+
+                    logger.info(
+                        f"[DEBUG] Processing result: memory_id={memory_id}, scope={result_scope}, similarity={similarity:.3f}, scope_match={scope_match}"
+                    )
+
                     if similarity >= min_similarity and scope_match:
-                        results.append({
-                            "id": None,  # For compatibility
-                            "memory_id": memory_id,
-                            "similarity": similarity,
-                            "distance": distance,
-                            "metadata": metadata
-                        })
+                        results.append(
+                            {
+                                "id": None,  # For compatibility
+                                "memory_id": memory_id,
+                                "similarity": similarity,
+                                "distance": distance,
+                                "metadata": metadata,
+                            }
+                        )
 
             # Limit final results
             results = results[:limit]
-            
-            logger.info(f"Vector search completed: {len(results)} results after filtering (scope={scope}, include_child={include_child_scopes})")
+
+            logger.info(
+                f"Vector search completed: {len(results)} results after filtering (scope={scope}, include_child={include_child_scopes})"
+            )
             return results
 
         except Exception as e:
             logger.error(f"Search failed: {e}")
             return []
 
-    async def search(self, embedding: Any, scope: Optional[str] = None, limit: int = 10, min_score: float = 0.7) -> List[Tuple[str, float]]:
+    async def search(
+        self, embedding: Any, scope: Optional[str] = None, limit: int = 10, min_score: float = 0.7
+    ) -> List[Tuple[str, float]]:
         """Search for similar vectors (compatibility method)"""
         results = await self.search_similar(embedding, scope, limit, min_score)
         return [(r["memory_id"], r["similarity"]) for r in results]
@@ -288,13 +262,11 @@ class ChromaVectorStore(BaseVectorStore):
         """Get vector store statistics"""
         try:
             result = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: self.collection.  # type: ignore
-                get(include=["metadatas"])
+                None, lambda: self.collection.get(include=["metadatas"])  # type: ignore
             )
-            
+
             total_count = len(result["ids"]) if result["ids"] else 0
-            
+
             # Count by scope
             scope_counts: Dict[str, int] = {}
             if result["metadatas"]:
@@ -302,21 +274,13 @@ class ChromaVectorStore(BaseVectorStore):
                     scope = metadata.get("scope", "unknown")
                     scope_counts[scope] = scope_counts.get(scope, 0) + 1
 
-            return {
-                "total_vectors": total_count,
-                "scope_counts": scope_counts,
-                "collection_name": "memories"
-            }
+            return {"total_vectors": total_count, "scope_counts": scope_counts, "collection_name": "memories"}
 
         except Exception as e:
             logger.error(f"Failed to get statistics: {e}")
             return {"error": str(e)}
 
-    async def update_metadata(
-        self,
-        memory_id: str,
-        metadata: Dict[str, Any]
-    ) -> bool:
+    async def update_metadata(self, memory_id: str, metadata: Dict[str, Any]) -> bool:
         """Update metadata for existing vector"""
         try:
             # Prepare metadata (ChromaDB requires string values)
@@ -325,26 +289,15 @@ class ChromaVectorStore(BaseVectorStore):
                 chroma_metadata[key] = str(value)
 
             await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: self.collection.  # type: ignore
-                update(
-                    ids=[memory_id],
-                    metadatas=[chroma_metadata]
-                )
+                None, lambda: self.collection.update(ids=[memory_id], metadatas=[chroma_metadata])  # type: ignore
             )
 
-            logger.info(
-                "Vector metadata updated",
-                extra={"memory_id": memory_id}
-            )
+            logger.info("Vector metadata updated", extra={"memory_id": memory_id})
             return True
 
         except Exception as e:
             logger.error(
-                "Failed to update vector metadata",
-                error_code="VECTOR_UPDATE_ERROR",
-                memory_id=memory_id,
-                error=str(e)
+                "Failed to update vector metadata", error_code="VECTOR_UPDATE_ERROR", memory_id=memory_id, error=str(e)
             )
             return False
 
@@ -362,28 +315,21 @@ class ChromaVectorStore(BaseVectorStore):
         """Check ChromaDB health status"""
         try:
             if not self.client or not self.collection:
-                return {
-                    "status": "error",
-                    "message": "ChromaDB not initialized"
-                }
+                return {"status": "error", "message": "ChromaDB not initialized"}
 
             # Get collection stats as health check
             count = self.collection.count()
-            
+
             return {
                 "status": "healthy",
                 "collection_name": self.collection.name,
                 "document_count": count,
                 "persist_directory": self.persist_directory,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
-            return {
-                "status": "error",
-                "message": str(e),
-                "timestamp": datetime.utcnow().isoformat()
-            }
+            return {"status": "error", "message": str(e), "timestamp": datetime.utcnow().isoformat()}
 
     async def get_collection_stats(self, scope: Optional[str] = None) -> Dict[str, Any]:
         """Get collection statistics, optionally filtered by scope"""
@@ -392,7 +338,7 @@ class ChromaVectorStore(BaseVectorStore):
                 return {"error": "Collection not initialized"}
 
             total_count = self.collection.count()
-            
+
             stats = {
                 "total_documents": total_count,
                 "collection_name": self.collection.name,
@@ -401,9 +347,7 @@ class ChromaVectorStore(BaseVectorStore):
             if scope:
                 # Get documents for specific scope
                 try:
-                    results = self.collection.get(
-                        where={"scope": scope}
-                    )
+                    results = self.collection.get(where={"scope": scope})
                     scope_count = len(results.get("ids", []))
                     stats["scope_documents"] = scope_count
                     stats["filtered_by_scope"] = scope
@@ -414,9 +358,5 @@ class ChromaVectorStore(BaseVectorStore):
             return stats
 
         except Exception as e:
-            logger.error(
-                "Failed to get collection stats",
-                error_code="COLLECTION_STATS_ERROR",
-                error=str(e)
-            )
+            logger.error("Failed to get collection stats", error_code="COLLECTION_STATS_ERROR", error=str(e))
             return {"error": str(e)}

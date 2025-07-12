@@ -1,6 +1,7 @@
 """
 メトリクス収集基盤
 """
+
 import time
 from typing import Any, Dict, Callable
 
@@ -20,6 +21,7 @@ class MetricsCollector:
 
         def done() -> None:
             self.metrics[name] = time.time() - start
+
         return done
 
     def get_metrics(self) -> Dict[str, Any]:

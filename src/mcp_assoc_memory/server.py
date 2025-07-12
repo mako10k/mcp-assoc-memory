@@ -24,15 +24,37 @@ from .storage.graph_store import NetworkXGraphStore
 from .config import get_config
 from .simple_persistence import get_persistent_storage
 from .api.models import (
-    MemoryStoreRequest, MemorySearchRequest, DiversifiedSearchRequest, UnifiedSearchRequest, 
-    MemoryManageRequest, MemorySyncRequest, MemoryUpdateRequest,
-    MemoryMoveRequest, ScopeListRequest, ScopeSuggestRequest,
-    SessionManageRequest, MemoryExportRequest, MemoryImportRequest,
-    Memory, SearchResult, Association, MemoryWithAssociations,
-    SearchResultWithAssociations, ScopeInfo, ScopeRecommendation,
-    SessionInfo, PaginationInfo, MemoryResponse, ScopeListResponse,
-    ScopeSuggestResponse, MemoryMoveResponse, SessionManageResponse,
-    MemoryImportResponse, MemoryExportResponse, MCPResponse, ErrorResponse
+    MemoryStoreRequest,
+    MemorySearchRequest,
+    DiversifiedSearchRequest,
+    UnifiedSearchRequest,
+    MemoryManageRequest,
+    MemorySyncRequest,
+    MemoryUpdateRequest,
+    MemoryMoveRequest,
+    ScopeListRequest,
+    ScopeSuggestRequest,
+    SessionManageRequest,
+    MemoryExportRequest,
+    MemoryImportRequest,
+    Memory,
+    SearchResult,
+    Association,
+    MemoryWithAssociations,
+    SearchResultWithAssociations,
+    ScopeInfo,
+    ScopeRecommendation,
+    SessionInfo,
+    PaginationInfo,
+    MemoryResponse,
+    ScopeListResponse,
+    ScopeSuggestResponse,
+    MemoryMoveResponse,
+    SessionManageResponse,
+    MemoryImportResponse,
+    MemoryExportResponse,
+    MCPResponse,
+    ErrorResponse,
 )
 from .api.utils import validate_scope_path, get_child_scopes, get_parent_scope
 from .api.tools import (
@@ -60,7 +82,7 @@ from .api.tools import (
     handle_memory_stats,
     handle_scope_memories,
     handle_analyze_memories_prompt,
-    handle_summarize_memory_prompt
+    handle_summarize_memory_prompt,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,7 +115,7 @@ memory_manager = MemoryManager(
     metadata_store=metadata_store,
     graph_store=graph_store,
     embedding_service=embedding_service,
-    similarity_calculator=similarity_calculator
+    similarity_calculator=similarity_calculator,
 )
 
 # Fallback simple storage for compatibility
@@ -148,13 +170,10 @@ Stores your content as a searchable memory, automatically discovers connections 
         "title": "Memory Storage with Auto-Association",
         "readOnlyHint": False,
         "destructiveHint": False,
-        "idempotentHint": False
-    }
+        "idempotentHint": False,
+    },
 )
-async def memory_store(
-    request: MemoryStoreRequest,
-    ctx: Context
-) -> MemoryResponse:
+async def memory_store(request: MemoryStoreRequest, ctx: Context) -> MemoryResponse:
     """Store a memory with full associative capabilities"""
     return await handle_memory_store(request, ctx)
 
@@ -196,19 +215,16 @@ Retrieves all stored memories with pagination support, providing a complete over
 ⚠️ Important: Large collections may take time to load; prefer memory_search for targeted access
 
 ➡️ What's next: Use memory_search for specific content, scope_list for organization overview""",
-    annotations={
-        "title": "All Memories List",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True
-    }
+    annotations={"title": "All Memories List", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True},
 )
 async def memory_list_all(
     ctx: Context,
-    page: Annotated[int, Field(
-        default=1, 
-        ge=1, 
-        description="""Page number for pagination:
+    page: Annotated[
+        int,
+        Field(
+            default=1,
+            ge=1,
+            description="""Page number for pagination:
         
         Navigation Strategy:
         • Start with page=1 for initial overview
@@ -217,13 +233,16 @@ async def memory_list_all(
         • Monitor total_pages to understand collection size
         
         Example: page=1 for first overview, page=3 for deeper exploration""",
-        examples=[1, 2, 3]
-    )] = 1,
-    per_page: Annotated[int, Field(
-        default=10, 
-        ge=1, 
-        le=100, 
-        description="""Items per page (1-100):
+            examples=[1, 2, 3],
+        ),
+    ] = 1,
+    per_page: Annotated[
+        int,
+        Field(
+            default=10,
+            ge=1,
+            le=100,
+            description="""Items per page (1-100):
         
         Values & Use Cases:
         • 5-10: Quick overview (manageable chunks) ← RECOMMENDED
@@ -232,8 +251,9 @@ async def memory_list_all(
         
         Strategy: Start with 10, increase for bulk operations
         Example: per_page=25 for efficient content review""",
-        examples=[10, 25, 50]
-    )] = 10
+            examples=[10, 25, 50],
+        ),
+    ] = 10,
 ) -> Dict[str, Any]:
     """List all memories with pagination (for debugging)"""
     return await handle_memory_list_all(page, per_page, ctx)
@@ -253,27 +273,21 @@ async def get_scope_memories(scope: str, ctx: Context) -> dict:
 
 
 # Prompt definitions - LLM interaction patterns
-@mcp.prompt(
-    name="analyze_memories",
-    description="Generate prompts for memory analysis"
-)
+@mcp.prompt(name="analyze_memories", description="Generate prompts for memory analysis")
 async def analyze_memories_prompt(
     ctx: Context,
     scope: Annotated[str, Field(default="user/default", description="Target scope for analysis")] = "user/default",
-    include_child_scopes: Annotated[bool, Field(default=True, description="Include child scopes in analysis")] = True
+    include_child_scopes: Annotated[bool, Field(default=True, description="Include child scopes in analysis")] = True,
 ) -> str:
     """Generate memory analysis prompt"""
     return await handle_analyze_memories_prompt(scope, include_child_scopes, ctx)
 
 
-@mcp.prompt(
-    name="summarize_memory",
-    description="Generate prompts for summarizing specific memories"
-)
+@mcp.prompt(name="summarize_memory", description="Generate prompts for summarizing specific memories")
 async def summarize_memory_prompt(
     ctx: Context,
     memory_id: Annotated[str, Field(description="ID of the memory to summarize")],
-    context_scope: Annotated[str, Field(default="", description="Contextual scope for summary generation")] = ""
+    context_scope: Annotated[str, Field(default="", description="Contextual scope for summary generation")] = "",
 ) -> str:
     """Generate memory summary prompt"""
     return await handle_summarize_memory_prompt(memory_id, context_scope, ctx)
@@ -305,8 +319,8 @@ Provides complete session lifecycle management including creation, listing, and 
         "title": "Session Lifecycle Management",
         "readOnlyHint": False,
         "destructiveHint": False,
-        "idempotentHint": False
-    }
+        "idempotentHint": False,
+    },
 )
 async def session_manage(request: SessionManageRequest, ctx: Context):
     """Manage sessions and cleanup"""
@@ -339,8 +353,8 @@ Displays the hierarchical structure of all scopes with memory counts, helping yo
         "title": "Scope Hierarchy List",
         "readOnlyHint": True,
         "destructiveHint": False,
-        "idempotentHint": True
-    }
+        "idempotentHint": True,
+    },
 )
 async def scope_list(request: ScopeListRequest, ctx: Context):
     """List scopes with pagination and hierarchy"""
@@ -373,8 +387,8 @@ Analyzes your content using keyword detection and context patterns to recommend 
         "title": "Scope Recommendation",
         "readOnlyHint": True,
         "destructiveHint": False,
-        "idempotentHint": True
-    }
+        "idempotentHint": True,
+    },
 )
 async def scope_suggest(request: ScopeSuggestRequest, ctx: Context):
     """Suggest scope based on content analysis"""
@@ -409,12 +423,7 @@ Moves specified memories from their current scopes to a new target scope, preser
 ⚠️ Important: Cannot undo moves; verify target_scope before execution
 
 ➡️ What's next: Use scope_list to verify new organization, memory_search in new scope to confirm placement""",
-    annotations={
-        "title": "Memory Move",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False
-    }
+    annotations={"title": "Memory Move", "readOnlyHint": False, "destructiveHint": False, "idempotentHint": False},
 )
 async def memory_move(request: MemoryMoveRequest, ctx: Context):
     """Move memories to a new scope"""
@@ -446,14 +455,11 @@ Takes a specific memory as starting point and finds semantically related memorie
         "title": "Memory Association Discovery",
         "readOnlyHint": True,
         "destructiveHint": False,
-        "idempotentHint": True
-    }
+        "idempotentHint": True,
+    },
 )
 async def memory_discover_associations(
-    memory_id: str,
-    limit: int = 10,
-    similarity_threshold: float = 0.1,
-    ctx: Optional[Context] = None
+    memory_id: str, limit: int = 10, similarity_threshold: float = 0.1, ctx: Optional[Context] = None
 ):
     """Discover semantic associations for a specific memory"""
     return await handle_memory_discover_associations(memory_id, ctx, limit, similarity_threshold)
@@ -484,13 +490,10 @@ Provides unified interface for both standard semantic search and diversified sea
         "title": "Memory Search Interface",
         "readOnlyHint": True,
         "destructiveHint": False,
-        "idempotentHint": True
-    }
+        "idempotentHint": True,
+    },
 )
-async def memory_search(
-    request: UnifiedSearchRequest,
-    ctx: Context
-) -> List[MemoryResponse]:
+async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> List[MemoryResponse]:
     """Unified search supporting both standard and diversified modes"""
     # Delegate to handler
     result = await handle_unified_search(request, ctx)
@@ -525,13 +528,10 @@ Provides unified interface for memory retrieval, updates, and deletion using ope
         "title": "Unified Memory Management",
         "readOnlyHint": False,
         "destructiveHint": True,
-        "idempotentHint": False
-    }
+        "idempotentHint": False,
+    },
 )
-async def memory_manage(
-    request: MemoryManageRequest,
-    ctx: Context
-) -> Dict[str, Any]:
+async def memory_manage(request: MemoryManageRequest, ctx: Context) -> Dict[str, Any]:
     """Unified CRUD operations for memory management"""
     # Delegate to handler
     return await handle_memory_manage(request, ctx)
@@ -562,19 +562,17 @@ Provides unified interface for both import and export operations using operation
         "title": "Unified Memory Synchronization",
         "readOnlyHint": False,
         "destructiveHint": True,
-        "idempotentHint": False
-    }
+        "idempotentHint": False,
+    },
 )
-async def memory_sync(
-    request: MemorySyncRequest,
-    ctx: Context
-) -> Dict[str, Any]:
+async def memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[str, Any]:
     """Unified import/export operations for memory synchronization"""
     # Delegate to handler
     return await handle_memory_sync(request, ctx)
 
 
 if __name__ == "__main__":
+
     async def startup():
         """Initialize the memory system on startup"""
         try:
@@ -583,23 +581,23 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"Failed to initialize associative memory system: {e}")
             # Continue with simple storage as fallback
-    
+
     # Initialize before running
     asyncio.run(startup())
-    
+
     # Use transport configuration from config file
-    transport_config = config.get('transport', {})
-    
-    if transport_config.get('http_enabled', False):
+    transport_config = config.get("transport", {})
+
+    if transport_config.get("http_enabled", False):
         # HTTP transport
-        port = transport_config.get('http_port', 8000)
-        host = transport_config.get('http_host', '0.0.0.0')
+        port = transport_config.get("http_port", 8000)
+        host = transport_config.get("http_host", "0.0.0.0")
         logger.info(f"Starting server on HTTP transport: {host}:{port}")
         mcp.run(transport="http", host=host, port=port)
-    elif transport_config.get('sse_enabled', False):
+    elif transport_config.get("sse_enabled", False):
         # SSE transport
-        port = transport_config.get('sse_port', 8000)
-        host = transport_config.get('sse_host', '0.0.0.0')
+        port = transport_config.get("sse_port", 8000)
+        host = transport_config.get("sse_host", "0.0.0.0")
         logger.info(f"Starting server on SSE transport: {host}:{port}")
         mcp.run(transport="sse", host=host, port=port)
     else:

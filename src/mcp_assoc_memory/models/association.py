@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class Association:
     """記憶間の関連性"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     source_memory_id: str = ""
     target_memory_id: str = ""
@@ -65,6 +66,7 @@ class Association:
 @dataclass
 class AssociationGraph:
     """関連性グラフ"""
+
     # memory_id -> node_data
     nodes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     # association_id -> association
@@ -78,30 +80,17 @@ class AssociationGraph:
         """関連性エッジを追加"""
         self.edges[association.id] = association
 
-    def get_related_memories(
-        self, memory_id: str, min_strength: float = 0.0
-    ) -> List[Dict[str, Any]]:
+    def get_related_memories(self, memory_id: str, min_strength: float = 0.0) -> List[Dict[str, Any]]:
         """関連する記憶を取得"""
         related = []
         for assoc in self.edges.values():
             if assoc.strength >= min_strength:
                 if assoc.source_memory_id == memory_id:
-                    related.append({
-                        "memory_id": assoc.target_memory_id,
-                        "association": assoc,
-                        "direction": "outgoing"
-                    })
+                    related.append({"memory_id": assoc.target_memory_id, "association": assoc, "direction": "outgoing"})
                 elif assoc.target_memory_id == memory_id:
-                    related.append({
-                        "memory_id": assoc.source_memory_id,
-                        "association": assoc,
-                        "direction": "incoming"
-                    })
+                    related.append({"memory_id": assoc.source_memory_id, "association": assoc, "direction": "incoming"})
         return related
 
     def to_dict(self) -> Dict[str, Any]:
         """辞書形式に変換"""
-        return {
-            "nodes": self.nodes,
-            "edges": {k: v.to_dict() for k, v in self.edges.items()}
-        }
+        return {"nodes": self.nodes, "edges": {k: v.to_dict() for k, v in self.edges.items()}}

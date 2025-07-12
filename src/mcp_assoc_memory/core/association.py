@@ -19,15 +19,17 @@ logger = get_memory_logger(__name__)
 
 class AssociationType(Enum):
     """関連性の種類"""
+
     SEMANTIC = "semantic"  # 意味的関連
     TEMPORAL = "temporal"  # 時間的関連
-    CAUSAL = "causal"     # 因果関連
-    SIMILAR = "similar"   # 類似関連
+    CAUSAL = "causal"  # 因果関連
+    SIMILAR = "similar"  # 類似関連
     CONTEXTUAL = "contextual"  # 文脈的関連
 
 
 class AssociationStrength(Enum):
     """関連強度レベル"""
+
     WEAK = (0.0, 0.3)
     MODERATE = (0.3, 0.7)
     STRONG = (0.7, 1.0)
@@ -41,11 +43,9 @@ class AssociationEngine:
         similarity_calculator: Optional[SimilarityCalculator] = None,
         temporal_threshold_hours: int = 24,
         semantic_threshold: float = 0.7,
-        context_window_size: int = 5
+        context_window_size: int = 5,
     ):
-        self.similarity_calculator = (
-            similarity_calculator or SimilarityCalculator()
-        )
+        self.similarity_calculator = similarity_calculator or SimilarityCalculator()
         self.temporal_threshold = timedelta(hours=temporal_threshold_hours)
         self.semantic_threshold = semantic_threshold
         self.context_window_size = context_window_size
@@ -55,7 +55,7 @@ class AssociationEngine:
         target_memory: Memory,
         target_embedding: np.ndarray,
         candidate_memories: List[Tuple[Memory, np.ndarray]],
-        association_types: Optional[List[AssociationType]] = None
+        association_types: Optional[List[AssociationType]] = None,
     ) -> List[Association]:
         """指定した記憶に対する関連性を生成"""
         if association_types is None:
@@ -66,10 +66,7 @@ class AssociationEngine:
         try:
             for assoc_type in association_types:
                 type_associations = await self._generate_type_associations(
-                    target_memory,
-                    target_embedding,
-                    candidate_memories,
-                    assoc_type
+                    target_memory, target_embedding, candidate_memories, assoc_type
                 )
                 associations.extend(type_associations)
 
@@ -82,8 +79,8 @@ class AssociationEngine:
                     "target_memory_id": target_memory.id,
                     "candidate_count": len(candidate_memories),
                     "association_count": len(associations),
-                    "association_types": [t.value for t in association_types]
-                }
+                    "association_types": [t.value for t in association_types],
+                },
             )
 
             return associations
@@ -93,7 +90,7 @@ class AssociationEngine:
                 "Failed to generate associations",
                 error_code="ASSOCIATION_GENERATION_ERROR",
                 target_memory_id=target_memory.id,
-                error=str(e)
+                error=str(e),
             )
             return []
 
@@ -102,7 +99,7 @@ class AssociationEngine:
         target_memory: Memory,
         target_embedding: np.ndarray,
         candidate_memories: List[Tuple[Memory, np.ndarray]],
-        association_type: AssociationType
+        association_type: AssociationType,
     ) -> List[Association]:
         """特定タイプの関連性を生成"""
         associations = []
@@ -113,19 +110,12 @@ class AssociationEngine:
                 continue
 
             # Scope compatibility check
-            if not self._is_scope_compatible(
-                target_memory.scope,
-                candidate_memory.scope
-            ):
+            if not self._is_scope_compatible(target_memory.scope, candidate_memory.scope):
                 continue
 
             # 関連性計算
             strength = await self._calculate_association_strength(
-                target_memory,
-                target_embedding,
-                candidate_memory,
-                candidate_embedding,
-                association_type
+                target_memory, target_embedding, candidate_memory, candidate_embedding, association_type
             )
 
             if strength > 0.1:  # 最小閾値
@@ -137,8 +127,8 @@ class AssociationEngine:
                     auto_generated=True,
                     metadata={
                         "generation_method": association_type.value,
-                        "calculated_at": datetime.utcnow().isoformat()
-                    }
+                        "calculated_at": datetime.utcnow().isoformat(),
+                    },
                 )
                 associations.append(association)
 
@@ -150,30 +140,24 @@ class AssociationEngine:
         embedding1: np.ndarray,
         memory2: Memory,
         embedding2: np.ndarray,
-        association_type: AssociationType
+        association_type: AssociationType,
     ) -> float:
         """関連強度を計算"""
         try:
             if association_type == AssociationType.SEMANTIC:
-                return self._calculate_semantic_strength(
-                    embedding1, embedding2
-                )
+                return self._calculate_semantic_strength(embedding1, embedding2)
 
             elif association_type == AssociationType.TEMPORAL:
                 return self._calculate_temporal_strength(memory1, memory2)
 
             elif association_type == AssociationType.SIMILAR:
-                return self._calculate_similarity_strength(
-                    embedding1, embedding2
-                )
+                return self._calculate_similarity_strength(embedding1, embedding2)
 
             elif association_type == AssociationType.CONTEXTUAL:
                 return self._calculate_contextual_strength(memory1, memory2)
 
             elif association_type == AssociationType.CAUSAL:
-                return self._calculate_causal_strength(
-                    memory1, embedding1, memory2, embedding2
-                )
+                return self._calculate_causal_strength(memory1, embedding1, memory2, embedding2)
             # All enum values are covered above - this should never be reached
 
         except Exception as e:
@@ -181,21 +165,13 @@ class AssociationEngine:
                 "Failed to calculate association strength",
                 error_code="STRENGTH_CALC_ERROR",
                 association_type=association_type.value,
-                error=str(e)
+                error=str(e),
             )
             return 0.0
 
-    def _calculate_semantic_strength(
-        self,
-        embedding1: np.ndarray,
-        embedding2: np.ndarray
-    ) -> float:
+    def _calculate_semantic_strength(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """意味的関連強度を計算"""
-        similarity = self.similarity_calculator.calculate_similarity(
-            embedding1,
-            embedding2,
-            SimilarityMetric.COSINE
-        )
+        similarity = self.similarity_calculator.calculate_similarity(embedding1, embedding2, SimilarityMetric.COSINE)
 
         # 意味的関連は高い類似度が必要
         if similarity >= self.semantic_threshold:
@@ -203,35 +179,20 @@ class AssociationEngine:
 
         return 0.0
 
-    def _calculate_temporal_strength(
-        self,
-        memory1: Memory,
-        memory2: Memory
-    ) -> float:
+    def _calculate_temporal_strength(self, memory1: Memory, memory2: Memory) -> float:
         """時間的関連強度を計算"""
         time_diff = abs(memory1.created_at - memory2.created_at)
 
         if time_diff <= self.temporal_threshold:
             # 時間差が小さいほど強い関連
-            strength = 1.0 - (
-                time_diff.total_seconds()
-                / self.temporal_threshold.total_seconds()
-            )
+            strength = 1.0 - (time_diff.total_seconds() / self.temporal_threshold.total_seconds())
             return max(0.0, strength)
 
         return 0.0
 
-    def _calculate_similarity_strength(
-        self,
-        embedding1: np.ndarray,
-        embedding2: np.ndarray
-    ) -> float:
+    def _calculate_similarity_strength(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """類似関連強度を計算"""
-        similarity = self.similarity_calculator.calculate_similarity(
-            embedding1,
-            embedding2,
-            SimilarityMetric.EUCLIDEAN
-        )
+        similarity = self.similarity_calculator.calculate_similarity(embedding1, embedding2, SimilarityMetric.EUCLIDEAN)
 
         # 類似関連は中程度の類似度から有効
         if similarity >= 0.5:
@@ -239,44 +200,28 @@ class AssociationEngine:
 
         return 0.0
 
-    def _calculate_contextual_strength(
-        self,
-        memory1: Memory,
-        memory2: Memory
-    ) -> float:
+    def _calculate_contextual_strength(self, memory1: Memory, memory2: Memory) -> float:
         """文脈的関連強度を計算"""
         strength = 0.0
 
         # タグの重複度
         common_tags = set(memory1.tags) & set(memory2.tags)
         if common_tags:
-            tag_overlap = len(common_tags) / max(
-                len(memory1.tags), len(memory2.tags)
-            )
+            tag_overlap = len(common_tags) / max(len(memory1.tags), len(memory2.tags))
             strength += tag_overlap * 0.5
 
         # メタデータの類似性
-        metadata_similarity = self._calculate_metadata_similarity(
-            memory1.metadata,
-            memory2.metadata
-        )
+        metadata_similarity = self._calculate_metadata_similarity(memory1.metadata, memory2.metadata)
         strength += metadata_similarity * 0.3
 
         # Scope relationship
-        scope_strength = self._calculate_scope_strength(
-            memory1.scope,
-            memory2.scope
-        )
+        scope_strength = self._calculate_scope_strength(memory1.scope, memory2.scope)
         strength += scope_strength * 0.2
 
         return min(1.0, strength)
 
     def _calculate_causal_strength(
-        self,
-        memory1: Memory,
-        embedding1: np.ndarray,
-        memory2: Memory,
-        embedding2: np.ndarray
+        self, memory1: Memory, embedding1: np.ndarray, memory2: Memory, embedding2: np.ndarray
     ) -> float:
         """因果関連強度を計算"""
         # 時間的順序の確認
@@ -285,9 +230,7 @@ class AssociationEngine:
 
         # 意味的関連の確認
         semantic_similarity = self.similarity_calculator.calculate_similarity(
-            embedding1,
-            embedding2,
-            SimilarityMetric.COSINE
+            embedding1, embedding2, SimilarityMetric.COSINE
         )
 
         # 時間的近接度
@@ -299,11 +242,7 @@ class AssociationEngine:
 
         return 0.0
 
-    def _calculate_metadata_similarity(
-        self,
-        metadata1: Dict[str, Any],
-        metadata2: Dict[str, Any]
-    ) -> float:
+    def _calculate_metadata_similarity(self, metadata1: Dict[str, Any], metadata2: Dict[str, Any]) -> float:
         """メタデータ類似度を計算"""
         if not metadata1 or not metadata2:
             return 0.0
@@ -319,58 +258,48 @@ class AssociationEngine:
 
         return matches / len(common_keys)
 
-    def _calculate_scope_strength(
-        self,
-        scope1: str,
-        scope2: str
-    ) -> float:
+    def _calculate_scope_strength(self, scope1: str, scope2: str) -> float:
         """Calculate scope relationship strength"""
         if scope1 == scope2:
             return 1.0
 
         # Split scopes into parts for hierarchical comparison
-        parts1 = scope1.split('/')
-        parts2 = scope2.split('/')
-        
+        parts1 = scope1.split("/")
+        parts2 = scope2.split("/")
+
         # Calculate common prefix length
         common_length = 0
         min_length = min(len(parts1), len(parts2))
-        
+
         for i in range(min_length):
             if parts1[i] == parts2[i]:
                 common_length += 1
             else:
                 break
-        
+
         # Calculate strength based on common hierarchy depth
         max_depth = max(len(parts1), len(parts2))
         if max_depth == 0:
             return 0.0
-            
+
         strength = common_length / max_depth
         return max(0.0, min(1.0, strength))
 
-    def _is_scope_compatible(
-        self,
-        scope1: str,
-        scope2: str
-    ) -> bool:
+    def _is_scope_compatible(self, scope1: str, scope2: str) -> bool:
         """Check scope compatibility"""
         # Session scopes are only compatible with same session
-        if scope1.startswith('session/') and scope2.startswith('session/'):
+        if scope1.startswith("session/") and scope2.startswith("session/"):
             return scope1 == scope2
-        
+
         # Session scopes are not compatible with global scopes
-        if (scope1.startswith('session/') and scope2 == 'global') or \
-           (scope2.startswith('session/') and scope1 == 'global'):
+        if (scope1.startswith("session/") and scope2 == "global") or (
+            scope2.startswith("session/") and scope1 == "global"
+        ):
             return False
 
         return True
 
-    def _deduplicate_associations(
-        self,
-        associations: List[Association]
-    ) -> List[Association]:
+    def _deduplicate_associations(self, associations: List[Association]) -> List[Association]:
         """重複関連性を除去"""
         seen_pairs = set()
         deduplicated = []
@@ -382,17 +311,13 @@ class AssociationEngine:
             pair_key = (assoc.source_memory_id, assoc.target_memory_id)
             reverse_pair_key = (assoc.target_memory_id, assoc.source_memory_id)
 
-            if (pair_key not in seen_pairs
-                    and reverse_pair_key not in seen_pairs):
+            if pair_key not in seen_pairs and reverse_pair_key not in seen_pairs:
                 seen_pairs.add(pair_key)
                 deduplicated.append(assoc)
 
         return deduplicated
 
-    def get_association_strength_level(
-        self,
-        strength: float
-    ) -> AssociationStrength:
+    def get_association_strength_level(self, strength: float) -> AssociationStrength:
         """関連強度のレベルを取得"""
         for level in AssociationStrength:
             min_val, max_val = level.value
@@ -402,29 +327,16 @@ class AssociationEngine:
         return AssociationStrength.WEAK
 
     def filter_associations_by_strength(
-        self,
-        associations: List[Association],
-        min_level: AssociationStrength = AssociationStrength.MODERATE
+        self, associations: List[Association], min_level: AssociationStrength = AssociationStrength.MODERATE
     ) -> List[Association]:
         """関連強度でフィルタリング"""
         min_strength = min_level.value[0]
-        return [
-            assoc for assoc in associations
-            if assoc.strength >= min_strength
-        ]
+        return [assoc for assoc in associations if assoc.strength >= min_strength]
 
-    def get_association_statistics(
-        self,
-        associations: List[Association]
-    ) -> Dict[str, Any]:
+    def get_association_statistics(self, associations: List[Association]) -> Dict[str, Any]:
         """関連性統計を取得"""
         if not associations:
-            return {
-                "total_count": 0,
-                "by_type": {},
-                "by_strength_level": {},
-                "avg_strength": 0.0
-            }
+            return {"total_count": 0, "by_type": {}, "by_strength_level": {}, "avg_strength": 0.0}
 
         # タイプ別統計
         by_type: Dict[str, int] = {}
@@ -437,14 +349,10 @@ class AssociationEngine:
         for assoc in associations:
             level = self.get_association_strength_level(assoc.strength)
             level_name = level.name.lower()
-            by_strength_level[level_name] = (
-                by_strength_level.get(level_name, 0) + 1
-            )
+            by_strength_level[level_name] = by_strength_level.get(level_name, 0) + 1
 
         # 平均強度
-        avg_strength = (
-            sum(a.strength for a in associations) / len(associations)
-        )
+        avg_strength = sum(a.strength for a in associations) / len(associations)
 
         return {
             "total_count": len(associations),
@@ -452,5 +360,5 @@ class AssociationEngine:
             "by_strength_level": by_strength_level,
             "avg_strength": avg_strength,
             "max_strength": max(a.strength for a in associations),
-            "min_strength": min(a.strength for a in associations)
+            "min_strength": min(a.strength for a in associations),
         }

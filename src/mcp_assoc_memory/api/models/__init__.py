@@ -15,7 +15,7 @@ from .requests import (
     ScopeSuggestRequest,
     SessionManageRequest,
     MemoryExportRequest,
-    MemoryImportRequest
+    MemoryImportRequest,
 )
 
 from .responses import (
@@ -43,10 +43,10 @@ from .responses import (
     MemoryExportResponse,
     MemoryImportResponse,
     ErrorResponse,
-    MCPResponse
+    MCPResponse,
 )
 
-__all__ = [    # Request models
+__all__ = [  # Request models
     "MemoryStoreRequest",
     "MemorySearchRequest",
     "DiversifiedSearchRequest",
@@ -60,7 +60,6 @@ __all__ = [    # Request models
     "SessionManageRequest",
     "MemoryExportRequest",
     "MemoryImportRequest",
-    
     # Response models
     "Memory",
     "SearchResult",
@@ -74,7 +73,7 @@ __all__ = [    # Request models
     "MemoryResponse",
     "MemoryStoreResponse",
     "MemorySearchResponse",
-    "MemoryGetResponse", 
+    "MemoryGetResponse",
     "MemoryUpdateResponse",
     "MemoryDeleteResponse",
     "MemoryMoveResponse",
@@ -86,5 +85,5 @@ __all__ = [    # Request models
     "MemoryExportResponse",
     "MemoryImportResponse",
     "ErrorResponse",
-    "MCPResponse"
+    "MCPResponse",
 ]

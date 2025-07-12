@@ -9,6 +9,7 @@ from datetime import datetime
 
 class Memory(BaseModel):
     """Memory model with all fields"""
+
     id: str = Field(description="Unique memory identifier")
     content: str = Field(description="Memory content")
     scope: str = Field(description="Memory scope for hierarchical organization")
@@ -21,12 +22,14 @@ class Memory(BaseModel):
 
 class SearchResult(BaseModel):
     """Search result with similarity score"""
+
     memory: Memory = Field(description="Memory object")
     similarity_score: float = Field(description="Similarity score (0.0-1.0)")
 
 
 class Association(BaseModel):
     """Memory association"""
+
     source_id: str = Field(description="Source memory ID")
     target_id: str = Field(description="Target memory ID")
     association_type: str = Field(description="Type of association (semantic, temporal, causal, similar)")
@@ -37,12 +40,14 @@ class Association(BaseModel):
 
 class MemoryWithAssociations(BaseModel):
     """Memory with its associations"""
+
     memory: Memory = Field(description="Memory object")
     associations: List[Association] = Field(default_factory=list, description="Related associations")
 
 
 class SearchResultWithAssociations(BaseModel):
     """Search result with associations"""
+
     memory: Memory = Field(description="Memory object")
     similarity_score: float = Field(description="Similarity score (0.0-1.0)")
     associations: List[Association] = Field(default_factory=list, description="Related associations")
@@ -50,6 +55,7 @@ class SearchResultWithAssociations(BaseModel):
 
 class ScopeInfo(BaseModel):
     """Scope information with statistics"""
+
     scope: str = Field(description="Scope path")
     memory_count: int = Field(default=0, description="Number of memories in this scope")
     child_scopes: List[str] = Field(default_factory=list, description="Child scope paths")
@@ -57,6 +63,7 @@ class ScopeInfo(BaseModel):
 
 class ScopeRecommendation(BaseModel):
     """Scope recommendation with confidence"""
+
     scope: str = Field(description="Recommended scope")
     confidence: float = Field(description="Confidence score (0.0-1.0)")
     reasoning: str = Field(description="Explanation for the recommendation")
@@ -64,6 +71,7 @@ class ScopeRecommendation(BaseModel):
 
 class SessionInfo(BaseModel):
     """Session information"""
+
     session_id: str = Field(description="Session identifier")
     created_at: datetime = Field(description="Session creation timestamp")
     memory_count: int = Field(default=0, description="Number of memories in session")
@@ -72,6 +80,7 @@ class SessionInfo(BaseModel):
 
 class PaginationInfo(BaseModel):
     """Pagination information"""
+
     page: int = Field(description="Current page number")
     per_page: int = Field(description="Items per page")
     total_items: int = Field(description="Total number of items")
@@ -83,6 +92,7 @@ class PaginationInfo(BaseModel):
 # Response models for each operation
 class MemoryStoreResponse(BaseModel):
     """Response for memory store operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -92,6 +102,7 @@ class MemoryStoreResponse(BaseModel):
 
 class MemorySearchResponse(BaseModel):
     """Response for memory search operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -102,6 +113,7 @@ class MemorySearchResponse(BaseModel):
 
 class MemoryGetResponse(BaseModel):
     """Response for memory get operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -110,6 +122,7 @@ class MemoryGetResponse(BaseModel):
 
 class MemoryUpdateResponse(BaseModel):
     """Response for memory update operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -119,6 +132,7 @@ class MemoryUpdateResponse(BaseModel):
 
 class MemoryDeleteResponse(BaseModel):
     """Response for memory delete operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -128,6 +142,7 @@ class MemoryDeleteResponse(BaseModel):
 
 class MemoryMoveResponse(BaseModel):
     """Response for memory move operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -137,6 +152,7 @@ class MemoryMoveResponse(BaseModel):
 
 class MemoryListAllResponse(BaseModel):
     """Response for memory list all operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -146,16 +162,20 @@ class MemoryListAllResponse(BaseModel):
 
 class MemoryDiscoverAssociationsResponse(BaseModel):
     """Response for memory discover associations operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
     source_memory: Optional[Memory] = Field(default=None, description="Source memory")
-    associations: List[SearchResultWithAssociations] = Field(default_factory=list, description="Discovered associations")
+    associations: List[SearchResultWithAssociations] = Field(
+        default_factory=list, description="Discovered associations"
+    )
     total_found: int = Field(default=0, description="Total number of associations found")
 
 
 class ScopeListResponse(BaseModel):
     """Response for scope list operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -165,6 +185,7 @@ class ScopeListResponse(BaseModel):
 
 class ScopeSuggestResponse(BaseModel):
     """Response for scope suggest operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -174,6 +195,7 @@ class ScopeSuggestResponse(BaseModel):
 
 class SessionManageResponse(BaseModel):
     """Response for session manage operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -184,6 +206,7 @@ class SessionManageResponse(BaseModel):
 
 class MemoryExportResponse(BaseModel):
     """Response for memory export operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -195,6 +218,7 @@ class MemoryExportResponse(BaseModel):
 
 class MemoryImportResponse(BaseModel):
     """Response for memory import operation"""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Human-readable message")
     data: Dict[str, Any] = Field(description="Response data")
@@ -207,6 +231,7 @@ class MemoryImportResponse(BaseModel):
 # Legacy compatibility response model (used by tools)
 class MemoryResponse(BaseModel):
     """Legacy memory response for tool compatibility"""
+
     memory_id: str = Field(description="Memory identifier")
     content: str = Field(description="Memory content")
     scope: str = Field(description="Memory scope")
@@ -223,6 +248,7 @@ class MemoryResponse(BaseModel):
 # Generic error response
 class ErrorResponse(BaseModel):
     """Error response"""
+
     success: bool = Field(default=False, description="Operation success status")
     message: str = Field(description="Error message")
     error: str = Field(description="Error type or code")
@@ -244,5 +270,5 @@ MCPResponse = Union[
     SessionManageResponse,
     MemoryExportResponse,
     MemoryImportResponse,
-    ErrorResponse
+    ErrorResponse,
 ]

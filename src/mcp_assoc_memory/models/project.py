@@ -11,15 +11,17 @@ from typing import Any, Dict, List, Optional
 
 class ProjectRole(Enum):
     """プロジェクトロール"""
-    OWNER = "owner"        # オーナー（全権限）
-    ADMIN = "admin"        # 管理者（メンバー管理可能）
-    MEMBER = "member"      # メンバー（読み書き可能）
-    VIEWER = "viewer"      # 閲覧者（読み取り専用）
+
+    OWNER = "owner"  # オーナー（全権限）
+    ADMIN = "admin"  # 管理者（メンバー管理可能）
+    MEMBER = "member"  # メンバー（読み書き可能）
+    VIEWER = "viewer"  # 閲覧者（読み取り専用）
 
 
 @dataclass
 class Project:
     """プロジェクト"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
     description: str = ""
@@ -28,7 +30,7 @@ class Project:
     # 設定
     is_public: bool = False
     memory_retention_days: Optional[int] = None  # None = 無制限
-    max_memory_count: Optional[int] = None       # None = 無制限
+    max_memory_count: Optional[int] = None  # None = 無制限
 
     # メタデータ
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -68,39 +70,25 @@ class Project:
         return cls(
             id=data["id"],
             name=data["name"],
-            description=data.get(
-                "description",
-                ""),
+            description=data.get("description", ""),
             owner_id=data["owner_id"],
-            is_public=data.get(
-                "is_public",
-                False),
+            is_public=data.get("is_public", False),
             memory_retention_days=data.get("memory_retention_days"),
             max_memory_count=data.get("max_memory_count"),
-            metadata=data.get(
-                "metadata",
-                {}),
-            tags=data.get(
-                "tags",
-                []),
-            created_at=datetime.fromisoformat(
-                data["created_at"]),
-            updated_at=datetime.fromisoformat(
-                data["updated_at"]),
-            memory_count=data.get(
-                "memory_count",
-                0),
-            member_count=data.get(
-                "member_count",
-                0),
-            last_activity=datetime.fromisoformat(
-                data["last_activity"]) if data.get("last_activity") else None,
+            metadata=data.get("metadata", {}),
+            tags=data.get("tags", []),
+            created_at=datetime.fromisoformat(data["created_at"]),
+            updated_at=datetime.fromisoformat(data["updated_at"]),
+            memory_count=data.get("memory_count", 0),
+            member_count=data.get("member_count", 0),
+            last_activity=datetime.fromisoformat(data["last_activity"]) if data.get("last_activity") else None,
         )
 
 
 @dataclass
 class ProjectMember:
     """プロジェクトメンバー"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     project_id: str = ""
     user_id: str = ""
@@ -141,15 +129,19 @@ class ProjectMember:
     def from_dict(cls, data: Dict[str, Any]) -> "ProjectMember":
         """辞書から復元"""
         return cls(
-            id=data["id"], project_id=data["project_id"], user_id=data["user_id"], role=ProjectRole(
-                data["role"]), can_read=data.get(
-                "can_read", True), can_write=data.get(
-                "can_write", True), can_delete=data.get(
-                    "can_delete", False), can_manage_members=data.get(
-                        "can_manage_members", False), invited_by=data.get("invited_by"), notes=data.get(
-                            "notes", ""), joined_at=datetime.fromisoformat(
-                                data["joined_at"]), last_active=datetime.fromisoformat(
-                                    data["last_active"]) if data.get("last_active") else None, )
+            id=data["id"],
+            project_id=data["project_id"],
+            user_id=data["user_id"],
+            role=ProjectRole(data["role"]),
+            can_read=data.get("can_read", True),
+            can_write=data.get("can_write", True),
+            can_delete=data.get("can_delete", False),
+            can_manage_members=data.get("can_manage_members", False),
+            invited_by=data.get("invited_by"),
+            notes=data.get("notes", ""),
+            joined_at=datetime.fromisoformat(data["joined_at"]),
+            last_active=datetime.fromisoformat(data["last_active"]) if data.get("last_active") else None,
+        )
 
     def has_permission(self, action: str) -> bool:
         """権限チェック"""
@@ -165,6 +157,7 @@ class ProjectMember:
 @dataclass
 class UserSession:
     """ユーザーセッション"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str = ""
     project_id: Optional[str] = None
@@ -197,10 +190,13 @@ class UserSession:
     def from_dict(cls, data: Dict[str, Any]) -> "UserSession":
         """辞書から復元"""
         return cls(
-            id=data["id"], user_id=data["user_id"], project_id=data.get("project_id"), session_name=data.get(
-                "session_name", ""), is_active=data.get(
-                "is_active", True), memory_count=data.get(
-                "memory_count", 0), created_at=datetime.fromisoformat(
-                    data["created_at"]), last_activity=datetime.fromisoformat(
-                        data["last_activity"]), expires_at=datetime.fromisoformat(
-                            data["expires_at"]) if data.get("expires_at") else None, )
+            id=data["id"],
+            user_id=data["user_id"],
+            project_id=data.get("project_id"),
+            session_name=data.get("session_name", ""),
+            is_active=data.get("is_active", True),
+            memory_count=data.get("memory_count", 0),
+            created_at=datetime.fromisoformat(data["created_at"]),
+            last_activity=datetime.fromisoformat(data["last_activity"]),
+            expires_at=datetime.fromisoformat(data["expires_at"]) if data.get("expires_at") else None,
+        )

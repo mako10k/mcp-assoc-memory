@@ -20,14 +20,12 @@ def set_dependencies(mm: Any, ms: Dict[str, Any], p: Any) -> None:
 
 
 async def handle_analyze_memories_prompt(
-    scope: str = "user/default",
-    include_child_scopes: bool = True,
-    ctx: Optional[Context] = None
+    scope: str = "user/default", include_child_scopes: bool = True, ctx: Optional[Context] = None
 ) -> str:
     """Generate memory analysis prompt"""
     if ctx:
         await ctx.info(f"Generating analysis prompt for scope '{scope}'...")
-    
+
     scope_memories = []
     for memory_data in memory_storage.values():
         memory_scope = memory_data["scope"]
@@ -39,13 +37,11 @@ async def handle_analyze_memories_prompt(
             # Exact scope match only
             if memory_scope == scope:
                 scope_memories.append(memory_data)
-    
-    memories_text = "\n".join([
-        f"- [{m['scope']}] {m['content']}" for m in scope_memories[:10]  # Maximum 10 memories
-    ])
-    
+
+    memories_text = "\n".join([f"- [{m['scope']}] {m['content']}" for m in scope_memories[:10]])  # Maximum 10 memories
+
     scope_info = " and child scopes" if include_child_scopes else ""
-    
+
     prompt = f"""The following memories are stored in the "{scope}" scope{scope_info}:
 
 {memories_text}
@@ -62,21 +58,17 @@ Please provide the analysis in a structured format."""
     return prompt
 
 
-async def handle_summarize_memory_prompt(
-    memory_id: str,
-    context_scope: str = "",
-    ctx: Optional[Context] = None
-) -> str:
+async def handle_summarize_memory_prompt(memory_id: str, context_scope: str = "", ctx: Optional[Context] = None) -> str:
     """Generate memory summary prompt"""
     if ctx:
         await ctx.info(f"Generating summary prompt for memory '{memory_id}'...")
-    
+
     memory_data = memory_storage.get(memory_id)
     if not memory_data:
         raise ValueError(f"Memory not found: {memory_id}")
-    
+
     context_info = f" within the context of '{context_scope}' scope" if context_scope else ""
-    
+
     prompt = f"""Please summarize the following memory{context_info}:
 
 Memory ID: {memory_data['memory_id']}

@@ -1,6 +1,7 @@
 """
 LRUCache実装
 """
+
 from collections import OrderedDict
 from typing import Any, Dict, Optional
 
@@ -27,11 +28,12 @@ class LRUCache:
             "max_size": self.capacity,
             "hits": self.hits,
             "misses": self.misses,
-            "hit_rate": hit_rate
+            "hit_rate": hit_rate,
         }
 
     def get(self, key: Any) -> Optional[Any]:
         import time
+
         if key not in self.cache:
             self.misses += 1
             return None
@@ -52,6 +54,7 @@ class LRUCache:
         self.cache[key] = value
         if self.ttl_seconds is not None:
             import time
+
             self.expiry[key] = time.time() + self.ttl_seconds
         if len(self.cache) > self.capacity:
             old_key, _ = self.cache.popitem(last=False)
@@ -65,6 +68,7 @@ class LRUCache:
             return True
         return False
 
+
 # --- EmbeddingCache ---
 
 
@@ -76,6 +80,7 @@ class EmbeddingCache(LRUCache):
     def get_embedding(self, text: str, model: str) -> Optional[list]:
         key = (text, model)
         return self.get(key)
+
 
 # --- SearchCache ---
 

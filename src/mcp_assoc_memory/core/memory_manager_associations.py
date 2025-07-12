@@ -19,40 +19,33 @@ logger = get_memory_logger(__name__)
 
 class MemoryManagerAssociations:
     """Memory association management mixin - requires MemoryManagerCore inheritance"""
-    
+
     # Type annotations for inherited attributes
     vector_store: "BaseVectorStore"
     metadata_store: "BaseMetadataStore"
     graph_store: "BaseGraphStore"
     association_cache: "LRUCache"
-    
+
     # Method stubs for inherited methods
     async def get_memory(self, memory_id: str) -> Optional[Memory]:
         """Stub - implemented in MemoryManagerCore"""
         raise NotImplementedError("This method should be inherited from MemoryManagerCore")
 
-    async def _auto_associate_memory(
-        self,
-        memory: Memory,
-        embedding: np.ndarray
-    ) -> None:
+    async def _auto_associate_memory(self, memory: Memory, embedding: np.ndarray) -> None:
         """Auto-associate memory with similar memories"""
         try:
             # Search for similar memories
             emb_list: List[float]
-            if hasattr(embedding, 'flatten'):
+            if hasattr(embedding, "flatten"):
                 emb_list = embedding.flatten().tolist()
-            elif hasattr(embedding, 'tolist'):
+            elif hasattr(embedding, "tolist"):
                 emb_list = embedding.tolist()
             else:
                 # Handle list or other iterable types
                 emb_list = embedding if isinstance(embedding, list) else list(embedding)
-            
+
             similar_results = await self.vector_store.search_similar(
-                emb_list,
-                scope=memory.scope,
-                limit=10,
-                min_similarity=0.7  # Default threshold for auto-association
+                emb_list, scope=memory.scope, limit=10, min_similarity=0.7  # Default threshold for auto-association
             )
 
             # Create relationships
@@ -68,18 +61,14 @@ class MemoryManagerAssociations:
                         target_memory_id=result["memory_id"],
                         association_type="semantic",
                         strength=similarity_score,
-                        auto_generated=True
+                        auto_generated=True,
                     )
 
                     # Store relationship
                     await self._store_association(association)
 
             logger.info(
-                "Auto-association completed",
-                extra_data={
-                    "memory_id": memory.id,
-                    "similar_count": len(similar_results)
-                }
+                "Auto-association completed", extra_data={"memory_id": memory.id, "similar_count": len(similar_results)}
             )
 
         except Exception as e:
@@ -87,7 +76,7 @@ class MemoryManagerAssociations:
                 "Failed to auto-associate memory",
                 error_code="AUTO_ASSOCIATION_ERROR",
                 memory_id=memory.id,
-                error=str(e)
+                error=str(e),
             )
 
     async def _store_association(self, association: Association) -> bool:
@@ -111,16 +100,12 @@ class MemoryManagerAssociations:
                 "Failed to store association",
                 error_code="ASSOCIATION_STORE_ERROR",
                 association_id=association.id,
-                error=str(e)
+                error=str(e),
             )
             return False
 
     async def get_associations(
-        self,
-        memory_id: str,
-        association_type: Optional[str] = None,
-        min_strength: float = 0.0,
-        limit: int = 10
+        self, memory_id: str, association_type: Optional[str] = None, min_strength: float = 0.0, limit: int = 10
     ) -> List[Association]:
         """Get associations for a memory"""
         try:
@@ -132,7 +117,7 @@ class MemoryManagerAssociations:
 
             # Get from metadata store
             all_associations: List[Association] = await self.metadata_store.get_memory_associations(memory_id)
-            
+
             # Apply filters (association_type and min_strength)
             filtered_associations = []
             for assoc in all_associations:
@@ -143,7 +128,7 @@ class MemoryManagerAssociations:
                 if assoc.strength < min_strength:
                     continue
                 filtered_associations.append(assoc)
-            
+
             # Apply limit and cache results
             limited_associations = filtered_associations[:limit] if filtered_associations else []
             self.association_cache.set(cache_key, limited_associations)
@@ -152,10 +137,7 @@ class MemoryManagerAssociations:
 
         except Exception as e:
             logger.error(
-                "Failed to get associations",
-                error_code="GET_ASSOCIATIONS_ERROR",
-                memory_id=memory_id,
-                error=str(e)
+                "Failed to get associations", error_code="GET_ASSOCIATIONS_ERROR", memory_id=memory_id, error=str(e)
             )
             return []
 
@@ -165,21 +147,18 @@ class MemoryManagerAssociations:
         target_memory_id: str,
         association_type: str = "manual",
         strength: float = 1.0,
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
     ) -> bool:
         """Create manual association between memories"""
         try:
             # Validate that both memories exist
             source_memory = await self.get_memory(source_memory_id)
             target_memory = await self.get_memory(target_memory_id)
-            
+
             if not source_memory or not target_memory:
                 logger.warning(
                     "Cannot create association - memory not found",
-                    extra_data={
-                        "source_exists": source_memory is not None,
-                        "target_exists": target_memory is not None
-                    }
+                    extra_data={"source_exists": source_memory is not None, "target_exists": target_memory is not None},
                 )
                 return False
 
@@ -190,7 +169,7 @@ class MemoryManagerAssociations:
                 association_type=association_type,
                 strength=strength,
                 auto_generated=False,
-                metadata=metadata or {}
+                metadata=metadata or {},
             )
 
             return await self._store_association(association)
@@ -201,7 +180,7 @@ class MemoryManagerAssociations:
                 error_code="MANUAL_ASSOCIATION_ERROR",
                 source_memory_id=source_memory_id,
                 target_memory_id=target_memory_id,
-                error=str(e)
+                error=str(e),
             )
             return False
 
@@ -222,10 +201,7 @@ class MemoryManagerAssociations:
             # Remove from cache
             self.association_cache.delete(association_id)
 
-            logger.info(
-                "Association deleted successfully",
-                extra_data={"association_id": association_id}
-            )
+            logger.info("Association deleted successfully", extra_data={"association_id": association_id})
 
             return True
 
@@ -234,15 +210,11 @@ class MemoryManagerAssociations:
                 "Failed to delete association",
                 error_code="DELETE_ASSOCIATION_ERROR",
                 association_id=association_id,
-                error=str(e)
+                error=str(e),
             )
             return False
 
-    async def update_association_strength(
-        self,
-        association_id: str,
-        new_strength: float
-    ) -> bool:
+    async def update_association_strength(self, association_id: str, new_strength: float) -> bool:
         """Update association strength"""
         try:
             # For now, we use a workaround by recreating the association
@@ -255,33 +227,27 @@ class MemoryManagerAssociations:
                 "Failed to update association strength",
                 error_code="UPDATE_ASSOCIATION_ERROR",
                 association_id=association_id,
-                error=str(e)
+                error=str(e),
             )
             return False
 
     async def get_related_memories(
-        self,
-        memory_id: str,
-        max_depth: int = 2,
-        min_strength: float = 0.5,
-        limit: int = 10
+        self, memory_id: str, max_depth: int = 2, min_strength: float = 0.5, limit: int = 10
     ) -> List[Memory]:
         """Get memories related through associations (with depth)"""
         try:
             visited = set()
             related_memories = []
-            
+
             async def _traverse(current_id: str, depth: int) -> None:
                 if depth > max_depth or current_id in visited:
                     return
-                
+
                 visited.add(current_id)
-                
+
                 # Get direct associations
-                associations = await self.get_associations(
-                    current_id, min_strength=min_strength
-                )
-                
+                associations = await self.get_associations(current_id, min_strength=min_strength)
+
                 for association in associations:
                     # Get the other memory in the association
                     other_id = (
@@ -289,7 +255,7 @@ class MemoryManagerAssociations:
                         if association.source_memory_id == current_id
                         else association.source_memory_id
                     )
-                    
+
                     if other_id not in visited:
                         other_memory = await self.get_memory(other_id)
                         if other_memory:
@@ -297,11 +263,11 @@ class MemoryManagerAssociations:
                             # Stop if we reached the limit
                             if len(related_memories) >= limit:
                                 return
-                            
+
                         # Recursive traversal
                         if depth < max_depth:
                             await _traverse(other_id, depth + 1)
-            
+
             await _traverse(memory_id, 0)
             return related_memories[:limit]
 
@@ -310,15 +276,11 @@ class MemoryManagerAssociations:
                 "Failed to get related memories",
                 error_code="GET_RELATED_MEMORIES_ERROR",
                 memory_id=memory_id,
-                error=str(e)
+                error=str(e),
             )
             return []
 
-    async def rebuild_associations(
-        self,
-        scope: Optional[str] = None,
-        min_similarity: float = 0.7
-    ) -> int:
+    async def rebuild_associations(self, scope: Optional[str] = None, min_similarity: float = 0.7) -> int:
         """Rebuild all automatic associations for memories in scope"""
         try:
             # Get all memories in scope
@@ -344,20 +306,13 @@ class MemoryManagerAssociations:
 
             logger.info(
                 "Association rebuild completed",
-                extra_data={
-                    "scope": scope,
-                    "rebuilt_count": rebuilt_count,
-                    "total_memories": len(memories)
-                }
+                extra_data={"scope": scope, "rebuilt_count": rebuilt_count, "total_memories": len(memories)},
             )
 
             return rebuilt_count
 
         except Exception as e:
             logger.error(
-                "Failed to rebuild associations",
-                error_code="REBUILD_ASSOCIATIONS_ERROR",
-                scope=scope,
-                error=str(e)
+                "Failed to rebuild associations", error_code="REBUILD_ASSOCIATIONS_ERROR", scope=scope, error=str(e)
             )
             return 0
