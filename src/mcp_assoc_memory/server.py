@@ -76,6 +76,7 @@ from .api.tools import (
     set_scope_dependencies,
 )
 from .api.tools.other_tools import set_dependencies as set_other_dependencies
+from .api.dependencies import set_global_dependencies
 from .api.utils import get_child_scopes, get_parent_scope, validate_scope_path
 from .config import get_config
 from .core.embedding_service import (
@@ -128,7 +129,10 @@ memory_manager = MemoryManager(
 # Fallback simple storage for compatibility
 memory_storage, persistence = get_persistent_storage()
 
-# Set up tool dependencies
+# Set up tool dependencies - use centralized dependency manager
+set_global_dependencies(memory_manager, memory_storage, persistence)
+
+# Also set legacy dependencies for backward compatibility
 set_dependencies(memory_manager, memory_storage, persistence)
 set_scope_dependencies(memory_manager)
 set_resource_dependencies(memory_manager, memory_storage, persistence)
@@ -160,6 +164,29 @@ async def ensure_initialized():
             _initialized = False
             logger.error(f"Memory manager initialization failed: {e}")
             raise
+
+
+# Debug tool to check memory manager state
+@mcp.tool(
+    name="debug_memory_manager",
+    description="Debug tool to check memory manager state in MCP context",
+)
+async def debug_memory_manager(ctx: Context) -> Dict[str, Any]:
+    """Debug tool to check memory manager state"""
+    # Import memory tools to check global state
+    from .api.tools.memory_tools import memory_manager as tools_memory_manager
+    from .api.dependencies import dependencies
+    
+    return {
+        "server_memory_manager": str(memory_manager),
+        "server_memory_manager_type": str(type(memory_manager)),
+        "tools_memory_manager": str(tools_memory_manager),
+        "tools_memory_manager_type": str(type(tools_memory_manager)),
+        "dependencies_memory_manager": str(dependencies.memory_manager),
+        "dependencies_memory_manager_type": str(type(dependencies.memory_manager)),
+        "are_same_object": memory_manager is tools_memory_manager,
+        "server_initialized": "_initialized" in globals() and globals()["_initialized"],
+    }
 
 
 # Memory management tools

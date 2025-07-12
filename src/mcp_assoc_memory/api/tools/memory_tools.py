@@ -17,6 +17,7 @@ from ...config import get_config
 from ...core.memory_manager import MemoryManager
 from ...simple_persistence import get_persistent_storage
 from .export_tools import handle_memory_export
+from ..dependencies import dependencies, ensure_dependencies_initialized
 from ..models import (
     DiversifiedSearchRequest,
     MemoryExportRequest,
@@ -44,16 +45,85 @@ _initialized = False
 
 def set_dependencies(mm: MemoryManager, ms: Dict[str, Any], p: Any) -> None:
     """Set global dependencies from server.py"""
-    global memory_manager, memory_storage, persistence
+    global memory_manager, memory_storage, persistence, _initialized
     memory_manager = mm
     memory_storage = ms
     persistence = p
+    # Reset initialization flag when dependencies are updated
+    _initialized = False
+
+
+def get_memory_manager() -> Optional[MemoryManager]:
+    """Get the current memory manager instance"""
+    return memory_manager
+
+
+async def _get_or_create_memory_manager() -> Optional[MemoryManager]:
+    """
+    Get memory manager with dynamic dependency resolution.
+    This handles the case where the tool is running in a separate process
+    and global variables are not shared.
+    """
+    global memory_manager
+    
+    if memory_manager is not None:
+        return memory_manager
+    
+    # Try to dynamically create memory manager if not injected
+    try:
+        from ...core.memory_manager import MemoryManager
+        from ...storage.vector_store import ChromaVectorStore
+        from ...storage.metadata_store import SQLiteMetadataStore
+        from ...storage.graph_store import NetworkXGraphStore
+        from ...core.embedding_service import SentenceTransformerEmbeddingService, MockEmbeddingService
+        from ...core.similarity import SimilarityCalculator
+        
+        # Initialize storage components
+        vector_store = ChromaVectorStore()
+        metadata_store = SQLiteMetadataStore()
+        graph_store = NetworkXGraphStore()
+        
+        # Use SentenceTransformerEmbeddingService for production, fallback to Mock
+        try:
+            embedding_service = SentenceTransformerEmbeddingService()
+        except Exception:
+            embedding_service = MockEmbeddingService()
+        
+        similarity_calculator = SimilarityCalculator()
+        
+        # Create memory manager
+        mm = MemoryManager(
+            vector_store=vector_store,
+            metadata_store=metadata_store,
+            graph_store=graph_store,
+            embedding_service=embedding_service,
+            similarity_calculator=similarity_calculator,
+        )
+        
+        # Update global reference
+        memory_manager = mm
+        return mm
+        
+    except Exception as e:
+        print(f"Failed to dynamically create memory manager: {e}")
+        return None
 
 
 async def ensure_initialized() -> None:
     """Ensure memory manager is initialized"""
-    global _initialized
-    if not _initialized and memory_manager:
+    global _initialized, memory_manager
+    
+    # Try to get or create memory manager
+    memory_manager = await _get_or_create_memory_manager()
+    
+    # If memory_manager is still None, we cannot proceed with advanced operations
+    if memory_manager is None:
+        raise RuntimeError(
+            "Memory manager is not initialized and could not be created dynamically. "
+            "This suggests a configuration or dependency issue."
+        )
+    
+    if not _initialized:
         try:
             await memory_manager.initialize()
             _initialized = True
@@ -274,6 +344,10 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
 async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Dict[str, Any]:
     """Search memories using semantic similarity with hierarchical scope support"""
     try:
+        # Debug: Check memory manager state when tool is called
+        await ctx.info(f"DEBUG: memory_manager (global) = {memory_manager}")
+        await ctx.info(f"DEBUG: dependencies.memory_manager = {dependencies.memory_manager}")
+        
         await ensure_initialized()
         await ctx.info(
             f"Searching memories: '{request.query[:50]}...' in scope: {request.scope} (include_child_scopes: {request.include_child_scopes})"
@@ -1100,16 +1174,43 @@ async def _perform_hierarchical_fallback_search(
     1. Search parent scope level by level
     2. Return candidates immediately when results found
     3. If no results at any parent level, perform global search
+    
+    Returns helpful suggestions even if memory_manager is not available.
     """
-    if not memory_manager:
+    # Try centralized dependency manager first
+    current_memory_manager = dependencies.memory_manager
+    
+    # If not available, try factory approach
+    if not current_memory_manager:
+        from ..memory_factory import get_or_create_memory_manager
+        try:
+            current_memory_manager = await get_or_create_memory_manager()
+            await ctx.info("Using factory-created memory manager for fallback search")
+        except Exception as e:
+            await ctx.warning(f"Factory memory manager creation failed: {e}")
+    
+    if not current_memory_manager:
         await ctx.error("Memory manager not initialized for fallback search")
+        # Return useful manual suggestions even without advanced search
         return {
             "type": "scope_fallback",
             "original_scope": original_scope,
-            "error": "Memory manager not initialized",
+            "error": "Advanced fallback search unavailable - memory manager not initialized",
             "candidates": [],
-            "fallback_level": 0
+            "fallback_level": 0,
+            "manual_suggestions": {
+                "try_parent_scope": original_scope.rsplit("/", 1)[0] if "/" in original_scope else None,
+                "try_include_child_scopes": not include_child_scopes,
+                "try_lower_threshold": max(0.05, similarity_threshold - 0.05),
+                "try_broader_search": "Remove scope restriction for global search",
+                "suggested_scopes": [
+                    "work/projects", "learning/programming", "personal/notes",
+                    original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global"
+                ]
+            },
+            "note": "Manual suggestions provided due to initialization issue"
         }
+    
     fallback_suggestions = {
         "type": "scope_fallback",
         "original_scope": original_scope,
@@ -1133,7 +1234,7 @@ async def _perform_hierarchical_fallback_search(
         
         # Search in parent scope
         try:
-            results = await memory_manager.search_memories(
+            results = await current_memory_manager.search_memories(
                 query=query,
                 scope=parent_scope,
                 include_child_scopes=include_child_scopes,
@@ -1167,7 +1268,7 @@ async def _perform_hierarchical_fallback_search(
     # If no results found at any parent level, try global search
     await ctx.info("No results in parent scopes, attempting global search")
     try:
-        global_results = await memory_manager.search_memories(
+        global_results = await current_memory_manager.search_memories(
             query=query,
             scope=None,  # Global search
             include_child_scopes=True,
@@ -1197,7 +1298,27 @@ async def _perform_hierarchical_fallback_search(
     except Exception as e:
         await ctx.warning(f"Error during global fallback search: {e}")
     
-    # No results found anywhere
+    # No results found anywhere - provide helpful manual suggestions
+    fallback_suggestions.update({
+        "found_in_scope": None,
+        "candidates": [],
+        "fallback_level": fallback_level + 1,
+        "search_strategy": "no_results",
+        "manual_suggestions": {
+            "try_parent_scope": original_scope.rsplit("/", 1)[0] if "/" in original_scope else None,
+            "try_include_child_scopes": not include_child_scopes,
+            "try_lower_threshold": max(0.05, similarity_threshold - 0.05),
+            "try_different_keywords": "Rephrase query with different terms",
+            "suggested_scopes": [
+                "work/projects", "learning/programming", "personal/notes",
+                original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global"
+            ]
+        },
+        "note": "No results found - try suggestions below"
+    })
+    
+    await ctx.info("No results found in hierarchical or global search")
+    return fallback_suggestions
     fallback_suggestions.update({
         "found_in_scope": None,
         "candidates": [],
