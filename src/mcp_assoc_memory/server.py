@@ -231,13 +231,13 @@ async def memory_list_all(
             default=1,
             ge=1,
             description="""Page number for pagination:
-        
+
         Navigation Strategy:
         • Start with page=1 for initial overview
         • Use pagination.has_next to continue browsing
         • Jump to specific pages for targeted access
         • Monitor total_pages to understand collection size
-        
+
         Example: page=1 for first overview, page=3 for deeper exploration""",
             examples=[1, 2, 3],
         ),
@@ -249,12 +249,12 @@ async def memory_list_all(
             ge=1,
             le=100,
             description="""Items per page (1-100):
-        
+
         Values & Use Cases:
         • 5-10: Quick overview (manageable chunks) ← RECOMMENDED
         • 20-50: Efficient browsing (bulk review)
         • 50-100: System analysis (comprehensive data check)
-        
+
         Strategy: Start with 10, increase for bulk operations
         Example: per_page=25 for efficient content review""",
             examples=[10, 25, 50],
@@ -548,7 +548,7 @@ async def memory_manage(request: MemoryManageRequest, ctx: Context) -> Dict[str,
     description="""🔄 Unified Memory Sync: Handle import and export operations
 
 When to use:
-→ Single interface for data synchronization operations  
+→ Single interface for data synchronization operations
 → Backup and restore memories with consistent interface
 → Cross-environment memory transfer with unified parameters
 

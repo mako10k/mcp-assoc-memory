@@ -2,12 +2,11 @@
 
 # Memory management tools
 # Export/import tools - RE-ENABLED
-from .export_tools import handle_memory_export, handle_memory_import
+from .export_tools import handle_memory_export
 from .memory_tools import (
     ensure_initialized,
     handle_diversified_search,
     handle_memory_delete,
-    handle_memory_discover_associations,
     handle_memory_get,
     handle_memory_import,
     handle_memory_list_all,

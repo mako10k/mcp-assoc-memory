@@ -120,7 +120,7 @@ class NetworkXGraphStore(BaseGraphStore):
                     if hasattr(comms, "__iter__") and not isinstance(comms, (str, bytes, int, float, complex, bool)):
                         try:
                             # NetworkX community detection returns generator of node sets
-                            communities = [list(c) for c in comms]  # type: ignore[misc]
+                            communities = [list(c) for c in comms]  # type: ignore[arg-type]
                         except Exception:
                             communities = []
                     else:

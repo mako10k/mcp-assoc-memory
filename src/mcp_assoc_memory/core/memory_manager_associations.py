@@ -43,7 +43,7 @@ class MemoryManagerAssociations:
                 emb_list = embedding.tolist()
             else:
                 # Handle list or other iterable types
-                emb_list = embedding if isinstance(embedding, list) else list(embedding)
+                emb_list = embedding if isinstance(embedding, list) else list(embedding)  # type: ignore[arg-type]
 
             similar_results = await self.vector_store.search_similar(
                 emb_list, scope=memory.scope, limit=10, min_similarity=0.7  # Default threshold for auto-association
@@ -114,7 +114,7 @@ class MemoryManagerAssociations:
             cache_key = f"{memory_id}_{association_type}_{min_strength}_{limit}"
             cached_associations = self.association_cache.get(cache_key)
             if cached_associations:
-                return cached_associations[:limit]
+                return cached_associations[:limit]  # type: ignore[no-any-return]
 
             # Get from metadata store
             all_associations: List[Association] = await self.metadata_store.get_memory_associations(memory_id)

@@ -3,6 +3,7 @@ Memory management tools for MCP Associative Memory Server
 """
 
 import base64
+import binascii
 import gzip
 import json
 from datetime import datetime
@@ -15,6 +16,7 @@ from pydantic import Field
 from ...config import get_config
 from ...core.memory_manager import MemoryManager
 from ...simple_persistence import get_persistent_storage
+from .export_tools import handle_memory_export
 from ..models import (
     DiversifiedSearchRequest,
     MemoryExportRequest,
@@ -655,7 +657,7 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
                     # Assume it's compressed
                     compressed_data = base64.b64decode(import_data_str)
                     import_data_str = gzip.decompress(compressed_data).decode("utf-8")
-            except:
+            except (ValueError, binascii.Error, gzip.BadGzipFile, UnicodeDecodeError):
                 pass  # If decompression fails, assume it's plain JSON
 
             import_source = "direct_data"
@@ -957,3 +959,43 @@ async def handle_memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[s
     except Exception as e:
         await ctx.error(f"Memory sync operation failed: {e}")
         return {"error": f"Memory sync operation failed: {str(e)}", "operation": request.operation, "success": False}
+
+
+async def _resolve_import_path(file_path: str) -> Path:
+    """Resolve import file path with proper validation."""
+    path = Path(file_path)
+
+    # If it's a relative path, make it relative to the data directory
+    if not path.is_absolute():
+        data_dir = Path("data/imports")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        path = data_dir / path
+
+    return path
+
+
+async def _validate_import_data(data: Dict[str, Any]) -> bool:
+    """Validate import data structure."""
+    try:
+        # Check required fields
+        if not isinstance(data, dict):
+            return False
+
+        # Check if it has memories list
+        if "memories" not in data:
+            return False
+
+        memories = data["memories"]
+        if not isinstance(memories, list):
+            return False
+
+        # Validate each memory has required fields
+        for memory in memories[:5]:  # Check first 5 for performance
+            if not isinstance(memory, dict):
+                return False
+            if "content" not in memory:
+                return False
+
+        return True
+    except Exception:
+        return False
