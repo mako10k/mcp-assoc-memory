@@ -312,6 +312,7 @@ class MemoryManagerCore:
         self,
         memory_id: str,
         content: Optional[str] = None,
+        scope: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None,
         category: Optional[str] = None,
@@ -325,9 +326,14 @@ class MemoryManagerCore:
                 logger.warning(f"Memory not found for update: {memory_id}")
                 return None
 
-            # Prepare update data
+            # Prepare updated values and track changes
             update_data = {}
-            
+            updated_metadata = existing_memory.metadata
+            if metadata is not None:
+                # Merge with existing metadata
+                updated_metadata = existing_memory.metadata.copy()
+                updated_metadata.update(metadata)
+
             if content is not None:
                 update_data["content"] = content
                 # Regenerate embedding if content changed
@@ -335,11 +341,8 @@ class MemoryManagerCore:
                 if new_embedding is not None:
                     update_data["embedding"] = new_embedding
 
-            if metadata is not None:
-                # Merge with existing metadata
-                updated_metadata = existing_memory.metadata.copy()
-                updated_metadata.update(metadata)
-                update_data["metadata"] = updated_metadata
+            if scope is not None:
+                update_data["scope"] = scope
 
             if tags is not None:
                 update_data["tags"] = tags
@@ -351,23 +354,44 @@ class MemoryManagerCore:
             update_data["updated_at"] = datetime.utcnow()
 
             async with self.operation_lock:
+                # Create updated memory object
+                updated_memory_obj = Memory(
+                    id=existing_memory.id,
+                    scope=scope if scope is not None else existing_memory.scope,
+                    content=content if content is not None else existing_memory.content,
+                    metadata=updated_metadata if metadata is not None else existing_memory.metadata,
+                    tags=tags if tags is not None else existing_memory.tags,
+                    category=category if category is not None else existing_memory.category,
+                    user_id=existing_memory.user_id,
+                    project_id=existing_memory.project_id,
+                    session_id=existing_memory.session_id,
+                    created_at=existing_memory.created_at,
+                    updated_at=datetime.utcnow(),
+                    accessed_at=existing_memory.accessed_at,
+                    access_count=existing_memory.access_count,
+                    embedding=update_data.get("embedding", existing_memory.embedding)
+                )
+                
                 # Update metadata store
-                success = await self.metadata_store.update_memory(memory_id, update_data)
+                success = await self.metadata_store.update_memory(updated_memory_obj)
                 if not success:
                     return None
 
                 # Update vector store if embedding changed
                 if "embedding" in update_data:
-                    await self.vector_store.update_embedding(
+                    # Delete old embedding and store new one
+                    await self.vector_store.delete_embedding(memory_id)
+                    await self.vector_store.store_embedding(
                         memory_id,
                         update_data["embedding"],
-                        existing_memory.to_dict()
+                        updated_memory_obj.to_dict()
                     )
 
-                # Update graph store
+                # Update graph store - remove and re-add node with updated data
                 updated_memory = await self.get_memory(memory_id)
                 if updated_memory:
-                    await self.graph_store.update_memory_node(updated_memory)
+                    await self.graph_store.remove_memory_node(memory_id)
+                    await self.graph_store.add_memory_node(updated_memory)
 
                 # Clear cache to force reload
                 self.memory_cache.delete(memory_id)

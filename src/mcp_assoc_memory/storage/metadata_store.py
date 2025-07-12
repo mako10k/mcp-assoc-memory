@@ -527,13 +527,15 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 async with aiosqlite.connect(self.database_path) as db:
                     await db.execute('''
                         UPDATE memories SET
-                            content = ?, metadata = ?, tags = ?,
+                            scope = ?, content = ?, metadata = ?, tags = ?, category = ?,
                             updated_at = ?, accessed_at = ?, access_count = ?
                         WHERE id = ?
                     ''', (
+                        memory.scope,
                         memory.content,
                         json.dumps(memory.metadata),
                         json.dumps(memory.tags),
+                        memory.category,
                         memory.updated_at.isoformat(),
                         memory.accessed_at.isoformat() if memory.accessed_at else None,
                         memory.access_count,

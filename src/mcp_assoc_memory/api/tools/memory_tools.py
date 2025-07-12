@@ -352,10 +352,12 @@ async def handle_diversified_search(
                     associations = await memory_manager.metadata_store.get_memory_associations(memory.id)
                     formatted_memory["associations"] = [
                         {
-                            "memory_id": assoc.target_memory_id,
+                            "source_id": assoc.source_memory_id,
+                            "target_id": assoc.target_memory_id,
                             "association_type": assoc.association_type,
                             "strength": assoc.strength,
-                            "auto_generated": assoc.auto_generated
+                            "auto_generated": assoc.auto_generated,
+                            "created_at": assoc.created_at
                         }
                         for assoc in associations[:3]  # Limit to top 3 associations
                     ]
