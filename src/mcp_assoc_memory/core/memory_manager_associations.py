@@ -43,7 +43,7 @@ class MemoryManagerAssociations:
                 emb_list = embedding.tolist()
             else:
                 # Handle list or other iterable types
-                emb_list = embedding if isinstance(embedding, list) else list(embedding)  # type: ignore[arg-type]
+                emb_list = embedding if isinstance(embedding, list) else list(embedding)
 
             similar_results = await self.vector_store.search_similar(
                 emb_list, scope=memory.scope, limit=10, min_similarity=0.7  # Default threshold for auto-association

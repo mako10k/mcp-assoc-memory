@@ -120,7 +120,7 @@ class NetworkXGraphStore(BaseGraphStore):
                     if hasattr(comms, "__iter__") and not isinstance(comms, (str, bytes, int, float, complex, bool)):
                         try:
                             # NetworkX community detection returns generator of node sets
-                            communities = [list(c) for c in comms]  # type: ignore[arg-type]
+                            communities = [list(c) for c in comms]
                         except Exception:
                             communities = []
                     else:
@@ -539,7 +539,7 @@ class NetworkXGraphStore(BaseGraphStore):
                 orphaned_nodes = []
                 for node in self.graph.nodes():
                     # NetworkX degree() method returns int but mypy incorrectly sees it as property
-                    deg = self.graph.degree(node)  # type: ignore[misc]
+                    deg = self.graph.degree(node)
                     if deg == 0:
                         orphaned_nodes.append(node)
 
