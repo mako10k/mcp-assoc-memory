@@ -153,3 +153,65 @@ def sample_memory_data() -> List[Dict]:
             "metadata": {"difficulty": "intermediate"}
         }
     ]
+
+
+@pytest.fixture
+async def populated_memory_manager(simple_memory_manager, sample_memory_data) -> AsyncGenerator[MemoryManager, None]:
+    """Create a memory manager pre-populated with sample data."""
+    manager = simple_memory_manager
+    
+    # Store sample memories
+    stored_memories = []
+    for data in sample_memory_data:
+        memory = await manager.store_memory(**data)
+        stored_memories.append(memory)
+    
+    # Mock the search_memories method to return the stored memories
+    async def mock_search_memories(query: str = "", scope: Optional[str] = None, limit: int = 10, **kwargs):
+        # Simple mock search that returns all stored memories
+        return stored_memories[:limit]
+    
+    manager.search_memories = mock_search_memories
+    
+    yield manager
+
+
+class TestMemoryFactory:
+    """Test memory factory for creating test Memory instances."""
+
+    def __init__(self):
+        self.counter = 0
+
+    def create_memory(self, content: str = "Test content", scope: str = "test",
+                      category: str = "test", tags: Optional[List[str]] = None,
+                      metadata: Optional[Dict] = None) -> Memory:
+        """Create a test Memory instance."""
+        self.counter += 1
+        return Memory(
+            id=f"test-memory-{self.counter:03d}",
+            content=content,
+            scope=scope,
+            category=category,
+            tags=tags or [],
+            metadata=metadata or {},
+            created_at=datetime.utcnow()
+        )
+
+    def create_memories(self, count: int = 1) -> List[Memory]:
+        """Create multiple test Memory instances."""
+        return [
+            self.create_memory(
+                content=f"Test memory content {i + 1}",
+                scope=f"test/memory/{i + 1}",
+                category="auto-generated",
+                tags=[f"test-{i + 1}", "auto"],
+                metadata={"index": i + 1}
+            )
+            for i in range(count)
+        ]
+
+
+@pytest.fixture
+def memory_factory():
+    """Provide a memory factory for tests."""
+    return TestMemoryFactory()
