@@ -855,3 +855,16 @@ class SQLiteMetadataStore(BaseMetadataStore):
         except Exception as e:
             logger.error("Failed to update association", error=str(e))
             return False
+
+    async def get_memory_count_by_scope(self, scope: str) -> int:
+        """Get count of memories in a specific scope"""
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(
+                    "SELECT COUNT(*) FROM memories WHERE JSON_EXTRACT(metadata, '$.scope') = ?", (scope,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    return row[0] if row and row[0] is not None else 0
+        except Exception as e:
+            logger.error(f"Failed to get memory count for scope '{scope}': {e}")
+            return 0

@@ -153,6 +153,7 @@ class MemoryManager(
                 "batch_delete_memories",
                 "cleanup_database",
                 "get_all_scopes",
+                "get_memory_count_by_scope",
             ],
         }
 

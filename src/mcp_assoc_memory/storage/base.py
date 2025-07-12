@@ -217,23 +217,24 @@ class BaseMetadataStore(BaseStorage):
         pass
 
     @abstractmethod
+    @abstractmethod
     async def delete_association(self, association_id: str) -> bool:
-        """関連性を削除"""
+        """Delete association relationship"""
         pass
 
     @abstractmethod
     async def get_all_scopes(self) -> List[str]:
-        """全スコープを取得"""
+        """Get all available scopes"""
         pass
 
     @abstractmethod
     async def get_all_memories(self, limit: int = 1000) -> List[Memory]:
-        """全記憶を取得"""
+        """Get all memories"""
         pass
 
     @abstractmethod
     async def get_association_count(self, scope: Optional[str] = None) -> int:
-        """関連性の数を取得"""
+        """Get count of associations"""
         pass
 
     @abstractmethod
@@ -241,11 +242,16 @@ class BaseMetadataStore(BaseStorage):
         """関連性を更新"""
         pass
 
+    @abstractmethod
+    async def get_memory_count_by_scope(self, scope: str) -> int:
+        """Get count of memories in a specific scope"""
+        pass
+
 
 class BaseGraphStore(BaseStorage):
     @abstractmethod
     async def get_all_association_edges(self, scope: Optional[str] = None) -> List[Dict[str, Any]]:
-        """全関連エッジ取得（可視化用）"""
+        """Get all association edges (for visualization)"""
         pass
 
     @abstractmethod

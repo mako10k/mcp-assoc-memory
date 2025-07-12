@@ -527,3 +527,11 @@ class MemoryManagerAdmin:
         except Exception as e:
             logger.error(f"Get all scopes error: {e}")
             return []
+
+    async def get_memory_count_by_scope(self, scope: str) -> int:
+        """Get count of memories in a specific scope"""
+        try:
+            return await self.metadata_store.get_memory_count_by_scope(scope)
+        except Exception as e:
+            logger.error(f"Get memory count by scope error for scope '{scope}': {e}")
+            return 0
