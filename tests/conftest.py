@@ -94,25 +94,16 @@ async def test_chroma_client(temp_dir: Path) -> AsyncGenerator[ClientAPI, None]:
     persist_directory = temp_dir / "test_chroma_db"
     persist_directory.mkdir(exist_ok=True)
     
-    client = chromadb.PersistentClient(
-        path=str(persist_directory),
-        settings=Settings(
-            is_persistent=True,
-            allow_reset=True,
-            anonymized_telemetry=False,
-            # Disable unnecessary features for faster initialization
-            chroma_server_authn_provider="",
-            chroma_client_auth_provider="",
-            # Use in-memory SQLite for faster testing
-            chroma_db_impl="duckdb+parquet"
-        )
-    )
+    # Use new ChromaDB API without deprecated settings
+    client = chromadb.PersistentClient(path=str(persist_directory))
     
     yield client
     
-    # Cleanup
+    # Cleanup - avoid reset() which is disabled by default
     try:
-        client.reset()
+        collections = client.list_collections()
+        for collection in collections:
+            client.delete_collection(collection.name)
     except Exception:
         pass  # Ignore cleanup errors
 

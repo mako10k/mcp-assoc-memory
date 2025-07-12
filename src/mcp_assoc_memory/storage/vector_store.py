@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import chromadb
-    from chromadb.config import Settings
 
     CHROMADB_AVAILABLE = True
 except ImportError:
@@ -42,10 +41,8 @@ class ChromaVectorStore(BaseVectorStore):
                 # Remote connection
                 self.client = chromadb.HttpClient(host=self.host, port=self.port)
             else:
-                # Local persistence
-                self.client = chromadb.PersistentClient(
-                    path=self.persist_directory, settings=Settings(anonymized_telemetry=False, allow_reset=True)
-                )
+                # Local persistence with new API
+                self.client = chromadb.PersistentClient(path=self.persist_directory)
 
             # Initialize single collection for all memories
             collection_name = "memories"
@@ -53,21 +50,17 @@ class ChromaVectorStore(BaseVectorStore):
                 raise RuntimeError("ChromaDB client not initialized")
 
             try:
-                self.collection = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: self.client.get_collection(collection_name)  # type: ignore
-                )
+                # Use synchronous API directly instead of run_in_executor
+                self.collection = self.client.get_collection(collection_name)
                 logger.info(f"Using existing collection: {collection_name}")
             except Exception:
                 # Create new collection with cosine distance
-                self.collection = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: self.client.create_collection(  # type: ignore
-                        name=collection_name,
-                        metadata={
-                            "description": "Unified memory collection with scope-based organization",
-                            "hnsw:space": "cosine",  # Use cosine distance as per design spec
-                        },
-                    ),
+                self.collection = self.client.create_collection(
+                    name=collection_name,
+                    metadata={
+                        "description": "Unified memory collection with scope-based organization",
+                        "hnsw:space": "cosine",  # Use cosine distance as per design spec
+                    },
                 )
                 logger.info(f"Created new collection: {collection_name} with cosine distance")
 
@@ -100,11 +93,9 @@ class ChromaVectorStore(BaseVectorStore):
                 else:
                     chroma_metadata[key] = str(value)
 
-            await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: self.collection.add(  # type: ignore
-                    ids=[memory_id], embeddings=[embedding], metadatas=[chroma_metadata]
-                ),
+            # Use synchronous API directly
+            self.collection.add(
+                ids=[memory_id], embeddings=[embedding], metadatas=[chroma_metadata]
             )
 
             logger.info(
@@ -117,9 +108,7 @@ class ChromaVectorStore(BaseVectorStore):
     async def get_embedding(self, memory_id: str) -> Optional[Any]:
         """Get embedding by memory ID"""
         try:
-            result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.collection.get(ids=[memory_id], include=["embeddings"])  # type: ignore
-            )
+            result = self.collection.get(ids=[memory_id], include=["embeddings"])
             if result["embeddings"] and result["embeddings"][0]:
                 return result["embeddings"][0]
             return None
@@ -134,9 +123,7 @@ class ChromaVectorStore(BaseVectorStore):
     async def delete_vector(self, memory_id: str) -> bool:
         """Delete vector from ChromaDB"""
         try:
-            await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.collection.delete(ids=[memory_id])  # type: ignore
-            )
+            self.collection.delete(ids=[memory_id])
             logger.info("Vector deleted successfully", extra={"memory_id": memory_id})
             return True
         except Exception as e:
@@ -173,14 +160,11 @@ class ChromaVectorStore(BaseVectorStore):
                 f"[DEBUG] search_similar: scope={scope}, include_child_scopes={include_child_scopes}, where_clause={where_clause}"
             )
 
-            result = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: self.collection.query(  # type: ignore
-                    query_embeddings=[query_embedding],
-                    n_results=int(limit * 3) if include_child_scopes else int(limit),  # Ensure integers
-                    where=where_clause,
-                    include=["metadatas", "distances"],
-                ),
+            result = self.collection.query(
+                query_embeddings=[query_embedding],
+                n_results=int(limit * 3) if include_child_scopes else int(limit),  # Ensure integers
+                where=where_clause,
+                include=["metadatas", "distances"],
             )
 
             logger.info(
@@ -261,9 +245,7 @@ class ChromaVectorStore(BaseVectorStore):
     async def get_statistics(self) -> Dict[str, Any]:
         """Get vector store statistics"""
         try:
-            result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.collection.get(include=["metadatas"])  # type: ignore
-            )
+            result = self.collection.get(include=["metadatas"])
 
             total_count = len(result["ids"]) if result["ids"] else 0
 
@@ -288,9 +270,7 @@ class ChromaVectorStore(BaseVectorStore):
             for key, value in metadata.items():
                 chroma_metadata[key] = str(value)
 
-            await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.collection.update(ids=[memory_id], metadatas=[chroma_metadata])  # type: ignore
-            )
+            self.collection.update(ids=[memory_id], metadatas=[chroma_metadata])
 
             logger.info("Vector metadata updated", extra={"memory_id": memory_id})
             return True
