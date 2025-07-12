@@ -50,18 +50,19 @@ class TestMemoryManagerStorage:
             content=content,
             scope="test/duplicates"
         )
-        assert result1["success"] is True
+        assert result1 is not None
+        assert isinstance(result1, Memory)
         
-        # Attempt to store duplicate (should be detected)
+        # Attempt to store duplicate (should return existing memory)
         result2 = await test_memory_manager.store_memory(
             content=content,
             scope="test/duplicates",
             allow_duplicates=False
         )
         
-        assert result2["success"] is True
-        assert result2["data"]["is_duplicate"] is True
-        assert result2["data"]["duplicate_of"] == result1["data"]["memory_id"]
+        assert result2 is not None
+        assert isinstance(result2, Memory)
+        assert result2.id == result1.id  # Should return same memory for duplicate
     
     @pytest.mark.asyncio
     async def test_store_memory_allow_duplicates(self, test_memory_manager: MemoryManager):
@@ -81,33 +82,37 @@ class TestMemoryManagerStorage:
             allow_duplicates=True
         )
         
-        assert result1["success"] is True
-        assert result2["success"] is True
-        assert result1["data"]["memory_id"] != result2["data"]["memory_id"]
-        assert result2["data"]["is_duplicate"] is False
+        assert result1 is not None
+        assert result2 is not None
+        assert isinstance(result1, Memory)
+        assert isinstance(result2, Memory)
+        assert result1.id != result2.id  # Should create new memory when duplicates allowed
     
     @pytest.mark.asyncio
     async def test_get_memory_success(self, populated_memory_manager: MemoryManager):
         """Test successful memory retrieval."""
-        # Get all memories to find a valid ID
-        all_memories = await populated_memory_manager.get_all_memories()
-        memory_id = all_memories[0]["memory_id"]
+        # Store a test memory first
+        stored_memory = await populated_memory_manager.store_memory(
+            content="Test memory for retrieval",
+            scope="test/retrieval"
+        )
+        assert stored_memory is not None
         
-        result = await populated_memory_manager.get_memory(memory_id)
+        # Retrieve the memory
+        result = await populated_memory_manager.get_memory(stored_memory.id)
         
-        assert result["success"] is True
-        assert result["data"]["memory_id"] == memory_id
-        assert "content" in result["data"]
-        assert "scope" in result["data"]
-        assert "created_at" in result["data"]
+        assert result is not None
+        assert isinstance(result, Memory)
+        assert result.id == stored_memory.id
+        assert result.content == "Test memory for retrieval"
+        assert result.scope == "test/retrieval"
     
     @pytest.mark.asyncio
     async def test_get_memory_not_found(self, test_memory_manager: MemoryManager):
         """Test retrieval of non-existent memory."""
         result = await test_memory_manager.get_memory("non-existent-id")
         
-        assert result["success"] is False
-        assert "not found" in result["message"].lower()
+        assert result is None
     
     @pytest.mark.asyncio
     async def test_update_memory_success(self, populated_memory_manager: MemoryManager):
