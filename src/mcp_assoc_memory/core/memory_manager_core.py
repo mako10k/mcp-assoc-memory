@@ -185,21 +185,47 @@ class MemoryManagerCore:
                 )
 
             async with self.operation_lock:
-                # Store in vector store
+                # Parallel storage operations for better performance
+                storage_tasks = []
+                
+                # Store in vector store (if embedding available)
                 if embedding is not None:
-                    success = await self.vector_store.store_embedding(
-                        memory.id,
-                        embedding,
-                        memory.to_dict()
-                    )
-                    if not success:
-                        logger.warning(
-                            "Failed to store in vector store",
-                            extra_data={"memory_id": memory.id}
+                    storage_tasks.append(
+                        self.vector_store.store_embedding(
+                            memory.id,
+                            embedding,
+                            memory.to_dict()
                         )
-
-                # Store in metadata store
-                metadata_id = await self.metadata_store.store_memory(memory)
+                    )
+                
+                # Store in metadata store (always required)
+                storage_tasks.append(
+                    self.metadata_store.store_memory(memory)
+                )
+                
+                # Add memory node to graph store
+                storage_tasks.append(
+                    self.graph_store.add_memory_node(memory)
+                )
+                
+                # Execute storage operations in parallel
+                try:
+                    if embedding is not None:
+                        vector_success, metadata_id, graph_success = await asyncio.gather(*storage_tasks)
+                    else:
+                        # No vector storage needed
+                        metadata_id, graph_success = await asyncio.gather(*storage_tasks)
+                        vector_success = True  # No vector operation, consider success
+                except Exception as e:
+                    logger.error(
+                        "Failed to store memory in parallel operations",
+                        error_code="PARALLEL_STORAGE_ERROR",
+                        memory_id=memory.id,
+                        exception=str(e)
+                    )
+                    return None
+                
+                # Validate results
                 if not metadata_id:
                     logger.error(
                         "Failed to store in metadata store",
@@ -207,9 +233,13 @@ class MemoryManagerCore:
                         memory_id=memory.id
                     )
                     return None
-
-                # Add memory node to graph store
-                graph_success = await self.graph_store.add_memory_node(memory)
+                
+                if embedding is not None and not vector_success:
+                    logger.warning(
+                        "Failed to store in vector store",
+                        extra_data={"memory_id": memory.id}
+                    )
+                
                 if not graph_success:
                     logger.warning(
                         "Failed to add to graph store",
@@ -407,3 +437,128 @@ class MemoryManagerCore:
                 error=str(e)
             )
             return False
+
+    async def store_memories_batch(
+        self,
+        memories_data: List[Dict[str, Any]],
+        auto_associate: bool = True,
+        allow_duplicates: bool = False,
+        similarity_threshold: float = 0.95
+    ) -> List[Optional[Memory]]:
+        """Store multiple memories in batch for improved performance"""
+        try:
+            results = []
+            
+            # Process in smaller batches to avoid overwhelming the system
+            batch_size = 10
+            for i in range(0, len(memories_data), batch_size):
+                batch = memories_data[i:i + batch_size]
+                
+                # Prepare batch data
+                memory_objects = []
+                embeddings = []
+                
+                for memory_data in batch:
+                    # Extract data with defaults
+                    scope = memory_data.get("scope", "user/default")
+                    content = memory_data.get("content", "")
+                    metadata = memory_data.get("metadata")
+                    tags = memory_data.get("tags")
+                    category = memory_data.get("category")
+                    user_id = memory_data.get("user_id")
+                    project_id = memory_data.get("project_id")
+                    session_id = memory_data.get("session_id")
+                    
+                    # Skip if duplicate check fails
+                    if not allow_duplicates:
+                        existing_memory = await self.check_content_duplicate(
+                            content, scope, similarity_threshold
+                        )
+                        if existing_memory:
+                            results.append(existing_memory)
+                            continue
+                    
+                    # Create memory object
+                    final_metadata = metadata or {}
+                    final_metadata["scope"] = scope
+                    
+                    memory = Memory(
+                        scope=scope,
+                        content=content,
+                        metadata=final_metadata,
+                        tags=tags or [],
+                        category=category,
+                        user_id=user_id,
+                        project_id=project_id,
+                        session_id=session_id
+                    )
+                    
+                    # Generate embedding
+                    embedding = await self.embedding_service.get_embedding(content)
+                    
+                    memory_objects.append(memory)
+                    embeddings.append(embedding)
+                
+                # Batch storage operations
+                async with self.operation_lock:
+                    # Store all memories in parallel batch operations
+                    batch_tasks = []
+                    
+                    for memory, embedding in zip(memory_objects, embeddings):
+                        storage_tasks = []
+                        
+                        # Vector store
+                        if embedding is not None:
+                            storage_tasks.append(
+                                self.vector_store.store_embedding(
+                                    memory.id, embedding, memory.to_dict()
+                                )
+                            )
+                        
+                        # Metadata store
+                        storage_tasks.append(
+                            self.metadata_store.store_memory(memory)
+                        )
+                        
+                        # Graph store
+                        storage_tasks.append(
+                            self.graph_store.add_memory_node(memory)
+                        )
+                        
+                        batch_tasks.append(asyncio.gather(*storage_tasks))
+                    
+                    # Execute all batch operations
+                    batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                    
+                    # Process results and update cache
+                    for memory, batch_result in zip(memory_objects, batch_results):
+                        if isinstance(batch_result, Exception):
+                            logger.error(
+                                "Failed to store memory in batch",
+                                error_code="BATCH_STORAGE_ERROR",
+                                memory_id=memory.id,
+                                exception=str(batch_result)
+                            )
+                            results.append(None)
+                        else:
+                            # Cache successful memories
+                            self.memory_cache.set(memory.id, memory)
+                            results.append(memory)
+                            
+                            logger.info(
+                                "Memory stored successfully in batch",
+                                extra_data={
+                                    "memory_id": memory.id,
+                                    "scope": memory.scope
+                                }
+                            )
+            
+            return results
+            
+        except Exception as e:
+            logger.error(
+                "Batch memory storage failed",
+                error_code="BATCH_STORAGE_FAILED",
+                exception=str(e)
+            )
+            return [None] * len(memories_data)

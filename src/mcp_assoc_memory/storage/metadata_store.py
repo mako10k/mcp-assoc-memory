@@ -10,6 +10,7 @@ from ..models.association import Association
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
 from .base import BaseMetadataStore
+from .database_pool import get_database_pool, DatabasePool
 
 logger = get_memory_logger(__name__)
 
@@ -307,14 +308,20 @@ class SQLiteMetadataStore(BaseMetadataStore):
     def __init__(self, database_path: str = "./data/memory.db"):
         self.database_path = database_path
         self.db_lock = asyncio.Lock()
+        self._pool: Optional[DatabasePool] = None
 
         # Create database directory
         Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self) -> None:
-        """Initialize database and tables"""
+        """Initialize database pool and tables"""
         try:
-            async with aiosqlite.connect(self.database_path) as db:
+            # Initialize database pool
+            self._pool = await get_database_pool(self.database_path)
+            
+            # Create tables using pool connection
+            conn_manager = await self._pool.get_connection()
+            async with conn_manager as db:
                 # Memories table
                 await db.execute('''
                     CREATE TABLE IF NOT EXISTS memories (

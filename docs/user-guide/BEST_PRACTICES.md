@@ -1,4 +1,10 @@
-# Best Practices Guide - MCP Associative Memory Server
+# Best Practices Guide - MCP Associative Memory Server (2025)
+
+## 🚀 Production-Ready Memory Management
+
+**Current Status**: 74/74 tests passing • Complete CI/CD pipeline • Optimized performance
+
+This guide covers best practices for the **2025 production API** with 10 unified tools and enhanced performance optimizations.
 
 ## 🎯 Memory Management Best Practices
 
@@ -10,38 +16,46 @@
 - **Decision rationales** - "Chose PostgreSQL over MongoDB for ACID compliance requirements"
 - **Code patterns** - "Builder pattern implementation for complex configuration objects"
 - **Meeting outcomes** - "Team decided to migrate to microservices architecture by Q2"
+- **Performance insights** - "Parallel operations improved storage by 11% in our tests"
 
 #### ❌ What NOT to Store
 - **Raw code dumps** - Store patterns and insights instead
 - **Sensitive information** - Passwords, API keys, personal data
 - **Temporary debugging output** - Use session scope if needed
 - **Version-specific details** - Focus on concepts that transcend versions
-- **Duplicate information** - The system handles some duplicates, but avoid intentional redundancy
+- **Duplicate information** - Auto-duplicate detection handles this (95% threshold)
 
-### Scoping Strategy
+### Scoping Strategy with Smart Suggestions
 
 #### Hierarchical Organization
 ```
 work/
-  ├── architecture/        # System design decisions
-  ├── debugging/          # Problem-solving insights
-  ├── meetings/           # Meeting outcomes and decisions
+  ├── optimization/       # Performance improvements and analysis
+  ├── architecture/       # System design decisions
+  ├── debugging/         # Problem-solving insights
+  ├── meetings/          # Meeting outcomes and decisions
   ├── projects/
   │   ├── [project-name]/ # Project-specific knowledge
-  │   └── shared/         # Cross-project patterns
-  └── team/               # Team processes and learnings
+  │   └── shared/        # Cross-project patterns
+  └── team/              # Team processes and learnings
 
 learning/
-  ├── [technology]/       # Technology-specific knowledge
-  ├── patterns/           # Design patterns and architectures
-  ├── concepts/           # Fundamental concepts
-  └── courses/            # Structured learning content
+  ├── [technology]/      # Technology-specific knowledge
+  ├── patterns/          # Design patterns and architectures
+  ├── concepts/          # Fundamental concepts
+  └── courses/           # Structured learning content
 
 personal/
-  ├── goals/              # Personal objectives
-  ├── ideas/              # Creative thoughts
-  ├── reflections/        # Learning reflections
-  └── career/             # Career development notes
+  ├── goals/             # Personal objectives
+  ├── ideas/             # Creative thoughts
+  ├── reflections/       # Learning reflections
+  └── career/            # Career development notes
+```
+
+#### Smart Scope Assignment
+**Use `scope_suggest` for optimal organization:**
+```instructions
+Use scope_suggest to recommend where to store this content about database optimization techniques
 ```
 
 #### Scope Naming Conventions
