@@ -195,11 +195,26 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-data/
-logs/
+# Keep directory structure but ignore actual data files
+data/*.db
+data/*.sqlite
+data/*.json
+data/*.pkl
+data/chroma_db/*
+data/test_chroma_db/*
+!data/.gitkeep
+!data/*/
+!data/*/.gitkeep
+
+# Keep logs directory but ignore log files
+logs/*.log
+logs/*.pid
+!logs/.gitkeep
+
 *.db
 *.sqlite
-chroma_db/
+# Only ignore chroma_db in root, not in data/
+/chroma_db/
 vector_store/
 memory_data/
 

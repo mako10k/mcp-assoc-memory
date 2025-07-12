@@ -1,0 +1,2 @@
+# This file ensures the data directory is included in git repository
+# Git does not track empty directories, so this file keeps the directory structure
