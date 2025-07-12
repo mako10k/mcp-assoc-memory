@@ -110,7 +110,7 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             if self.collection is None:
                 raise RuntimeError("ChromaDB collection not initialized")
-                
+
             result = self.collection.get(ids=[memory_id], include=["embeddings"])
             if result["embeddings"] and result["embeddings"][0]:
                 return result["embeddings"][0]
@@ -128,7 +128,7 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             if self.collection is None:
                 raise RuntimeError("ChromaDB collection not initialized")
-                
+
             self.collection.delete(ids=[memory_id])
             logger.info("Vector deleted successfully", extra={"memory_id": memory_id})
             return True
@@ -256,7 +256,7 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             if self.collection is None:
                 raise RuntimeError("ChromaDB collection not initialized")
-                
+
             result = self.collection.get(include=["metadatas"])
 
             total_count = len(result["ids"]) if result["ids"] else 0
@@ -279,7 +279,7 @@ class ChromaVectorStore(BaseVectorStore):
         try:
             if self.collection is None:
                 raise RuntimeError("ChromaDB collection not initialized")
-                
+
             # Prepare metadata (ChromaDB requires string values)
             chroma_metadata = {}
             for key, value in metadata.items():
