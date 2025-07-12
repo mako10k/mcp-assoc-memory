@@ -40,7 +40,7 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
             )
 
         # Get all scopes from memory manager
-        all_scopes = memory_manager.get_all_scopes()
+        all_scopes = await memory_manager.get_all_scopes()
         logger.info(f"Retrieved {len(all_scopes)} total scopes")
 
         # Filter by parent scope if specified
@@ -63,7 +63,7 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
             memory_count = 0
             if request.include_memory_counts:
                 try:
-                    memory_count = memory_manager.get_memory_count_by_scope(scope)
+                    memory_count = await memory_manager.get_memory_count_by_scope(scope)
                 except Exception as e:
                     logger.warning(f"Failed to get memory count for scope {scope}: {e}")
                     memory_count = 0

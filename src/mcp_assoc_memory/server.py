@@ -75,6 +75,7 @@ from .api.tools import (
     set_resource_dependencies,
     set_scope_dependencies,
 )
+from .api.tools.other_tools import set_dependencies as set_other_dependencies
 from .api.utils import get_child_scopes, get_parent_scope, validate_scope_path
 from .config import get_config
 from .core.embedding_service import (
@@ -132,6 +133,7 @@ set_dependencies(memory_manager, memory_storage, persistence)
 set_scope_dependencies(memory_manager)
 set_resource_dependencies(memory_manager, memory_storage, persistence)
 set_prompt_dependencies(memory_manager, memory_storage, persistence)
+set_other_dependencies(memory_manager)
 
 # Global initialization flag
 _initialized = False
