@@ -9,7 +9,7 @@ import asyncio
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -89,25 +89,64 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
         embedding_service=mock_embedding_service
     )
     
-    # Mock the store_memory method to return a simple Memory object
+    # Mock the store_memory method with duplicate detection support
     memory_counter = {"count": 0}  # Use dict to allow modification in nested function
+    stored_memories = {}  # Store memories by content+scope for duplicate detection
+    stored_memories_by_id = {}  # Store memories by ID for retrieval
     
-    async def mock_store_memory(content: str, scope: str = "test", **kwargs) -> Memory:
+    async def mock_store_memory(
+        scope: str = "user/default",
+        content: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[List[str]] = None,
+        category: Optional[str] = None,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        auto_associate: bool = True,
+        allow_duplicates: bool = False,
+        similarity_threshold: float = 0.95,
+        **kwargs
+    ) -> Optional[Memory]:
+        # Check for duplicates if allow_duplicates is False
+        if not allow_duplicates:
+            duplicate_key = f"{content}||{scope}"
+            if duplicate_key in stored_memories:
+                # Return existing memory for duplicate content
+                return stored_memories[duplicate_key]
+        
+        # Create new memory
         memory_counter["count"] += 1
-        return Memory(
+        from datetime import datetime
+        memory = Memory(
             id=f"test-id-{memory_counter['count']:03d}",
             content=content,
             scope=scope,
-            category=kwargs.get("category", "test"),
-            tags=kwargs.get("tags", []),
-            metadata=kwargs.get("metadata", {}),
-            created_at="2025-07-12T09:00:00Z"
+            category=category or "test",
+            tags=tags or [],
+            metadata=metadata or {},
+            created_at=datetime.utcnow()
         )
+        
+        # Store for duplicate detection
+        duplicate_key = f"{content}||{scope}"
+        stored_memories[duplicate_key] = memory
+        
+        # Store by ID for retrieval
+        stored_memories_by_id[memory.id] = memory
+        
+        return memory
     
     manager.store_memory = mock_store_memory
     
     # Mock get_memory method
     async def mock_get_memory(memory_id: str) -> Optional[Memory]:
+        # Check stored memories first
+        if memory_id in stored_memories_by_id:
+            return stored_memories_by_id[memory_id]
+        
+        # Fallback for fixed test ID
+        from datetime import datetime
         if memory_id == "test-id-123":
             return Memory(
                 id=memory_id,
@@ -116,7 +155,7 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
                 category="test",
                 tags=[],
                 metadata={},
-                created_at="2025-07-12T09:00:00Z"
+                created_at=datetime.utcnow()
             )
         return None
     
@@ -150,6 +189,13 @@ def sample_memory_data() -> List[Dict]:
             "scope": "learning/ml",
             "category": "machine-learning",
             "tags": ["ml", "training", "models"],
+            "metadata": {"difficulty": "intermediate"}
+        },
+        {
+            "content": "REST APIs provide web service interfaces",
+            "scope": "learning/web",
+            "category": "web-development",
+            "tags": ["rest", "api", "web"],
             "metadata": {"difficulty": "intermediate"}
         }
     ]
@@ -215,3 +261,37 @@ class TestMemoryFactory:
 def memory_factory():
     """Provide a memory factory for tests."""
     return TestMemoryFactory()
+
+
+@pytest.fixture
+def test_embeddings():
+    """Provide test embeddings data."""
+    # Create embeddings with standard size (1536)
+    import random
+    random.seed(42)  # For consistent test results
+    return [
+        [random.random() for _ in range(1536)],
+        [random.random() for _ in range(1536)],
+        [random.random() for _ in range(1536)]
+    ]
+
+
+@pytest.fixture
+def test_search_results():
+    """Provide test search results data."""
+    return [
+        {
+            "id": "test-result-1",
+            "memory_id": "test-result-1",
+            "content": "Test search result 1",
+            "scope": "test",
+            "similarity_score": 0.95
+        },
+        {
+            "id": "test-result-2",
+            "memory_id": "test-result-2",
+            "content": "Test search result 2",
+            "scope": "test",
+            "similarity_score": 0.85
+        }
+    ]
