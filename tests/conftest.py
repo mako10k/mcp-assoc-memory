@@ -77,8 +77,12 @@ def test_config(temp_dir: Path) -> Dict:
 async def mock_embedding_service():
     """Mock embedding service for testing without API calls."""
     mock_service = AsyncMock()
-    mock_service.get_embedding.return_value = [0.1] * 1536  # Standard embedding size
-    mock_service.get_embeddings.return_value = [[0.1] * 1536, [0.2] * 1536]
+    # Use smaller, consistent embeddings for testing
+    mock_service.get_embedding.return_value = [0.1] * 384  # Smaller, faster embedding size
+    mock_service.get_embeddings.return_value = [[0.1] * 384, [0.2] * 384]
+    # Mock initialization to avoid heavy model loading
+    mock_service.initialize = AsyncMock()
+    mock_service.close = AsyncMock()
     return mock_service
 
 
@@ -95,7 +99,12 @@ async def test_chroma_client(temp_dir: Path) -> AsyncGenerator[ClientAPI, None]:
         settings=Settings(
             is_persistent=True,
             allow_reset=True,
-            anonymized_telemetry=False
+            anonymized_telemetry=False,
+            # Disable unnecessary features for faster initialization
+            chroma_server_authn_provider="",
+            chroma_client_auth_provider="",
+            # Use in-memory SQLite for faster testing
+            chroma_db_impl="duckdb+parquet"
         )
     )
     

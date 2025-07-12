@@ -56,11 +56,11 @@ jobs:
         
     - name: Run integration tests
       run: |
-        echo "Integration tests temporarily disabled due to timeout issues"
+        pytest tests/integration/ -v --tb=short --timeout=120 -x
         
     - name: Run e2e tests
       run: |
-        echo "E2E tests temporarily disabled due to timeout issues"
+        pytest tests/e2e/ -v --tb=short --timeout=180 -x
         
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
