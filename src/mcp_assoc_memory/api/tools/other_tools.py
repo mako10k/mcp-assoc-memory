@@ -13,13 +13,14 @@ from ..models.responses import (
     SessionInfo,
     SessionManageResponse,
 )
+from ...core.singleton_memory_manager import get_memory_manager
 
-# Module-level dependencies (set by server initialization)
+# Module-level dependencies (for backward compatibility)
 memory_manager = None
 
 
 def set_dependencies(mm: Any) -> None:
-    """Set module dependencies from server initialization"""
+    """Set module dependencies from server initialization (backward compatibility)"""
     global memory_manager
     memory_manager = mm
 

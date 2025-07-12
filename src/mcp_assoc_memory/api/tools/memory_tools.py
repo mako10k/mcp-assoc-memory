@@ -15,6 +15,7 @@ from pydantic import Field
 
 from ...config import get_config
 from ...core.memory_manager import MemoryManager
+from ...core.singleton_memory_manager import get_memory_manager, is_memory_manager_initialized
 from ...simple_persistence import get_persistent_storage
 from .export_tools import handle_memory_export
 from ..dependencies import dependencies, ensure_dependencies_initialized
@@ -53,19 +54,24 @@ def set_dependencies(mm: MemoryManager, ms: Dict[str, Any], p: Any) -> None:
     _initialized = False
 
 
-def get_memory_manager() -> Optional[MemoryManager]:
-    """Get the current memory manager instance"""
+def get_local_memory_manager() -> Optional[MemoryManager]:
+    """Get the current local memory manager instance (for backward compatibility)"""
     return memory_manager
 
 
 async def _get_or_create_memory_manager() -> Optional[MemoryManager]:
     """
-    Get memory manager with dynamic dependency resolution.
-    This handles the case where the tool is running in a separate process
-    and global variables are not shared.
+    Get memory manager using singleton pattern with fallback to dynamic creation
     """
     global memory_manager
     
+    # First try to get from singleton
+    singleton_manager = await get_memory_manager()
+    if singleton_manager is not None:
+        memory_manager = singleton_manager  # Update local reference
+        return singleton_manager
+    
+    # Fallback: check if local memory manager exists
     if memory_manager is not None:
         return memory_manager
     
@@ -110,8 +116,14 @@ async def _get_or_create_memory_manager() -> Optional[MemoryManager]:
 
 
 async def ensure_initialized() -> None:
-    """Ensure memory manager is initialized"""
+    """Ensure memory manager is initialized using singleton pattern"""
     global _initialized, memory_manager
+    
+    # Check if singleton is already initialized
+    if is_memory_manager_initialized():
+        memory_manager = await get_memory_manager()
+        _initialized = True
+        return
     
     # Try to get or create memory manager
     memory_manager = await _get_or_create_memory_manager()

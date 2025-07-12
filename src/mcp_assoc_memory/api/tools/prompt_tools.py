@@ -1,19 +1,20 @@
 """
-Prompt handlers for MCP Associative Memory Server
+Prompt generation tools for MCP Associative Memory Server
 """
-
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastmcp import Context
 
-# Global references (will be set by server.py)
+from ...core.singleton_memory_manager import get_memory_manager
+
+# Module-level dependencies (for backward compatibility)
 memory_manager: Optional[Any] = None
 memory_storage: Optional[Dict[str, Any]] = None
 persistence = None
 
 
 def set_dependencies(mm: Any, ms: Dict[str, Any], p: Any) -> None:
-    """Set global dependencies from server.py"""
+    """Set global dependencies from server.py (backward compatibility)"""
     global memory_manager, memory_storage, persistence
     memory_manager = mm
     memory_storage = ms
@@ -28,8 +29,17 @@ async def handle_analyze_memories_prompt(
         await ctx.info(f"Generating analysis prompt for scope '{scope}'...")
 
     scope_memories = []
-    for memory_data in memory_storage.values():
-        memory_scope = memory_data["scope"]
+    if memory_storage:
+        for memory_data in memory_storage.values():
+            memory_scope = memory_data["scope"]
+            if include_child_scopes:
+                # Include if memory scope starts with request scope (hierarchical match)
+                if memory_scope == scope or memory_scope.startswith(scope + "/"):
+                    scope_memories.append(memory_data)
+            else:
+                # Exact scope match only
+                if memory_scope == scope:
+                    scope_memories.append(memory_data)
         if include_child_scopes:
             # Include if memory scope starts with request scope (hierarchical match)
             if memory_scope == scope or memory_scope.startswith(scope + "/"):
@@ -64,6 +74,9 @@ async def handle_summarize_memory_prompt(memory_id: str, context_scope: str = ""
     if ctx:
         await ctx.info(f"Generating summary prompt for memory '{memory_id}'...")
 
+    if not memory_storage:
+        raise ValueError("Memory storage not initialized")
+        
     memory_data = memory_storage.get(memory_id)
     if not memory_data:
         raise ValueError(f"Memory not found: {memory_id}")
