@@ -294,9 +294,21 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
             },
         }
 
-        # Add scope suggestions if no results found
+        # Add enhanced scope suggestions with hierarchical fallback if no results found
         if not formatted_results and request.scope:
-            response["suggestions"] = {
+            await ctx.info("No results found, performing hierarchical fallback search")
+            fallback_suggestions = await _perform_hierarchical_fallback_search(
+                query=request.query,
+                original_scope=request.scope,
+                ctx=ctx,
+                limit=request.limit,
+                similarity_threshold=request.similarity_threshold,
+                include_child_scopes=request.include_child_scopes
+            )
+            response["suggestions"] = fallback_suggestions
+            
+            # Keep legacy suggestions for backward compatibility
+            response["legacy_suggestions"] = {
                 "try_include_child_scopes": not request.include_child_scopes,
                 "try_broader_scope": request.scope.rsplit("/", 1)[0] if "/" in request.scope else None,
                 "try_lower_threshold": max(0.05, request.similarity_threshold - 0.05),
@@ -999,3 +1011,134 @@ async def _validate_import_data(data: Dict[str, Any]) -> bool:
         return True
     except Exception:
         return False
+
+
+async def _extract_parent_scope(scope: str) -> Optional[str]:
+    """Extract parent scope from a hierarchical scope string"""
+    if not scope or "/" not in scope:
+        return None
+    return scope.rsplit("/", 1)[0]
+
+
+async def _perform_hierarchical_fallback_search(
+    query: str,
+    original_scope: str,
+    ctx: Context,
+    limit: int = 5,
+    similarity_threshold: float = 0.1,
+    include_child_scopes: bool = False
+) -> Dict[str, Any]:
+    """
+    Perform hierarchical fallback search when original search returns 0 results.
+    
+    Algorithm:
+    1. Search parent scope level by level
+    2. Return candidates immediately when results found
+    3. If no results at any parent level, perform global search
+    """
+    if not memory_manager:
+        await ctx.error("Memory manager not initialized for fallback search")
+        return {
+            "type": "scope_fallback",
+            "original_scope": original_scope,
+            "error": "Memory manager not initialized",
+            "candidates": [],
+            "fallback_level": 0
+        }
+    fallback_suggestions = {
+        "type": "scope_fallback",
+        "original_scope": original_scope,
+        "found_in_scope": None,
+        "candidates": [],
+        "fallback_level": 0,
+        "search_strategy": "hierarchical"
+    }
+    
+    current_scope = original_scope
+    fallback_level = 0
+    
+    # Try parent scopes level by level
+    while current_scope:
+        parent_scope = await _extract_parent_scope(current_scope)
+        if not parent_scope:
+            break
+            
+        fallback_level += 1
+        await ctx.info(f"Fallback search level {fallback_level}: searching in '{parent_scope}'")
+        
+        # Search in parent scope
+        try:
+            results = await memory_manager.search_memories(
+                query=query,
+                scope=parent_scope,
+                include_child_scopes=include_child_scopes,
+                limit=limit,
+                min_score=similarity_threshold,
+            )
+            
+            if results:
+                # Found results at this level - collect scope candidates
+                unique_scopes = set()
+                for result in results[:limit]:
+                    memory = result["memory"]
+                    memory_scope = memory.metadata.get("scope", memory.scope)
+                    unique_scopes.add(memory_scope)
+                
+                fallback_suggestions.update({
+                    "found_in_scope": parent_scope,
+                    "candidates": list(unique_scopes)[:5],  # Max 5 candidates
+                    "fallback_level": fallback_level,
+                    "results_count": len(results)
+                })
+                
+                await ctx.info(f"Found {len(results)} results in parent scope '{parent_scope}'")
+                return fallback_suggestions
+                
+        except Exception as e:
+            await ctx.warning(f"Error during fallback search in scope '{parent_scope}': {e}")
+        
+        current_scope = parent_scope
+    
+    # If no results found at any parent level, try global search
+    await ctx.info("No results in parent scopes, attempting global search")
+    try:
+        global_results = await memory_manager.search_memories(
+            query=query,
+            scope=None,  # Global search
+            include_child_scopes=True,
+            limit=limit,
+            min_score=max(0.05, similarity_threshold - 0.05),  # Lower threshold for global
+        )
+        
+        if global_results:
+            unique_scopes = set()
+            for result in global_results[:limit]:
+                memory = result["memory"]
+                memory_scope = memory.metadata.get("scope", memory.scope)
+                unique_scopes.add(memory_scope)
+            
+            fallback_suggestions.update({
+                "found_in_scope": "global",
+                "candidates": list(unique_scopes)[:5],
+                "fallback_level": fallback_level + 1,
+                "search_strategy": "global_fallback",
+                "results_count": len(global_results),
+                "note": "Results found via global search with relaxed threshold"
+            })
+            
+            await ctx.info(f"Found {len(global_results)} results via global search")
+            return fallback_suggestions
+            
+    except Exception as e:
+        await ctx.warning(f"Error during global fallback search: {e}")
+    
+    # No results found anywhere
+    fallback_suggestions.update({
+        "found_in_scope": None,
+        "candidates": [],
+        "fallback_level": fallback_level + 1,
+        "search_strategy": "exhausted",
+        "note": "No results found in any scope or global search"
+    })
+    
+    return fallback_suggestions
