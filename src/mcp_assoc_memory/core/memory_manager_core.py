@@ -359,7 +359,7 @@ class MemoryManagerCore:
                 # Update access count
                 cached_memory.access_count += 1
                 cached_memory.accessed_at = datetime.utcnow()
-                return cached_memory
+                return cached_memory  # type: ignore[no-any-return]
 
             # Get from metadata store
             memory = await self.metadata_store.get_memory(memory_id)
@@ -398,7 +398,7 @@ class MemoryManagerCore:
                 return None
 
             # Prepare updated values and track changes
-            update_data = {}
+            update_data: Dict[str, Any] = {}
             updated_metadata = existing_memory.metadata
             if metadata is not None:
                 # Merge with existing metadata
@@ -410,19 +410,23 @@ class MemoryManagerCore:
                 # Regenerate embedding if content changed
                 new_embedding = await self.embedding_service.get_embedding(content)
                 if new_embedding is not None:
-                    update_data["embedding"] = new_embedding
+                    # Convert embedding to appropriate format for storage
+                    if hasattr(new_embedding, 'tolist'):
+                        update_data["embedding"] = new_embedding.tolist()
+                    else:
+                        update_data["embedding"] = list(new_embedding)
 
             if scope is not None:
                 update_data["scope"] = scope
 
             if tags is not None:
-                update_data["tags"] = tags
+                update_data["tags"] = ",".join(tags) if isinstance(tags, list) else tags
 
             if category is not None:
                 update_data["category"] = category
 
             # Update timestamp
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.utcnow().isoformat()
 
             async with self.operation_lock:
                 # Create updated memory object
@@ -440,7 +444,7 @@ class MemoryManagerCore:
                     updated_at=datetime.utcnow(),
                     accessed_at=existing_memory.accessed_at,
                     access_count=existing_memory.access_count,
-                    embedding=update_data.get("embedding", existing_memory.embedding),
+                    embedding=update_data.get("embedding") or existing_memory.embedding,
                 )
 
                 # Update metadata store
@@ -534,7 +538,7 @@ class MemoryManagerCore:
     ) -> List[Optional[Memory]]:
         """Store multiple memories in batch for improved performance"""
         try:
-            results = []
+            results: List[Optional[Memory]] = []
 
             # Process in smaller batches to avoid overwhelming the system
             batch_size = 10
@@ -590,7 +594,7 @@ class MemoryManagerCore:
                     batch_tasks = []
 
                     for memory, embedding in zip(memory_objects, embeddings):
-                        storage_tasks = []
+                        storage_tasks: List[Any] = []
 
                         # Vector store
                         if embedding is not None:
