@@ -22,33 +22,15 @@
 <!-- ユーザーはここに新しいバックログ項目を追加してください -->
 <!-- Copilot will process and remove items from this section -->
 
+<!-- All new backlog items processed and moved to associative memory -->
+<!-- Content Relation Feature stored in work/backlog/medium with technical details -->
+
 <!-- All backlog items completed and processed to associative memory -->
 <!-- Next sprint items are stored in work/backlog/{priority} scopes -->
 
 
-## [High] Fix Memory Update Operation Parameter Handling
-**Type**: bug
-**Sprint**: 3
-**Description**: Memory update operation returns error scope and empty content, particularly with Japanese content and tag processing
-**Context**: mcp_assocmemory_memory_manage with operation="update" fails to process content and tags correctly. Error occurs in memory_tools.py update logic.
-
-## [High] Resolve Memory Move Operation Logic
-**Type**: bug  
-**Sprint**: 3
-**Description**: Memory move operation reports 0 moved memories when 1 was expected, memory not actually relocated to target scope
-**Context**: mcp_assocmemory_memory_move fails to transfer memories between scopes. Potential timing issue or scope validation problem in memory_manager_admin.py
-
-## [Medium] Fix Memory Import Validation Logic
-**Type**: bug
-**Sprint**: 3
-**Description**: Memory import operation fails with validation error "True" despite correct JSON structure
-**Context**: mcp_assocmemory_memory_sync with operation="import" has validation logic issues. JSON structure appears correct but validation fails in import processing.
-
-## [Medium] Investigate Diversified Search Indexing Delays
-**Type**: enhancement
-**Sprint**: 3
-**Description**: Advanced diversified search returns empty results, may indicate indexing delay or similarity threshold issues
-**Context**: Complex searches in test scope return empty results. Requires investigation of embedding processing timing and similarity threshold handling.
+<!-- All recent backlog items processed and moved to associative memory -->
+<!-- Items stored in work/backlog/{priority} scopes with full technical details -->
 
 ---
 

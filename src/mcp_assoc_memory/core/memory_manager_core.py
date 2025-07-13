@@ -445,6 +445,8 @@ class MemoryManagerCore:
                 if updated_memory:
                     await self.graph_store.remove_memory_node(memory_id)
                     await self.graph_store.add_memory_node(updated_memory)
+                else:
+                    logger.warning(f"Failed to retrieve updated memory after update: {memory_id}")
 
                 # Clear cache to force reload
                 self.memory_cache.delete(memory_id)
@@ -454,7 +456,18 @@ class MemoryManagerCore:
                     extra_data={"memory_id": memory_id, "updated_fields": list(update_data.keys())},
                 )
 
-                return await self.get_memory(memory_id)
+                # Final retrieval with explicit error checking
+                final_memory = await self.get_memory(memory_id)
+                if final_memory is None:
+                    logger.error(f"CRITICAL: get_memory returned None after successful update for memory_id: {memory_id}")
+                    # Try to recover by querying metadata store directly
+                    final_memory = await self.metadata_store.get_memory(memory_id)
+                    if final_memory:
+                        logger.info(f"Successfully recovered memory from metadata store: {memory_id}")
+                    else:
+                        logger.error(f"FAILED to recover memory from metadata store: {memory_id}")
+                        
+                return final_memory
 
         except Exception as e:
             logger.error("Failed to update memory", error_code="MEMORY_UPDATE_ERROR", memory_id=memory_id, error=str(e))

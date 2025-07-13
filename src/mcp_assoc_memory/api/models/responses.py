@@ -233,6 +233,8 @@ class MemoryImportResponse(BaseModel):
 class MemoryResponse(BaseModel):
     """Legacy memory response for tool compatibility"""
 
+    success: bool = Field(default=True, description="Operation success status")
+    message: str = Field(default="", description="Operation status message")
     memory_id: str = Field(description="Memory identifier")
     content: str = Field(description="Memory content")
     scope: str = Field(description="Memory scope")

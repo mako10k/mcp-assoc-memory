@@ -98,6 +98,8 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
         error_msg = "Content cannot be empty"
         await ctx.error(error_msg)
         return MemoryResponse(
+            success=False,
+            message=error_msg,
             memory_id="error",
             content="",
             scope="error",
@@ -130,6 +132,8 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
         await ctx.info(f"Successfully stored memory: {memory.id}")
         
         return MemoryResponse(
+            success=True,
+            message="Memory stored successfully",
             memory_id=memory.id,
             content=memory.content,
             scope=memory.scope,
@@ -145,6 +149,8 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
         await ctx.error(error_msg)
         
         return MemoryResponse(
+            success=False,
+            message=error_msg,
             memory_id="error",
             content="",
             scope="error",
@@ -479,7 +485,7 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
             await ctx.warning(f"Memory not found: {request.memory_id}")
             return MemoryResponse(success=False, message="Memory not found", memory_id=request.memory_id)
 
-        # Update memory
+        # Update memory with explicit None check
         updated_memory = await memory_manager.update_memory(
             memory_id=request.memory_id,
             content=request.content,
@@ -488,10 +494,25 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
             category=request.category,
             metadata=request.metadata,
         )
+        
+        # Critical: Check if update_memory returned None
+        if updated_memory is None:
+            error_msg = f"Memory update operation returned None for memory_id: {request.memory_id}"
+            await ctx.error(error_msg)
+            return MemoryResponse(
+                success=False,
+                message="Memory update failed",
+                memory_id=request.memory_id,
+                content="",
+                scope="error",
+                created_at=datetime.now()
+            )
 
         await ctx.info(f"Memory updated successfully: {request.memory_id}")
 
         return MemoryResponse(
+            success=True,
+            message="Memory updated successfully",
             memory_id=updated_memory.id,
             content=updated_memory.content,
             scope=updated_memory.scope,
@@ -502,9 +523,17 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
         )
 
     except Exception as e:
-        await ctx.error(f"Failed to update memory: {e}")
-        # Return a minimal valid response for error case
-        return MemoryResponse(memory_id=request.memory_id, content="", scope="error", created_at=datetime.now())
+        error_msg = f"Failed to update memory: {str(e)}"
+        await ctx.error(error_msg)
+        return MemoryResponse(
+            success=False,
+            message=error_msg,
+            memory_id=request.memory_id,
+            content="",
+            scope="error",
+            created_at=datetime.now(),
+            metadata={"error": error_msg, "error_type": type(e).__name__}
+        )
 
 
 async def handle_memory_discover_associations(
