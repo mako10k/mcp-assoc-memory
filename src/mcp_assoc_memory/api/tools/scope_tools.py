@@ -3,10 +3,11 @@ Scope management tool handlers for MCP Associative Memory Server
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastmcp import Context
 
+from ...core.singleton_memory_manager import get_memory_manager, get_or_create_memory_manager
 from ..models import (
     ErrorResponse,
     MCPResponse,
@@ -21,12 +22,12 @@ from ..utils import get_child_scopes, get_parent_scope, validate_scope_path
 
 logger = logging.getLogger(__name__)
 
-# Module-level dependencies (set by server initialization)
+# Module-level dependencies (for backward compatibility)
 memory_manager = None
 
 
 def set_dependencies(mm: Any) -> None:
-    """Set module dependencies from server initialization"""
+    """Set module dependencies from server initialization (backward compatibility)"""
     global memory_manager
     memory_manager = mm
 
@@ -34,24 +35,31 @@ def set_dependencies(mm: Any) -> None:
 async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeListResponse:
     """Handle scope list requests"""
     try:
-        if memory_manager is None:
-            return ErrorResponse(
-                success=False, error="Memory manager not initialized", message="Internal server error", data={}
+        # Use comprehensive memory manager access
+        current_memory_manager = await get_or_create_memory_manager()
+        if current_memory_manager is None:
+            return ScopeListResponse(
+                success=False,
+                message="Internal server error",
+                data={"error": "Memory manager not initialized"},
+                scopes=[],
+                total_scopes=0,
             )
 
         # Get all scopes from memory manager
-        all_scopes = await memory_manager.get_all_scopes()
+        all_scopes = await current_memory_manager.get_all_scopes()
         logger.info(f"Retrieved {len(all_scopes)} total scopes")
 
         # Filter by parent scope if specified
         parent_scope = request.parent_scope
         if parent_scope:
             if not validate_scope_path(parent_scope):
-                return ErrorResponse(
+                return ScopeListResponse(
                     success=False,
-                    error="INVALID_SCOPE",
                     message=f"Invalid parent scope format: {parent_scope}",
-                    data={},
+                    data={"error": "INVALID_SCOPE"},
+                    scopes=[],
+                    total_scopes=0,
                 )
             filtered_scopes = get_child_scopes(parent_scope, all_scopes)
         else:
@@ -63,17 +71,19 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
             memory_count = 0
             if request.include_memory_counts:
                 try:
-                    memory_count = await memory_manager.get_memory_count_by_scope(scope)
+                    memory_count = await current_memory_manager.get_memory_count_by_scope(scope)
                 except Exception as e:
                     logger.warning(f"Failed to get memory count for scope {scope}: {e}")
                     memory_count = 0
+
+            # Get child scopes for this scope
+            child_scopes = [s for s in all_scopes if s.startswith(scope + "/") and s != scope]
 
             scope_infos.append(
                 ScopeInfo(
                     scope=scope,
                     memory_count=memory_count,
-                    parent_scope=get_parent_scope(scope),
-                    has_children=any(s.startswith(scope + "/") for s in all_scopes if s != scope),
+                    child_scopes=child_scopes,
                 )
             )
 
@@ -84,21 +94,34 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
             success=True,
             message=f"Retrieved {len(scope_infos)} scopes",
             data={"scopes": scope_infos, "parent_scope": parent_scope, "total_count": len(scope_infos)},
+            scopes=scope_infos,
+            total_scopes=len(scope_infos),
         )
 
     except Exception as e:
         logger.error(f"Error in scope_list: {e}", exc_info=True)
-        return ErrorResponse(
-            success=False, error="SCOPE_LIST_ERROR", message=f"Failed to list scopes: {str(e)}", data={}
+        return ScopeListResponse(
+            success=False,
+            message=f"Failed to list scopes: {str(e)}",
+            data={"error": "SCOPE_LIST_ERROR"},
+            scopes=[],
+            total_scopes=0,
         )
 
 
 async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> ScopeSuggestResponse:
     """Handle scope suggestion requests"""
     try:
-        if memory_manager is None:
-            return ErrorResponse(
-                success=False, error="Memory manager not initialized", message="Internal server error", data={}
+        # Use unified memory manager access
+        current_memory_manager = await get_or_create_memory_manager()
+
+        if current_memory_manager is None:
+            return ScopeSuggestResponse(
+                success=False,
+                message="Internal server error",
+                data={"error": "Memory manager not initialized"},
+                recommendation=None,
+                alternatives=[],
             )
 
         content = request.content.lower()
@@ -208,6 +231,10 @@ async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Sc
 
     except Exception as e:
         logger.error(f"Error in scope_suggest: {e}", exc_info=True)
-        return ErrorResponse(
-            success=False, error="SCOPE_SUGGEST_ERROR", message=f"Failed to suggest scope: {str(e)}", data={}
+        return ScopeSuggestResponse(
+            success=False,
+            message=f"Failed to suggest scope: {str(e)}",
+            data={"error": "SCOPE_SUGGEST_ERROR"},
+            recommendation=None,
+            alternatives=[],
         )

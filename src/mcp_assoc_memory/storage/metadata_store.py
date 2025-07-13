@@ -228,7 +228,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 user_id=str(row[5]) if row[5] is not None else None,
                 project_id=str(row[6]) if row[6] is not None else None,
                 session_id=str(row[7]) if row[7] is not None else None,
-                category=None,
+                category=str(row[12]) if row[12] is not None else None,  # Fixed: use row[12] for category
                 created_at=datetime.fromisoformat(row[8]),
                 updated_at=datetime.fromisoformat(row[9]),
                 accessed_at=datetime.fromisoformat(row[10]) if row[10] else None,
@@ -324,7 +324,8 @@ class SQLiteMetadataStore(BaseMetadataStore):
                         created_at TEXT NOT NULL,
                         updated_at TEXT NOT NULL,
                         accessed_at TEXT,
-                        access_count INTEGER DEFAULT 0
+                        access_count INTEGER DEFAULT 0,
+                        category TEXT
                     )
                 """
                 )

@@ -15,6 +15,7 @@ from typing import Annotated, Any, Dict, List, Optional
 from fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
+from .api.dependencies import set_global_dependencies
 from .api.models import (
     Association,
     DiversifiedSearchRequest,
@@ -76,7 +77,6 @@ from .api.tools import (
     set_scope_dependencies,
 )
 from .api.tools.other_tools import set_dependencies as set_other_dependencies
-from .api.dependencies import set_global_dependencies
 from .api.utils import get_child_scopes, get_parent_scope, validate_scope_path
 from .config import get_config
 from .core.embedding_service import (
@@ -88,6 +88,11 @@ from .core.embedding_service import (
 # Import the full associative memory architecture
 from .core.memory_manager import MemoryManager
 from .core.similarity import SimilarityCalculator
+from .core.singleton_memory_manager import (
+    get_memory_manager,
+    initialize_memory_manager,
+    is_memory_manager_initialized,
+)
 from .simple_persistence import get_persistent_storage
 from .storage.graph_store import NetworkXGraphStore
 from .storage.metadata_store import SQLiteMetadataStore
@@ -117,48 +122,43 @@ except Exception as e:
 
 similarity_calculator = SimilarityCalculator()
 
-# Initialize memory manager
-memory_manager = MemoryManager(
-    vector_store=vector_store,
-    metadata_store=metadata_store,
-    graph_store=graph_store,
-    embedding_service=embedding_service,
-    similarity_calculator=similarity_calculator,
-)
+# Initialize memory manager using singleton pattern (will be done in ensure_initialized)
+memory_manager = None
 
 # Fallback simple storage for compatibility
 memory_storage, persistence = get_persistent_storage()
-
-# Set up tool dependencies - use centralized dependency manager
-set_global_dependencies(memory_manager, memory_storage, persistence)
-
-# Also set legacy dependencies for backward compatibility
-set_dependencies(memory_manager, memory_storage, persistence)
-set_scope_dependencies(memory_manager)
-set_resource_dependencies(memory_manager, memory_storage, persistence)
-set_prompt_dependencies(memory_manager, memory_storage, persistence)
-set_other_dependencies(memory_manager)
 
 # Global initialization flag
 _initialized = False
 
 
 async def ensure_initialized():
-    """Ensure memory manager is initialized"""
-    global _initialized
+    """Ensure memory manager is initialized using singleton pattern"""
+    global _initialized, memory_manager
     if not _initialized:
         try:
-            await memory_manager.initialize()
-            # Set dependencies for tool handlers
+            # Initialize memory manager using singleton pattern
+            memory_manager = await initialize_memory_manager(
+                vector_store=vector_store,
+                metadata_store=metadata_store,
+                graph_store=graph_store,
+                embedding_service=embedding_service,
+                similarity_calculator=similarity_calculator,
+            )
+
+            # Set up tool dependencies - use centralized dependency manager
+            set_global_dependencies(memory_manager, memory_storage, persistence)
+
+            # Also set legacy dependencies for backward compatibility
             set_dependencies(memory_manager, memory_storage, persistence)
             set_scope_dependencies(memory_manager)
             set_resource_dependencies(memory_manager, memory_storage, persistence)
             set_prompt_dependencies(memory_manager, memory_storage, persistence)
             set_other_dependencies(memory_manager)
-            
+
             _initialized = True
-            logger.info("Memory manager initialized successfully")
-            
+            logger.info("Memory manager initialized successfully using singleton pattern")
+
         except Exception as e:
             # Reset flag to allow retry
             _initialized = False
@@ -174,9 +174,9 @@ async def ensure_initialized():
 async def debug_memory_manager(ctx: Context) -> Dict[str, Any]:
     """Debug tool to check memory manager state"""
     # Import memory tools to check global state
-    from .api.tools.memory_tools import memory_manager as tools_memory_manager
     from .api.dependencies import dependencies
-    
+    from .api.tools.memory_tools import memory_manager as tools_memory_manager
+
     return {
         "server_memory_manager": str(memory_manager),
         "server_memory_manager_type": str(type(memory_manager)),
@@ -544,6 +544,7 @@ async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> List[Mem
     result = await handle_unified_search(request, ctx)
     # Convert handler result to expected format
     if isinstance(result, dict) and "results" in result:
+        # Return the MemoryResponse objects directly
         return result["results"]
     # Return empty list if result format is unexpected
     return []

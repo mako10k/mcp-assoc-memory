@@ -1,19 +1,21 @@
 """
-Prompt handlers for MCP Associative Memory Server
+Prompt generation tools for MCP Associative Memory Server
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastmcp import Context
 
-# Global references (will be set by server.py)
+from ...core.singleton_memory_manager import get_memory_manager
+
+# Module-level dependencies (for backward compatibility)
 memory_manager: Optional[Any] = None
 memory_storage: Optional[Dict[str, Any]] = None
 persistence = None
 
 
 def set_dependencies(mm: Any, ms: Dict[str, Any], p: Any) -> None:
-    """Set global dependencies from server.py"""
+    """Set global dependencies from server.py (backward compatibility)"""
     global memory_manager, memory_storage, persistence
     memory_manager = mm
     memory_storage = ms
@@ -27,17 +29,56 @@ async def handle_analyze_memories_prompt(
     if ctx:
         await ctx.info(f"Generating analysis prompt for scope '{scope}'...")
 
-    scope_memories = []
-    for memory_data in memory_storage.values():
-        memory_scope = memory_data["scope"]
-        if include_child_scopes:
-            # Include if memory scope starts with request scope (hierarchical match)
-            if memory_scope == scope or memory_scope.startswith(scope + "/"):
-                scope_memories.append(memory_data)
-        else:
-            # Exact scope match only
-            if memory_scope == scope:
-                scope_memories.append(memory_data)
+    # Use Singleton memory manager with fallback
+    manager = await get_memory_manager()
+    if not manager:
+        # Fallback to module-level memory_storage if available
+        if not memory_storage:
+            raise ValueError("No memory manager or storage available")
+
+        scope_memories = []
+        for memory_data in memory_storage.values():
+            memory_scope = memory_data["scope"]
+            if include_child_scopes:
+                # Include if memory scope starts with request scope (hierarchical match)
+                if memory_scope == scope or memory_scope.startswith(scope + "/"):
+                    scope_memories.append(memory_data)
+            else:
+                # Exact scope match only
+                if memory_scope == scope:
+                    scope_memories.append(memory_data)
+    else:
+        # Use Singleton memory manager
+        try:
+            # Get memories from the metadata store via scope
+            if include_child_scopes:
+                # Use search to get all memories and filter
+                all_memories = await manager.search_memories("", scope=scope, limit=1000, min_score=0.0)
+                scope_memories = []
+                for memory in all_memories:
+                    memory_scope = memory.get("scope", "")
+                    if memory_scope == scope or memory_scope.startswith(scope + "/"):
+                        scope_memories.append(memory)
+            else:
+                # Direct scope query
+                memories = await manager.metadata_store.get_memories_by_scope(scope)
+                scope_memories = []
+                for memory in memories:
+                    scope_memories.append(
+                        {
+                            "id": memory.id,
+                            "content": memory.content,
+                            "scope": memory.scope,
+                            "category": memory.category,
+                            "tags": memory.tags,
+                            "created_at": memory.created_at,
+                            "metadata": memory.metadata,
+                        }
+                    )
+        except Exception as e:
+            if ctx:
+                await ctx.error(f"Failed to retrieve memories from manager: {e}")
+            raise ValueError(f"Failed to retrieve memories: {e}")
 
     memories_text = "\n".join([f"- [{m['scope']}] {m['content']}" for m in scope_memories[:10]])  # Maximum 10 memories
 
@@ -64,9 +105,34 @@ async def handle_summarize_memory_prompt(memory_id: str, context_scope: str = ""
     if ctx:
         await ctx.info(f"Generating summary prompt for memory '{memory_id}'...")
 
-    memory_data = memory_storage.get(memory_id)
-    if not memory_data:
-        raise ValueError(f"Memory not found: {memory_id}")
+    # Use Singleton memory manager with fallback
+    manager = await get_memory_manager()
+    if not manager:
+        # Fallback to module-level memory_storage if available
+        if not memory_storage:
+            raise ValueError("No memory manager or storage available")
+
+        memory_data = memory_storage.get(memory_id)
+        if not memory_data:
+            raise ValueError(f"Memory not found: {memory_id}")
+    else:
+        # Use Singleton memory manager
+        try:
+            memory = await manager.get_memory(memory_id)
+            if not memory:
+                raise ValueError(f"Memory not found: {memory_id}")
+
+            memory_data = {
+                "memory_id": memory.id,
+                "scope": memory.scope,
+                "created_at": memory.created_at,
+                "content": memory.content,
+                "metadata": memory.metadata,
+            }
+        except Exception as e:
+            if ctx:
+                await ctx.error(f"Failed to retrieve memory: {e}")
+            raise ValueError(f"Failed to retrieve memory: {e}")
 
     context_info = f" within the context of '{context_scope}' scope" if context_scope else ""
 

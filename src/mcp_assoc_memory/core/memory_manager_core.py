@@ -52,7 +52,7 @@ class MemoryManagerCore:
 
         except Exception as e:
             logger.error(
-                "Failed to initialize memory manager: %s", str(e), extra={"error_code": "MEMORY_MANAGER_INIT_ERROR"}
+                f"Failed to initialize memory manager: {str(e)}", error_code="MEMORY_MANAGER_INIT_ERROR"
             )
             raise
 
@@ -67,7 +67,7 @@ class MemoryManagerCore:
 
         except Exception as e:
             logger.warning(
-                "Error during memory manager cleanup: %s", str(e), extra={"error_code": "MEMORY_MANAGER_CLOSE_ERROR"}
+                f"Error during memory manager cleanup: {str(e)}", error_code="MEMORY_MANAGER_CLOSE_ERROR"
             )
 
     async def check_content_duplicate(
@@ -86,7 +86,7 @@ class MemoryManagerCore:
 
             # Search for similar content in the same scope
             similar_results = await self.vector_store.search(
-                content_embedding, scope=scope, limit=5, min_score=similarity_threshold
+                content_embedding, scope=scope or "user/default", limit=5, min_score=similarity_threshold
             )
 
             # Check each result for actual duplicate
@@ -161,7 +161,7 @@ class MemoryManagerCore:
 
             async with self.operation_lock:
                 # Parallel storage operations for better performance
-                storage_tasks = []
+                storage_tasks: List[Any] = []
 
                 # Store in vector store (if embedding available)
                 if embedding is not None:
@@ -173,20 +173,138 @@ class MemoryManagerCore:
                 # Add memory node to graph store
                 storage_tasks.append(self.graph_store.add_memory_node(memory))
 
-                # Execute storage operations in parallel
+                # Execute storage operations in parallel with detailed logging
+                import traceback  # Import once at the beginning
+
                 try:
+                    logger.info(
+                        "Starting parallel storage operations",
+                        extra_data={
+                            "memory_id": memory.id,
+                            "has_embedding": embedding is not None,
+                            "storage_tasks_count": len(storage_tasks),
+                            "operations": [
+                                "vector_store.store_embedding" if embedding is not None else None,
+                                "metadata_store.store_memory",
+                                "graph_store.add_memory_node",
+                            ],
+                        },
+                    )
+
+                    # Debug: Force print for visibility
+                    print(
+                        f"DEBUG: Starting storage for memory {memory.id}, embedding={embedding is not None}, tasks={len(storage_tasks)}"
+                    )
+
                     if embedding is not None:
-                        vector_success, metadata_id, graph_success = await asyncio.gather(*storage_tasks)
+                        # Execute all three operations
+                        print("DEBUG: Executing 3 storage tasks with embedding")
+                        results = await asyncio.gather(*storage_tasks, return_exceptions=True)
+                        vector_success, metadata_id, graph_success = results
+
+                        print(
+                            f"DEBUG: Results - vector:{type(vector_success)}, metadata:{type(metadata_id)}, graph:{type(graph_success)}"
+                        )
+
+                        # Check for exceptions in individual operations
+                        if isinstance(vector_success, Exception):
+                            print(f"DEBUG: Vector store failed: {vector_success}")
+                            logger.error(
+                                "Vector store operation failed",
+                                error_code="VECTOR_STORE_ERROR",
+                                memory_id=memory.id,
+                                exception=str(vector_success),
+                                traceback=traceback.format_exception(
+                                    type(vector_success), vector_success, vector_success.__traceback__
+                                ),
+                            )
+                            vector_success = False
+
+                        if isinstance(metadata_id, Exception):
+                            print(f"DEBUG: Metadata store failed: {metadata_id}")
+                            logger.error(
+                                "Metadata store operation failed",
+                                error_code="METADATA_STORE_ERROR",
+                                memory_id=memory.id,
+                                exception=str(metadata_id),
+                                traceback=traceback.format_exception(
+                                    type(metadata_id), metadata_id, metadata_id.__traceback__
+                                ),
+                            )
+                            return None  # Metadata store is critical
+
+                        if isinstance(graph_success, Exception):
+                            print(f"DEBUG: Graph store failed: {graph_success}")
+                            logger.error(
+                                "Graph store operation failed",
+                                error_code="GRAPH_STORE_ERROR",
+                                memory_id=memory.id,
+                                exception=str(graph_success),
+                                traceback=traceback.format_exception(
+                                    type(graph_success), graph_success, graph_success.__traceback__
+                                ),
+                            )
+                            graph_success = False
                     else:
-                        # No vector storage needed
-                        metadata_id, graph_success = await asyncio.gather(*storage_tasks)
+                        # No vector storage needed - only metadata and graph
+                        print("DEBUG: Executing 2 storage tasks without embedding")
+                        results = await asyncio.gather(*storage_tasks, return_exceptions=True)
+                        metadata_id, graph_success = results
                         vector_success = True  # No vector operation, consider success
+
+                        print(f"DEBUG: Results - metadata:{type(metadata_id)}, graph:{type(graph_success)}")
+
+                        if isinstance(metadata_id, Exception):
+                            print(f"DEBUG: Metadata store failed (no vector): {metadata_id}")
+                            logger.error(
+                                "Metadata store operation failed (no vector)",
+                                error_code="METADATA_STORE_ERROR",
+                                memory_id=memory.id,
+                                exception=str(metadata_id),
+                                traceback=traceback.format_exception(
+                                    type(metadata_id), metadata_id, metadata_id.__traceback__
+                                ),
+                            )
+                            return None  # Metadata store is critical
+
+                        if isinstance(graph_success, Exception):
+                            print(f"DEBUG: Graph store failed (no vector): {graph_success}")
+                            logger.error(
+                                "Graph store operation failed (no vector)",
+                                error_code="GRAPH_STORE_ERROR",
+                                memory_id=memory.id,
+                                exception=str(graph_success),
+                                traceback=traceback.format_exception(
+                                    type(graph_success), graph_success, graph_success.__traceback__
+                                ),
+                            )
+                            graph_success = False
+
+                    print(
+                        f"DEBUG: Final results - vector:{vector_success}, metadata:{metadata_id}, graph:{graph_success}"
+                    )
+
+                    logger.info(
+                        "Parallel storage operations completed",
+                        extra_data={
+                            "memory_id": memory.id,
+                            "vector_success": vector_success,
+                            "metadata_success": bool(metadata_id),
+                            "graph_success": graph_success,
+                            "metadata_id": str(metadata_id) if metadata_id else "None",
+                        },
+                    )
+
                 except Exception as e:
+                    tb = traceback.format_exc()
                     logger.error(
-                        "Failed to store memory in parallel operations",
-                        error_code="PARALLEL_STORAGE_ERROR",
+                        "Unexpected error in parallel storage operations",
+                        error_code="PARALLEL_STORAGE_UNEXPECTED_ERROR",
                         memory_id=memory.id,
                         exception=str(e),
+                        traceback=tb,
+                        has_embedding=embedding is not None,
+                        storage_tasks_count=len(storage_tasks),
                     )
                     return None
 
@@ -343,6 +461,8 @@ class MemoryManagerCore:
                 if updated_memory:
                     await self.graph_store.remove_memory_node(memory_id)
                     await self.graph_store.add_memory_node(updated_memory)
+                else:
+                    logger.warning(f"Failed to retrieve updated memory after update: {memory_id}")
 
                 # Clear cache to force reload
                 self.memory_cache.delete(memory_id)
@@ -352,7 +472,20 @@ class MemoryManagerCore:
                     extra_data={"memory_id": memory_id, "updated_fields": list(update_data.keys())},
                 )
 
-                return await self.get_memory(memory_id)
+                # Final retrieval with explicit error checking
+                final_memory = await self.get_memory(memory_id)
+                if final_memory is None:
+                    logger.error(
+                        f"CRITICAL: get_memory returned None after successful update for memory_id: {memory_id}"
+                    )
+                    # Try to recover by querying metadata store directly
+                    final_memory = await self.metadata_store.get_memory(memory_id)
+                    if final_memory:
+                        logger.info(f"Successfully recovered memory from metadata store: {memory_id}")
+                    else:
+                        logger.error(f"FAILED to recover memory from metadata store: {memory_id}")
+
+                return final_memory
 
         except Exception as e:
             logger.error("Failed to update memory", error_code="MEMORY_UPDATE_ERROR", memory_id=memory_id, error=str(e))

@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
+from ...core.singleton_memory_manager import get_memory_manager, get_or_create_memory_manager
 from ...simple_persistence import get_persistent_storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
 from ..models.responses import (
@@ -14,12 +15,12 @@ from ..models.responses import (
     SessionManageResponse,
 )
 
-# Module-level dependencies (set by server initialization)
+# Module-level dependencies (for backward compatibility)
 memory_manager = None
 
 
 def set_dependencies(mm: Any) -> None:
-    """Set module dependencies from server initialization"""
+    """Set module dependencies from server initialization (backward compatibility)"""
     global memory_manager
     memory_manager = mm
 
@@ -31,32 +32,72 @@ memory_storage, persistence = get_persistent_storage()
 async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, Any]:
     """Handle memory_move tool requests."""
     try:
-        # Move implementation would go here - this is a placeholder
-        # for the full implementation that exists in the handlers
         await ctx.info(f"Moving {len(request.memory_ids)} memories to scope: {request.target_scope}")
 
+        # Get memory manager instance
+        memory_manager = await get_or_create_memory_manager()
+        if not memory_manager:
+            error_msg = "Memory manager not available"
+            await ctx.error(error_msg)
+            return MemoryMoveResponse(
+                success=False,
+                message=error_msg,
+                data={},
+                moved_memories=[],
+                failed_memory_ids=request.memory_ids,
+            ).model_dump()
+
         moved_count = 0
+        failed_memory_ids = []
+
         for memory_id in request.memory_ids:
-            if memory_id in memory_storage:
-                memory_storage[memory_id]["scope"] = request.target_scope
+            try:
+                # Update memory with new scope (both scope field and metadata)
+                updated_memory = await memory_manager.update_memory(
+                    memory_id=memory_id,
+                    scope=request.target_scope,
+                    metadata={"scope": request.target_scope},  # Also update metadata scope
+                )
+
+                # Critical: Check if update_memory returned None
+                if updated_memory is None:
+                    error_msg = f"Failed to update memory {memory_id} - update_memory returned None"
+                    await ctx.warning(error_msg)
+                    failed_memory_ids.append(memory_id)
+                    continue
+
                 moved_count += 1
+                await ctx.info(f"Successfully moved memory {memory_id} to {request.target_scope}")
 
-        if moved_count > 0:
-            persistence.save_memories(memory_storage)
+            except Exception as move_error:
+                error_msg = f"Failed to move memory {memory_id}: {move_error}"
+                await ctx.warning(error_msg)
+                failed_memory_ids.append(memory_id)
 
-        await ctx.info(f"Successfully moved {moved_count} memories")
+        success_msg = f"Successfully moved {moved_count} memories to {request.target_scope}"
+        if failed_memory_ids:
+            success_msg += f" ({len(failed_memory_ids)} failed)"
+
+        await ctx.info(success_msg)
 
         return MemoryMoveResponse(
             success=True,
-            message=f"Successfully moved {moved_count} memories to {request.target_scope}",
+            message=success_msg,
             data={"moved_count": moved_count, "target_scope": request.target_scope},
-            moved_memories=[],
-            failed_memory_ids=[],
+            moved_memories=[],  # Simplified: don't return full memory objects to avoid serialization issues
+            failed_memory_ids=failed_memory_ids,
         ).model_dump()
 
     except Exception as e:
-        await ctx.error(f"Failed to move memories: {e}")
-        return {"success": False, "error": f"Failed to move memories: {e}", "data": {}}
+        error_msg = f"Failed to move memories: {e}"
+        await ctx.error(error_msg)
+        return MemoryMoveResponse(
+            success=False,
+            message=error_msg,
+            data={},
+            moved_memories=[],
+            failed_memory_ids=request.memory_ids,
+        ).model_dump()
 
 
 async def handle_memory_discover_associations(
@@ -66,8 +107,20 @@ async def handle_memory_discover_associations(
     try:
         await ctx.info(f"Discovering associations for memory: {memory_id}")
 
+        # Use comprehensive memory manager access
+        manager = await get_or_create_memory_manager()
+        if not manager:
+            return {
+                "success": False,
+                "message": "No memory manager available",
+                "data": {},
+                "source_memory": None,
+                "associations": [],
+                "total_found": 0,
+            }
+
         # Get the source memory
-        source_memory = await memory_manager.get_memory(memory_id)  # type: ignore
+        source_memory = await manager.get_memory(memory_id)
         if not source_memory:
             await ctx.warning(f"Memory not found: {memory_id}")
             return {
@@ -81,7 +134,7 @@ async def handle_memory_discover_associations(
 
         # Use search_memories to find semantically related memories
         # First try with the exact content
-        search_results = await memory_manager.search_memories(  # type: ignore
+        search_results = await manager.search_memories(
             query=source_memory.content,
             limit=limit + 1,  # +1 to account for source memory in results
             min_score=similarity_threshold,
@@ -90,7 +143,7 @@ async def handle_memory_discover_associations(
         # If no results, try with a shorter query from content
         if not search_results and len(source_memory.content) > 100:
             short_query = source_memory.content[:100]
-            search_results = await memory_manager.search_memories(  # type: ignore
+            search_results = await manager.search_memories(
                 query=short_query,
                 limit=limit + 1,
                 min_score=similarity_threshold,

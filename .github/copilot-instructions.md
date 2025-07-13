@@ -12,12 +12,64 @@ This project implements a memory-centered LLM assistant system using the Model C
 - **Use strict typing** - all inputs/outputs must follow defined types
 - **Follow existing structure** - respect current file/module layout and naming conventions
 - **Prefer reuse** - use existing utilities instead of reimplementing logic
+- **MANDATORY: Run mypy before any modification** - Type checking prevents basic errors like import/class mismatches
 
 ### MCP Tool Development
 - Each tool handler uses `mode`-based dispatch - always validate `mode` before branching
 - Tool responses must follow MCP JSON-RPC spec with `success`, `message`, `error`, `data` fields
 - Use `parameters` schema field for tools (not `inputSchema` except for legacy compatibility)
 - On errors, return `data: {}` and use shared `errorResponse()` helper
+
+### 🚨 **CRITICAL ERROR HANDLING MANDATE** 🚨
+**ABSOLUTE PROHIBITION: No fallback mechanisms or error avoidance patterns**
+- **NEVER implement fallback storage, fallback services, or alternative paths when core functionality fails**
+- **ALWAYS fail fast with clear error messages when None is returned or core operations fail**
+- **MANDATORY: Early None checks with immediate exception raising and detailed logging**
+- **REQUIRED: All errors must be properly logged with full context and returned to client**
+- **FORBIDDEN: Hiding problems behind try/except blocks without addressing root cause**
+- **PRINCIPLE: Surface problems immediately to force proper diagnosis and fix**
+
+Example of CORRECT error handling:
+```python
+result = await core_operation()
+if result is None:
+    error_msg = "core_operation returned None - indicates fundamental issue"
+    logger.error(error_msg, extra={"operation": "core_operation", "context": context})
+    raise RuntimeError(error_msg)
+```
+
+Example of FORBIDDEN pattern:
+```python
+try:
+    result = await advanced_operation()
+except Exception:
+    result = fallback_operation()  # FORBIDDEN - hides the real problem
+```
+
+### 🚨 **TIMEOUT HANDLING MANDATE** 🚨
+**ABSOLUTE PROHIBITION: Avoiding investigation due to timeouts**
+- **NEVER simplify tests or change approaches solely because of timeouts**
+- **ALWAYS extend timeout values for time-consuming operations that need investigation**
+- **MANDATORY: Investigate the root cause of why operations take long or hang**
+- **REQUIRED: Use appropriate timeout values (30-60s for complex operations, 120s+ for initialization)**
+- **FORBIDDEN: Switching to "simpler tests" to avoid timeout issues**
+- **PRINCIPLE: Time-consuming operations often reveal the real problems - investigate them fully**
+
+Example of CORRECT timeout handling:
+```python
+# Extend timeout for complex initialization
+result = await shell_execute(command, timeout_seconds=120)
+# If it times out, investigate WHY it hangs, don't simplify the test
+```
+
+Example of FORBIDDEN pattern:
+```python
+# This times out, so let's try something simpler
+try:
+    complex_test(timeout=30)  # Times out
+except TimeoutError:
+    simple_test()  # FORBIDDEN - avoids the real issue
+```
 
 ### Code Language Standards
 - **All source code in English** - comments, variables, error messages, docstrings
@@ -129,8 +181,8 @@ learning/
 *Users can add project-specific guidance, temporary development focus areas, or special requirements here. This section should be regularly reviewed and cleaned up during maintenance cycles.*
 
 <!-- User requests go here -->
-`run_in_terminal` ツールより MCPの`*_shell_execute` ツールを使ってください。
-セキュリティガードに引っかかる場合や長時間の実行や端末実行が必要な場合は MCPの`*_terminal_create` ツールを使ってください
+Use MCP `*_shell_execute` tools instead of `run_in_terminal` tool.
+For security guard conflicts, long-running executions, or terminal sessions, use MCP `*_terminal_create` tools.
 
 
 ---

@@ -16,10 +16,10 @@ start() {
     fi
     echo "Starting MCP server..."
     cd "$APP_DIR"
-    # Start MCP server (recommended: python -m mcp_assoc_memory ...)
+    # Start MCP server (single entry point: server.py)
     CONFIG_ARG="--config $APP_DIR/config.json"
 
-    nohup $PYTHON -m mcp_assoc_memory $CONFIG_ARG >> "$LOG_FILE" 2>&1 &
+    nohup $PYTHON -m mcp_assoc_memory.server $CONFIG_ARG >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     echo "Started successfully (PID: $(cat $PID_FILE))"
 }

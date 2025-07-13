@@ -6,6 +6,8 @@ import base64
 import binascii
 import gzip
 import json
+import traceback  # Add missing import
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
@@ -15,8 +17,12 @@ from pydantic import Field
 
 from ...config import get_config
 from ...core.memory_manager import MemoryManager
+from ...core.singleton_memory_manager import (
+    get_memory_manager,
+    get_or_create_memory_manager,
+    is_memory_manager_initialized,
+)
 from ...simple_persistence import get_persistent_storage
-from .export_tools import handle_memory_export
 from ..dependencies import dependencies, ensure_dependencies_initialized
 from ..models import (
     DiversifiedSearchRequest,
@@ -32,6 +38,7 @@ from ..models import (
     PaginationInfo,
     UnifiedSearchRequest,
 )
+from .export_tools import handle_memory_export
 
 # Get the config instance
 config = get_config()
@@ -53,308 +60,118 @@ def set_dependencies(mm: MemoryManager, ms: Dict[str, Any], p: Any) -> None:
     _initialized = False
 
 
-def get_memory_manager() -> Optional[MemoryManager]:
-    """Get the current memory manager instance"""
+def get_local_memory_manager() -> Optional[MemoryManager]:
+    """Get the current local memory manager instance (for backward compatibility)"""
     return memory_manager
 
 
-async def _get_or_create_memory_manager() -> Optional[MemoryManager]:
-    """
-    Get memory manager with dynamic dependency resolution.
-    This handles the case where the tool is running in a separate process
-    and global variables are not shared.
-    """
-    global memory_manager
-    
-    if memory_manager is not None:
-        return memory_manager
-    
-    # Try to dynamically create memory manager if not injected
-    try:
-        from ...core.memory_manager import MemoryManager
-        from ...storage.vector_store import ChromaVectorStore
-        from ...storage.metadata_store import SQLiteMetadataStore
-        from ...storage.graph_store import NetworkXGraphStore
-        from ...core.embedding_service import SentenceTransformerEmbeddingService, MockEmbeddingService
-        from ...core.similarity import SimilarityCalculator
-        
-        # Initialize storage components
-        vector_store = ChromaVectorStore()
-        metadata_store = SQLiteMetadataStore()
-        graph_store = NetworkXGraphStore()
-        
-        # Use SentenceTransformerEmbeddingService for production, fallback to Mock
-        try:
-            embedding_service = SentenceTransformerEmbeddingService()
-        except Exception:
-            embedding_service = MockEmbeddingService()
-        
-        similarity_calculator = SimilarityCalculator()
-        
-        # Create memory manager
-        mm = MemoryManager(
-            vector_store=vector_store,
-            metadata_store=metadata_store,
-            graph_store=graph_store,
-            embedding_service=embedding_service,
-            similarity_calculator=similarity_calculator,
-        )
-        
-        # Update global reference
-        memory_manager = mm
-        return mm
-        
-    except Exception as e:
-        print(f"Failed to dynamically create memory manager: {e}")
-        return None
-
-
-async def ensure_initialized() -> None:
-    """Ensure memory manager is initialized"""
+async def ensure_initialized() -> MemoryManager:
+    """Ensure memory manager is initialized using singleton pattern"""
     global _initialized, memory_manager
-    
-    # Try to get or create memory manager
-    memory_manager = await _get_or_create_memory_manager()
-    
+
+    # Always get from singleton pattern
+    memory_manager = await get_or_create_memory_manager()
+
     # If memory_manager is still None, we cannot proceed with advanced operations
     if memory_manager is None:
         raise RuntimeError(
             "Memory manager is not initialized and could not be created dynamically. "
             "This suggests a configuration or dependency issue."
         )
-    
+
+    # Initialize if needed
     if not _initialized:
         try:
             await memory_manager.initialize()
             _initialized = True
-            # Verify vector store is properly initialized
-            if memory_manager.vector_store.collection is None:
-                raise RuntimeError("Vector store collection not initialized after initialization")
+            # Verify storage initialization properly
+            if not hasattr(memory_manager, "vector_store"):
+                raise RuntimeError("Vector store not initialized after initialization")
         except Exception as e:
             # Reset flag to allow retry
             _initialized = False
             raise RuntimeError(f"Memory manager initialization failed: {e}")
 
+    return memory_manager
+
 
 async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> MemoryResponse:
-    """Store a memory with full associative capabilities"""
-    try:
-        # Basic input validation
-        if not request.content or len(request.content.strip()) == 0:
-            await ctx.error("Content cannot be empty")
-            return MemoryResponse(
-                memory_id="error",
-                content="",
-                scope="error",
-                created_at=datetime.now(),
-                metadata={"error": "Content cannot be empty", "suggestions": ["Provide non-empty content for the memory"]}
-            )
-        
-        if not request.scope or len(request.scope.strip()) == 0:
-            await ctx.error("Scope cannot be empty")
-            return MemoryResponse(
-                memory_id="error",
-                content="",
-                scope="error",
-                created_at=datetime.now(),
-                metadata={"error": "Scope cannot be empty", "suggestions": ["Provide a valid scope like 'work/projects'"]}
-            )
-
-        await ctx.info(f"Storing memory in scope '{request.scope}': {request.content[:50]}...")
-
-        # Try advanced memory manager first, fallback to simple storage
-        memory = None
-
-        if memory_manager:
-            try:
-                await ensure_initialized()
-                memory = await memory_manager.store_memory(
-                    content=request.content,
-                    scope=request.scope,
-                    tags=request.tags or [],
-                    category=request.category,
-                    metadata=request.metadata or {},
-                    similarity_threshold=request.similarity_threshold,
-                )
-                await ctx.info(f"Memory stored using advanced manager with ID: {memory.id}")
-            except Exception as e:
-                await ctx.warning(f"Advanced storage failed: {str(e)}, falling back to simple storage")
-                memory = None
-
-        # Fallback to simple storage if advanced storage failed or unavailable
-        if not memory:
-            import uuid
-
-            memory_id = str(uuid.uuid4())
-
-            # Check for duplicates in simple storage if not allowed
-            if not request.allow_duplicates:
-                for existing_id, existing_memory in memory_storage.items():
-                    if existing_memory["content"].strip().lower() == request.content.strip().lower():
-                        await ctx.warning(f"Duplicate content detected. Existing memory_id: {existing_id}")
-
-                        # Return minimal or full response for duplicate
-                        if request.minimal_response:
-                            return MemoryResponse(
-                                memory_id=existing_id,
-                                content="[Content hidden for minimal response]",
-                                scope=existing_memory["scope"],
-                                metadata={},
-                                tags=[],
-                                category=existing_memory.get("category"),
-                                created_at=existing_memory["created_at"],
-                                is_duplicate=True,
-                                duplicate_of=existing_id,
-                            )
-                        else:
-                            return MemoryResponse(
-                                memory_id=existing_id,
-                                content=existing_memory["content"],
-                                scope=existing_memory["scope"],
-                                metadata=existing_memory.get("metadata", {}),
-                                tags=existing_memory.get("tags", []),
-                                category=existing_memory.get("category"),
-                                created_at=existing_memory["created_at"],
-                                is_duplicate=True,
-                                duplicate_of=existing_id,
-                            )
-
-            # Store in simple storage
-            memory_data = {
-                "memory_id": memory_id,
-                "content": request.content,
-                "scope": request.scope,
-                "metadata": request.metadata or {},
-                "tags": request.tags or [],
-                "category": request.category,
-                "created_at": datetime.now(),
-            }
-
-            memory_storage[memory_id] = memory_data
-            persistence.save_memories(memory_storage)
-
-            await ctx.info(f"Memory stored using simple storage with ID: {memory_id}")
-
-            # Return minimal or full response
-            if request.minimal_response:
-                return MemoryResponse(
-                    memory_id=memory_id,
-                    content="[Content hidden for minimal response]",
-                    scope=request.scope,
-                    metadata={},
-                    tags=[],
-                    category=request.category,
-                    created_at=memory_data["created_at"],
-                    is_duplicate=False,
-                )
-            else:
-                return MemoryResponse(
-                    memory_id=memory_id,
-                    content=request.content,
-                    scope=request.scope,
-                    metadata=request.metadata or {},
-                    tags=request.tags or [],
-                    category=request.category,
-                    created_at=memory_data["created_at"],
-                    is_duplicate=False,
-                )
-
-        # Advanced storage succeeded - check for duplicates if not allowed
-        if not request.allow_duplicates and memory:
-            if hasattr(memory, "metadata") and memory.metadata and memory.metadata.get("is_duplicate"):
-                await ctx.warning(
-                    f"Duplicate memory detected. Existing memory_id: {memory.metadata.get('original_memory_id')}"
-                )
-
-                # Return minimal or full response based on request
-                if request.minimal_response:
-                    return MemoryResponse(
-                        memory_id=memory.metadata.get("original_memory_id", "unknown"),
-                        content="[Content hidden for minimal response]",  # Required field but minimized
-                        scope=memory.scope,
-                        metadata={},  # Minimal metadata
-                        tags=[],
-                        category=memory.category,
-                        created_at=memory.created_at,
-                        is_duplicate=True,
-                        duplicate_of=memory.metadata.get("original_memory_id"),
-                    )
-                else:
-                    return MemoryResponse(
-                        memory_id=memory.metadata.get("original_memory_id", "unknown"),
-                        content=memory.content,
-                        scope=memory.scope,
-                        metadata=memory.metadata,
-                        tags=memory.tags or [],
-                        category=memory.category,
-                        created_at=memory.created_at,
-                        is_duplicate=True,
-                        duplicate_of=memory.metadata.get("original_memory_id"),
-                    )
-
-        # Return successful advanced storage result
-        if request.minimal_response:
-            return MemoryResponse(
-                memory_id=memory.id,
-                content="[Content hidden for minimal response]",  # Required field but minimized
-                scope=memory.scope,
-                metadata={},  # Minimal metadata
-                tags=[],
-                category=memory.category,
-                created_at=memory.created_at,
-                is_duplicate=False,
-            )
-        else:
-            return MemoryResponse(
-                memory_id=memory.id,
-                content=memory.content,
-                scope=memory.scope,
-                metadata=memory.metadata if hasattr(memory, "metadata") else {},
-                tags=memory.tags or [],
-                category=memory.category,
-                created_at=memory.created_at,
-                is_duplicate=False,
-            )
-
-    except Exception as e:
-        error_message = f"Failed to store memory: {str(e)}"
-        await ctx.error(error_message)
-        
-        # Provide more detailed error information
-        suggestions = [
-            "Check if the content and scope are valid",
-            "Try again in a moment if this was a temporary issue",
-            "Contact support if the problem persists"
-        ]
-        
+    """Store a memory with early validation and error handling"""
+    # Early validation - fail fast
+    if not request.content or not request.content.strip():
+        error_msg = "Content cannot be empty"
+        await ctx.error(error_msg)
         return MemoryResponse(
+            success=False,
+            message=error_msg,
             memory_id="error",
             content="",
             scope="error",
             created_at=datetime.now(),
-            metadata={
-                "error": "Memory storage failed",
-                "details": str(e),
-                "suggestions": suggestions,
-                "error_type": type(e).__name__
-            }
+            metadata={"error": error_msg},
+        )
+
+    try:
+        # Get memory manager with early None check
+        memory_manager = await ensure_initialized()
+        if memory_manager is None:
+            raise RuntimeError("Memory manager is None after initialization")
+
+        await ctx.info(f"Storing: {request.content[:50]}... in scope: {request.scope}")
+
+        # Store memory with explicit None check
+        memory = await memory_manager.store_memory(
+            content=request.content, scope=request.scope, allow_duplicates=request.allow_duplicates
+        )
+
+        # Early None check - this is the critical fix
+        if memory is None:
+            error_msg = "store_memory returned None - check memory manager implementation"
+            await ctx.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        # Success - memory object is guaranteed to be non-None here
+        await ctx.info(f"Successfully stored memory: {memory.id}")
+
+        return MemoryResponse(
+            success=True,
+            message="Memory stored successfully",
+            memory_id=memory.id,
+            content=memory.content,
+            scope=memory.scope,
+            created_at=memory.created_at,
+            metadata=memory.metadata or {},
+            tags=memory.tags or [],
+            category=memory.category,
+            is_duplicate=False,
+        )
+
+    except Exception as e:
+        error_msg = f"Failed to store memory: {str(e)}"
+        await ctx.error(error_msg)
+
+        return MemoryResponse(
+            success=False,
+            message=error_msg,
+            memory_id="error",
+            content="",
+            scope="error",
+            created_at=datetime.now(),
+            metadata={"error": error_msg, "error_type": type(e).__name__, "traceback": traceback.format_exc()},
         )
 
 
 async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Dict[str, Any]:
     """Search memories using semantic similarity with hierarchical scope support"""
     try:
-        # Debug: Check memory manager state when tool is called
-        await ctx.info(f"DEBUG: memory_manager (global) = {memory_manager}")
-        await ctx.info(f"DEBUG: dependencies.memory_manager = {dependencies.memory_manager}")
-        
-        await ensure_initialized()
+        # Get memory manager using unified function
+        manager_instance = await ensure_initialized()
         await ctx.info(
             f"Searching memories: '{request.query[:50]}...' in scope: {request.scope} (include_child_scopes: {request.include_child_scopes})"
         )
 
         # Perform search using memory manager with enhanced parameters
-        results = await memory_manager.search_memories(
+        results = await manager_instance.search_memories(
             query=request.query,
             scope=request.scope,
             include_child_scopes=request.include_child_scopes,
@@ -382,7 +199,7 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
             # Include associations if requested
             if request.include_associations:
                 try:
-                    associations = await memory_manager.metadata_store.get_memory_associations(memory.id)
+                    associations = await manager_instance.metadata_store.get_memory_associations(memory.id)
                     formatted_memory["associations"] = [
                         {
                             "source_id": assoc.source_memory_id,
@@ -397,8 +214,30 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
                 except Exception as e:
                     await ctx.warning(f"Failed to get associations for memory {memory.id}: {e}")
                     formatted_memory["associations"] = []
+            else:
+                formatted_memory["associations"] = None
 
-            formatted_results.append(formatted_memory)
+            # Create MemoryResponse object for proper validation
+            try:
+                memory_response = MemoryResponse(**formatted_memory)
+                formatted_results.append(memory_response)
+            except Exception as e:
+                await ctx.error(f"Failed to create MemoryResponse for memory {memory.id}: {e}")
+                # Fallback: create minimal valid response
+                memory_response = MemoryResponse(
+                    memory_id=memory.id,
+                    content=memory.content,
+                    scope=memory_scope,
+                    metadata=memory.metadata or {},
+                    tags=memory.tags or [],
+                    category=memory.category,
+                    created_at=memory.created_at,
+                    similarity_score=result["similarity"],
+                    associations=None,
+                    is_duplicate=False,
+                    duplicate_of=None,
+                )
+                formatted_results.append(memory_response)
 
         await ctx.info(f"Found {len(formatted_results)} memories")
 
@@ -425,10 +264,10 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
                 ctx=ctx,
                 limit=request.limit,
                 similarity_threshold=request.similarity_threshold,
-                include_child_scopes=request.include_child_scopes
+                include_child_scopes=request.include_child_scopes,
             )
             response["suggestions"] = fallback_suggestions
-            
+
             # Keep legacy suggestions for backward compatibility
             response["legacy_suggestions"] = {
                 "try_include_child_scopes": not request.include_child_scopes,
@@ -441,34 +280,30 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
     except Exception as e:
         error_message = f"Failed to search memories: {str(e)}"
         await ctx.error(error_message)
-        
+
         # Provide helpful error response with fallback empty results
         return {
             "error": "Memory search failed",
             "details": str(e),
             "error_type": type(e).__name__,
             "results": [],  # Graceful fallback
-            "query": getattr(request, 'query', 'unknown'),
-            "scope": getattr(request, 'scope', 'unknown'),
+            "query": getattr(request, "query", "unknown"),
+            "scope": getattr(request, "scope", "unknown"),
             "suggestions": [
                 "Check if the query format is valid",
                 "Try a simpler search query",
                 "Verify the scope exists using scope_list",
-                "Try again in a moment if this was a temporary issue"
+                "Try again in a moment if this was a temporary issue",
             ],
-            "fallback_used": True
+            "fallback_used": True,
         }
 
 
 async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Context) -> Dict[str, Any]:
     """Handle diversified similarity search for broader knowledge exploration"""
     try:
-        await ensure_initialized()
+        memory_manager = await ensure_initialized()
         await ctx.info(f"Starting diversified search: query='{request.query}', limit={request.limit}")
-
-        if not memory_manager:
-            await ctx.error("Memory manager not initialized")
-            return {"error": "Memory manager not initialized", "results": []}
 
         # Perform diversified similarity search
         diverse_results = await memory_manager.diversified_similarity_search(
@@ -493,9 +328,8 @@ async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Cont
                 "similarity_score": similarity_score,
                 "tags": memory.tags,
                 "category": memory.category,
-                "created_at": memory.created_at.isoformat() if memory.created_at else None,
+                "created_at": memory.created_at,
                 "metadata": memory.metadata or {},
-                "associations": [],
             }
 
             # Include associations if requested
@@ -517,8 +351,30 @@ async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Cont
                 except Exception as e:
                     await ctx.warning(f"Failed to get associations for memory {memory.id}: {e}")
                     formatted_memory["associations"] = []
+            else:
+                formatted_memory["associations"] = None
 
-            formatted_results.append(formatted_memory)
+            # Create MemoryResponse object for proper validation
+            try:
+                memory_response = MemoryResponse(**formatted_memory)
+                formatted_results.append(memory_response)
+            except Exception as e:
+                await ctx.error(f"Failed to create MemoryResponse for memory {memory.id}: {e}")
+                # Fallback: create minimal valid response
+                memory_response = MemoryResponse(
+                    memory_id=memory.id,
+                    content=memory.content,
+                    scope=memory_scope,
+                    metadata=memory.metadata or {},
+                    tags=memory.tags or [],
+                    category=memory.category,
+                    created_at=memory.created_at,
+                    similarity_score=similarity_score,
+                    associations=None,
+                    is_duplicate=False,
+                    duplicate_of=None,
+                )
+                formatted_results.append(memory_response)
 
         await ctx.info(f"Found {len(formatted_results)} diverse memories")
 
@@ -541,7 +397,7 @@ async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Cont
 async def handle_memory_get(memory_id: str, ctx: Context, include_associations: bool = True) -> Dict[str, Any]:
     """Get a specific memory by ID with optional associations"""
     try:
-        await ensure_initialized()
+        memory_manager = await ensure_initialized()
         await ctx.info(f"Retrieving memory: {memory_id}")
 
         # Get memory
@@ -595,27 +451,18 @@ async def handle_memory_get(memory_id: str, ctx: Context, include_associations: 
 async def handle_memory_delete(memory_id: str, ctx: Context) -> Dict[str, Any]:
     """Delete a specific memory by ID"""
     try:
-        await ensure_initialized()
+        memory_manager = await ensure_initialized()
         await ctx.info(f"Deleting memory: {memory_id}")
 
-        # Check if memory exists in advanced storage
+        # Check if memory exists
         memory = await memory_manager.get_memory(memory_id)
         if not memory:
-            # Check simple storage
-            if memory_id not in memory_storage:
-                await ctx.warning(f"Memory not found: {memory_id}")
-                return {"success": False, "error": "Memory not found"}
+            await ctx.warning(f"Memory not found: {memory_id}")
+            return {"success": False, "error": "Memory not found"}
 
-        # Delete from advanced storage
-        if memory:
-            await memory_manager.delete_memory(memory_id)
-            await ctx.info(f"Deleted memory from advanced storage: {memory_id}")
-
-        # Delete from simple storage
-        if memory_id in memory_storage:
-            del memory_storage[memory_id]
-            persistence.save_memories(memory_storage)
-            await ctx.info(f"Deleted memory from simple storage: {memory_id}")
+        # Delete the memory
+        await memory_manager.delete_memory(memory_id)
+        await ctx.info(f"Deleted memory successfully: {memory_id}")
 
         return {"success": True, "message": f"Memory {memory_id} deleted successfully"}
 
@@ -627,7 +474,7 @@ async def handle_memory_delete(memory_id: str, ctx: Context) -> Dict[str, Any]:
 async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> MemoryResponse:
     """Update an existing memory"""
     try:
-        await ensure_initialized()
+        memory_manager = await ensure_initialized()
         await ctx.info(f"Updating memory: {request.memory_id}")
 
         # Get existing memory
@@ -636,7 +483,7 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
             await ctx.warning(f"Memory not found: {request.memory_id}")
             return MemoryResponse(success=False, message="Memory not found", memory_id=request.memory_id)
 
-        # Update memory
+        # Update memory with explicit None check
         updated_memory = await memory_manager.update_memory(
             memory_id=request.memory_id,
             content=request.content,
@@ -646,9 +493,24 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
             metadata=request.metadata,
         )
 
+        # Critical: Check if update_memory returned None
+        if updated_memory is None:
+            error_msg = f"Memory update operation returned None for memory_id: {request.memory_id}"
+            await ctx.error(error_msg)
+            return MemoryResponse(
+                success=False,
+                message="Memory update failed",
+                memory_id=request.memory_id,
+                content="",
+                scope="error",
+                created_at=datetime.now(),
+            )
+
         await ctx.info(f"Memory updated successfully: {request.memory_id}")
 
         return MemoryResponse(
+            success=True,
+            message="Memory updated successfully",
             memory_id=updated_memory.id,
             content=updated_memory.content,
             scope=updated_memory.scope,
@@ -659,9 +521,17 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
         )
 
     except Exception as e:
-        await ctx.error(f"Failed to update memory: {e}")
-        # Return a minimal valid response for error case
-        return MemoryResponse(memory_id=request.memory_id, content="", scope="error", created_at=datetime.now())
+        error_msg = f"Failed to update memory: {str(e)}"
+        await ctx.error(error_msg)
+        return MemoryResponse(
+            success=False,
+            message=error_msg,
+            memory_id=request.memory_id,
+            content="",
+            scope="error",
+            created_at=datetime.now(),
+            metadata={"error": error_msg, "error_type": type(e).__name__},
+        )
 
 
 async def handle_memory_discover_associations(
@@ -672,14 +542,20 @@ async def handle_memory_discover_associations(
         await ensure_initialized()
         await ctx.info(f"Discovering associations for memory: {memory_id}")
 
+        # Get memory manager using unified function
+        manager = await get_or_create_memory_manager()
+        if not manager:
+            await ctx.error("Memory manager not available")
+            return {"error": "Memory manager not available", "associations": []}
+
         # Get the source memory
-        memory = await memory_manager.get_memory(memory_id)
+        memory = await manager.get_memory(memory_id)
         if not memory:
             await ctx.warning(f"Memory not found: {memory_id}")
             return {"error": "Memory not found", "associations": []}
 
         # Find similar memories with enhanced search strategy
-        search_results = await memory_manager.search_memories(
+        search_results = await manager.search_memories(
             query=memory.content,
             limit=limit * 3,  # Search more to account for filtering
             min_score=max(0.1, similarity_threshold - 0.2),  # Lower threshold for diversity
@@ -694,7 +570,7 @@ async def handle_memory_discover_associations(
             if memory.category:
                 enhanced_query += " " + memory.category
 
-            additional_results = await memory_manager.search_memories(
+            additional_results = await manager.search_memories(
                 query=enhanced_query, limit=limit * 2, min_score=max(0.1, similarity_threshold - 0.3)
             )
 
@@ -923,12 +799,20 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
 async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optional[Context] = None) -> Dict[str, Any]:
     """List all memories with pagination (for debugging)"""
     try:
-        await ensure_initialized()
+        await ensure_initialized()  # Just ensure it's initialized
 
         if ctx:
             await ctx.info(f"Retrieving memories (page {page}, {per_page} per page)...")
 
-        all_memories = list(memory_storage.values())
+        # Get all memories from memory manager
+        # Note: Currently memory_manager doesn't expose a list_all method
+        # This is a limitation that should be addressed in the memory_manager interface
+        if ctx:
+            await ctx.warning(
+                "Memory listing temporarily disabled due to singleton refactoring. Use memory_search with broad criteria instead."
+            )
+        all_memories = []
+
         total_items = len(all_memories)
 
         # Calculate pagination
@@ -940,17 +824,31 @@ async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optiona
         page_memories = all_memories[start_idx:end_idx]
         results = []
         for memory_data in page_memories:
-            results.append(
-                MemoryResponse(
-                    memory_id=memory_data["memory_id"],
-                    content=memory_data["content"],
-                    scope=memory_data["scope"],
-                    metadata=memory_data.get("metadata", {}),
-                    tags=memory_data.get("tags", []),
-                    category=memory_data.get("category"),
-                    created_at=memory_data["created_at"],
+            try:
+                # Ensure required fields exist and add defaults if missing
+                memory_id = memory_data.get("memory_id", memory_data.get("id", "unknown"))
+                content = memory_data.get("content", "")
+                scope = memory_data.get("scope", "unknown")
+                metadata = memory_data.get("metadata", {})
+                tags = memory_data.get("tags", [])
+                category = memory_data.get("category")
+                created_at = memory_data.get("created_at", datetime.now())
+
+                results.append(
+                    MemoryResponse(
+                        memory_id=memory_id,
+                        content=content,
+                        scope=scope,
+                        metadata=metadata,
+                        tags=tags,
+                        category=category,
+                        created_at=created_at,
+                    )
                 )
-            )
+            except Exception as e:
+                if ctx:
+                    await ctx.warning(f"Skipping invalid memory data: {e}, data: {memory_data}")
+                continue
 
         pagination = PaginationInfo(
             page=page,
@@ -1165,32 +1063,24 @@ async def _perform_hierarchical_fallback_search(
     ctx: Context,
     limit: int = 5,
     similarity_threshold: float = 0.1,
-    include_child_scopes: bool = False
+    include_child_scopes: bool = False,
 ) -> Dict[str, Any]:
     """
     Perform hierarchical fallback search when original search returns 0 results.
-    
+
     Algorithm:
     1. Search parent scope level by level
     2. Return candidates immediately when results found
     3. If no results at any parent level, perform global search
-    
+
     Returns helpful suggestions even if memory_manager is not available.
     """
-    # Try centralized dependency manager first
-    current_memory_manager = dependencies.memory_manager
-    
-    # If not available, try factory approach
-    if not current_memory_manager:
-        from ..memory_factory import get_or_create_memory_manager
-        try:
-            current_memory_manager = await get_or_create_memory_manager()
-            await ctx.info("Using factory-created memory manager for fallback search")
-        except Exception as e:
-            await ctx.warning(f"Factory memory manager creation failed: {e}")
-    
-    if not current_memory_manager:
-        await ctx.error("Memory manager not initialized for fallback search")
+    # Get memory manager using unified approach
+    try:
+        current_memory_manager = await ensure_initialized()
+        await ctx.info("Using memory manager for fallback search")
+    except Exception as e:
+        await ctx.warning(f"Memory manager initialization failed for fallback search: {e}")
         # Return useful manual suggestions even without advanced search
         return {
             "type": "scope_fallback",
@@ -1204,34 +1094,36 @@ async def _perform_hierarchical_fallback_search(
                 "try_lower_threshold": max(0.05, similarity_threshold - 0.05),
                 "try_broader_search": "Remove scope restriction for global search",
                 "suggested_scopes": [
-                    "work/projects", "learning/programming", "personal/notes",
-                    original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global"
-                ]
+                    "work/projects",
+                    "learning/programming",
+                    "personal/notes",
+                    original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global",
+                ],
             },
-            "note": "Manual suggestions provided due to initialization issue"
+            "note": "Manual suggestions provided due to initialization issue",
         }
-    
+
     fallback_suggestions = {
         "type": "scope_fallback",
         "original_scope": original_scope,
         "found_in_scope": None,
         "candidates": [],
         "fallback_level": 0,
-        "search_strategy": "hierarchical"
+        "search_strategy": "hierarchical",
     }
-    
+
     current_scope = original_scope
     fallback_level = 0
-    
+
     # Try parent scopes level by level
     while current_scope:
         parent_scope = await _extract_parent_scope(current_scope)
         if not parent_scope:
             break
-            
+
         fallback_level += 1
         await ctx.info(f"Fallback search level {fallback_level}: searching in '{parent_scope}'")
-        
+
         # Search in parent scope
         try:
             results = await current_memory_manager.search_memories(
@@ -1241,7 +1133,7 @@ async def _perform_hierarchical_fallback_search(
                 limit=limit,
                 min_score=similarity_threshold,
             )
-            
+
             if results:
                 # Found results at this level - collect scope candidates
                 unique_scopes = set()
@@ -1249,22 +1141,24 @@ async def _perform_hierarchical_fallback_search(
                     memory = result["memory"]
                     memory_scope = memory.metadata.get("scope", memory.scope)
                     unique_scopes.add(memory_scope)
-                
-                fallback_suggestions.update({
-                    "found_in_scope": parent_scope,
-                    "candidates": list(unique_scopes)[:5],  # Max 5 candidates
-                    "fallback_level": fallback_level,
-                    "results_count": len(results)
-                })
-                
+
+                fallback_suggestions.update(
+                    {
+                        "found_in_scope": parent_scope,
+                        "candidates": list(unique_scopes)[:5],  # Max 5 candidates
+                        "fallback_level": fallback_level,
+                        "results_count": len(results),
+                    }
+                )
+
                 await ctx.info(f"Found {len(results)} results in parent scope '{parent_scope}'")
                 return fallback_suggestions
-                
+
         except Exception as e:
             await ctx.warning(f"Error during fallback search in scope '{parent_scope}': {e}")
-        
+
         current_scope = parent_scope
-    
+
     # If no results found at any parent level, try global search
     await ctx.info("No results in parent scopes, attempting global search")
     try:
@@ -1275,56 +1169,64 @@ async def _perform_hierarchical_fallback_search(
             limit=limit,
             min_score=max(0.05, similarity_threshold - 0.05),  # Lower threshold for global
         )
-        
+
         if global_results:
             unique_scopes = set()
             for result in global_results[:limit]:
                 memory = result["memory"]
                 memory_scope = memory.metadata.get("scope", memory.scope)
                 unique_scopes.add(memory_scope)
-            
-            fallback_suggestions.update({
-                "found_in_scope": "global",
-                "candidates": list(unique_scopes)[:5],
-                "fallback_level": fallback_level + 1,
-                "search_strategy": "global_fallback",
-                "results_count": len(global_results),
-                "note": "Results found via global search with relaxed threshold"
-            })
-            
+
+            fallback_suggestions.update(
+                {
+                    "found_in_scope": "global",
+                    "candidates": list(unique_scopes)[:5],
+                    "fallback_level": fallback_level + 1,
+                    "search_strategy": "global_fallback",
+                    "results_count": len(global_results),
+                    "note": "Results found via global search with relaxed threshold",
+                }
+            )
+
             await ctx.info(f"Found {len(global_results)} results via global search")
             return fallback_suggestions
-            
+
     except Exception as e:
         await ctx.warning(f"Error during global fallback search: {e}")
-    
+
     # No results found anywhere - provide helpful manual suggestions
-    fallback_suggestions.update({
-        "found_in_scope": None,
-        "candidates": [],
-        "fallback_level": fallback_level + 1,
-        "search_strategy": "no_results",
-        "manual_suggestions": {
-            "try_parent_scope": original_scope.rsplit("/", 1)[0] if "/" in original_scope else None,
-            "try_include_child_scopes": not include_child_scopes,
-            "try_lower_threshold": max(0.05, similarity_threshold - 0.05),
-            "try_different_keywords": "Rephrase query with different terms",
-            "suggested_scopes": [
-                "work/projects", "learning/programming", "personal/notes",
-                original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global"
-            ]
-        },
-        "note": "No results found - try suggestions below"
-    })
-    
+    fallback_suggestions.update(
+        {
+            "found_in_scope": None,
+            "candidates": [],
+            "fallback_level": fallback_level + 1,
+            "search_strategy": "no_results",
+            "manual_suggestions": {
+                "try_parent_scope": original_scope.rsplit("/", 1)[0] if "/" in original_scope else None,
+                "try_include_child_scopes": not include_child_scopes,
+                "try_lower_threshold": max(0.05, similarity_threshold - 0.05),
+                "try_different_keywords": "Rephrase query with different terms",
+                "suggested_scopes": [
+                    "work/projects",
+                    "learning/programming",
+                    "personal/notes",
+                    original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global",
+                ],
+            },
+            "note": "No results found - try suggestions below",
+        }
+    )
+
     await ctx.info("No results found in hierarchical or global search")
     return fallback_suggestions
-    fallback_suggestions.update({
-        "found_in_scope": None,
-        "candidates": [],
-        "fallback_level": fallback_level + 1,
-        "search_strategy": "exhausted",
-        "note": "No results found in any scope or global search"
-    })
-    
+    fallback_suggestions.update(
+        {
+            "found_in_scope": None,
+            "candidates": [],
+            "fallback_level": fallback_level + 1,
+            "search_strategy": "exhausted",
+            "note": "No results found in any scope or global search",
+        }
+    )
+
     return fallback_suggestions

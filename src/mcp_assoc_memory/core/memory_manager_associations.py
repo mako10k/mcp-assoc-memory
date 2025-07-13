@@ -3,7 +3,7 @@ Memory association management - auto-association and relationship handling
 Manages semantic relationships between memories
 """
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
 import numpy as np
 
@@ -32,18 +32,20 @@ class MemoryManagerAssociations:
         """Stub - implemented in MemoryManagerCore"""
         raise NotImplementedError("This method should be inherited from MemoryManagerCore")
 
-    async def _auto_associate_memory(self, memory: Memory, embedding: np.ndarray) -> None:
+    async def _auto_associate_memory(self, memory: Memory, embedding: Any) -> None:
         """Auto-associate memory with similar memories"""
         try:
+            if embedding is None:
+                return
+
             # Search for similar memories
             emb_list: List[float]
             if hasattr(embedding, "flatten"):
                 emb_list = embedding.flatten().tolist()
-            elif hasattr(embedding, "tolist"):
-                emb_list = embedding.tolist()
+            elif isinstance(embedding, list):
+                emb_list = embedding
             else:
-                # Handle list or other iterable types
-                emb_list = embedding if isinstance(embedding, list) else list(embedding)
+                emb_list = list(embedding)
 
             similar_results = await self.vector_store.search_similar(
                 emb_list, scope=memory.scope, limit=10, min_similarity=0.7  # Default threshold for auto-association
