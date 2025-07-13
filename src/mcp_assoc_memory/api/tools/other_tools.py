@@ -52,10 +52,11 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
 
         for memory_id in request.memory_ids:
             try:
-                # Update memory with new scope
+                # Update memory with new scope (both scope field and metadata)
                 updated_memory = await memory_manager.update_memory(
                     memory_id=memory_id,
-                    scope=request.target_scope
+                    scope=request.target_scope,
+                    metadata={"scope": request.target_scope}  # Also update metadata scope
                 )
                 
                 # Critical: Check if update_memory returned None

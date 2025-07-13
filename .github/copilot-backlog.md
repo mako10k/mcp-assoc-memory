@@ -21,6 +21,11 @@
 
 <!-- ユーザーはここに新しいバックログ項目を追加してください -->
 <!-- Copilot will process and remove items from this section -->
+## [Medium] Config not affected
+**Type**: enhancement
+**Sprint**: 1
+**Description**: 設定のポートが 3006 なのに、実際は 8000 でリッスンしてる。
+**Context**: MCPの設定ファイルではポート3006が指定されているが、実際のサーバーは8000でリッスンしている。設定と実際の挙動を一致させる必要がある。
 
 <!-- All new backlog items processed and moved to associative memory -->
 <!-- Content Relation Feature stored in work/backlog/medium with technical details -->
