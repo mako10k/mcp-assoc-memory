@@ -32,32 +32,71 @@ memory_storage, persistence = get_persistent_storage()
 async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, Any]:
     """Handle memory_move tool requests."""
     try:
-        # Move implementation would go here - this is a placeholder
-        # for the full implementation that exists in the handlers
         await ctx.info(f"Moving {len(request.memory_ids)} memories to scope: {request.target_scope}")
 
+        # Get memory manager instance
+        memory_manager = await get_or_create_memory_manager()
+        if not memory_manager:
+            error_msg = "Memory manager not available"
+            await ctx.error(error_msg)
+            return MemoryMoveResponse(
+                success=False,
+                message=error_msg,
+                data={},
+                moved_memories=[],
+                failed_memory_ids=request.memory_ids,
+            ).model_dump()
+
         moved_count = 0
+        failed_memory_ids = []
+
         for memory_id in request.memory_ids:
-            if memory_id in memory_storage:
-                memory_storage[memory_id]["scope"] = request.target_scope
+            try:
+                # Update memory with new scope
+                updated_memory = await memory_manager.update_memory(
+                    memory_id=memory_id,
+                    scope=request.target_scope
+                )
+                
+                # Critical: Check if update_memory returned None
+                if updated_memory is None:
+                    error_msg = f"Failed to update memory {memory_id} - update_memory returned None"
+                    await ctx.warning(error_msg)
+                    failed_memory_ids.append(memory_id)
+                    continue
+                
                 moved_count += 1
+                await ctx.info(f"Successfully moved memory {memory_id} to {request.target_scope}")
+                
+            except Exception as move_error:
+                error_msg = f"Failed to move memory {memory_id}: {move_error}"
+                await ctx.warning(error_msg)
+                failed_memory_ids.append(memory_id)
 
-        if moved_count > 0:
-            persistence.save_memories(memory_storage)
-
-        await ctx.info(f"Successfully moved {moved_count} memories")
+        success_msg = f"Successfully moved {moved_count} memories to {request.target_scope}"
+        if failed_memory_ids:
+            success_msg += f" ({len(failed_memory_ids)} failed)"
+        
+        await ctx.info(success_msg)
 
         return MemoryMoveResponse(
             success=True,
-            message=f"Successfully moved {moved_count} memories to {request.target_scope}",
+            message=success_msg,
             data={"moved_count": moved_count, "target_scope": request.target_scope},
-            moved_memories=[],
-            failed_memory_ids=[],
+            moved_memories=[],  # Simplified: don't return full memory objects to avoid serialization issues
+            failed_memory_ids=failed_memory_ids,
         ).model_dump()
 
     except Exception as e:
-        await ctx.error(f"Failed to move memories: {e}")
-        return {"success": False, "error": f"Failed to move memories: {e}", "data": {}}
+        error_msg = f"Failed to move memories: {e}"
+        await ctx.error(error_msg)
+        return MemoryMoveResponse(
+            success=False,
+            message=error_msg,
+            data={},
+            moved_memories=[],
+            failed_memory_ids=request.memory_ids,
+        ).model_dump()
 
 
 async def handle_memory_discover_associations(
