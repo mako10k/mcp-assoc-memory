@@ -208,3 +208,54 @@ async def close_memory_manager() -> None:
 def is_memory_manager_initialized() -> bool:
     """Check if the global MemoryManager is initialized"""
     return _singleton_manager.is_initialized()
+
+
+async def get_or_create_memory_manager() -> Optional[MemoryManager]:
+    """
+    Unified function to get or create memory manager with robust fallback
+    
+    This replaces the duplicated _get_or_create_memory_manager functions
+    in various tool modules to ensure consistent behavior.
+    
+    Returns:
+        MemoryManager instance if available, None otherwise
+    """
+    # Try to get from singleton first
+    try:
+        if is_memory_manager_initialized():
+            return await get_memory_manager()
+    except Exception:
+        pass  # Fall through to other options
+    
+    # Try to create new instance as fallback
+    try:
+        from ..core.memory_manager import MemoryManager
+        from ..storage.vector_store import ChromaVectorStore
+        from ..storage.metadata_store import SQLiteMetadataStore
+        from ..storage.graph_store import NetworkXGraphStore
+        from ..core.embedding_service import EmbeddingService
+        from ..core.similarity import SimilarityCalculator
+        
+        # Create dependencies
+        vector_store = ChromaVectorStore(persist_directory="data/chroma_db")
+        metadata_store = SQLiteMetadataStore(database_path="data/memory.db")
+        graph_store = NetworkXGraphStore(graph_path="data/memory_graph.pkl")
+        
+        embedding_service = EmbeddingService()
+        similarity_calculator = SimilarityCalculator()
+        
+        # Create memory manager
+        mm = MemoryManager(
+            vector_store=vector_store,
+            metadata_store=metadata_store,
+            graph_store=graph_store,
+            embedding_service=embedding_service,
+            similarity_calculator=similarity_calculator,
+        )
+        
+        await mm.initialize()
+        return mm
+        
+    except Exception:
+        # Log the error but don't raise - allows graceful degradation
+        return None

@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ...simple_persistence import get_persistent_storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
@@ -13,7 +13,7 @@ from ..models.responses import (
     SessionInfo,
     SessionManageResponse,
 )
-from ...core.singleton_memory_manager import get_memory_manager
+from ...core.singleton_memory_manager import get_memory_manager, get_or_create_memory_manager
 
 # Module-level dependencies (for backward compatibility)
 memory_manager = None
@@ -67,20 +67,17 @@ async def handle_memory_discover_associations(
     try:
         await ctx.info(f"Discovering associations for memory: {memory_id}")
 
-        # Use Singleton memory manager with fallback
-        manager = await get_memory_manager()
+        # Use comprehensive memory manager access
+        manager = await get_or_create_memory_manager()
         if not manager:
-            # Fallback to module-level memory_manager if available
-            if not memory_manager:
-                return {
-                    "success": False,
-                    "message": "No memory manager available",
-                    "data": {},
-                    "source_memory": None,
-                    "associations": [],
-                    "total_found": 0,
-                }
-            manager = memory_manager
+            return {
+                "success": False,
+                "message": "No memory manager available",
+                "data": {},
+                "source_memory": None,
+                "associations": [],
+                "total_found": 0,
+            }
 
         # Get the source memory
         source_memory = await manager.get_memory(memory_id)

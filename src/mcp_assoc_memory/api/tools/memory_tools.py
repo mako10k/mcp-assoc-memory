@@ -15,7 +15,7 @@ from pydantic import Field
 
 from ...config import get_config
 from ...core.memory_manager import MemoryManager
-from ...core.singleton_memory_manager import get_memory_manager, is_memory_manager_initialized
+from ...core.singleton_memory_manager import get_memory_manager, is_memory_manager_initialized, get_or_create_memory_manager
 from ...simple_persistence import get_persistent_storage
 from .export_tools import handle_memory_export
 from ..dependencies import dependencies, ensure_dependencies_initialized
@@ -59,62 +59,6 @@ def get_local_memory_manager() -> Optional[MemoryManager]:
     return memory_manager
 
 
-async def _get_or_create_memory_manager() -> Optional[MemoryManager]:
-    """
-    Get memory manager using singleton pattern with fallback to dynamic creation
-    """
-    global memory_manager
-    
-    # First try to get from singleton
-    singleton_manager = await get_memory_manager()
-    if singleton_manager is not None:
-        memory_manager = singleton_manager  # Update local reference
-        return singleton_manager
-    
-    # Fallback: check if local memory manager exists
-    if memory_manager is not None:
-        return memory_manager
-    
-    # Try to dynamically create memory manager if not injected
-    try:
-        from ...core.memory_manager import MemoryManager
-        from ...storage.vector_store import ChromaVectorStore
-        from ...storage.metadata_store import SQLiteMetadataStore
-        from ...storage.graph_store import NetworkXGraphStore
-        from ...core.embedding_service import SentenceTransformerEmbeddingService, MockEmbeddingService
-        from ...core.similarity import SimilarityCalculator
-        
-        # Initialize storage components
-        vector_store = ChromaVectorStore()
-        metadata_store = SQLiteMetadataStore()
-        graph_store = NetworkXGraphStore()
-        
-        # Use SentenceTransformerEmbeddingService for production, fallback to Mock
-        try:
-            embedding_service = SentenceTransformerEmbeddingService()
-        except Exception:
-            embedding_service = MockEmbeddingService()
-        
-        similarity_calculator = SimilarityCalculator()
-        
-        # Create memory manager
-        mm = MemoryManager(
-            vector_store=vector_store,
-            metadata_store=metadata_store,
-            graph_store=graph_store,
-            embedding_service=embedding_service,
-            similarity_calculator=similarity_calculator,
-        )
-        
-        # Update global reference
-        memory_manager = mm
-        return mm
-        
-    except Exception as e:
-        print(f"Failed to dynamically create memory manager: {e}")
-        return None
-
-
 async def ensure_initialized() -> None:
     """Ensure memory manager is initialized using singleton pattern"""
     global _initialized, memory_manager
@@ -126,7 +70,7 @@ async def ensure_initialized() -> None:
         return
     
     # Try to get or create memory manager
-    memory_manager = await _get_or_create_memory_manager()
+    memory_manager = await get_or_create_memory_manager()
     
     # If memory_manager is still None, we cannot proceed with advanced operations
     if memory_manager is None:
@@ -737,14 +681,20 @@ async def handle_memory_discover_associations(
         await ensure_initialized()
         await ctx.info(f"Discovering associations for memory: {memory_id}")
 
+        # Get memory manager using unified function
+        manager = await get_or_create_memory_manager()
+        if not manager:
+            await ctx.error("Memory manager not available")
+            return {"error": "Memory manager not available", "associations": []}
+
         # Get the source memory
-        memory = await memory_manager.get_memory(memory_id)
+        memory = await manager.get_memory(memory_id)
         if not memory:
             await ctx.warning(f"Memory not found: {memory_id}")
             return {"error": "Memory not found", "associations": []}
 
         # Find similar memories with enhanced search strategy
-        search_results = await memory_manager.search_memories(
+        search_results = await manager.search_memories(
             query=memory.content,
             limit=limit * 3,  # Search more to account for filtering
             min_score=max(0.1, similarity_threshold - 0.2),  # Lower threshold for diversity
@@ -759,7 +709,7 @@ async def handle_memory_discover_associations(
             if memory.category:
                 enhanced_query += " " + memory.category
 
-            additional_results = await memory_manager.search_memories(
+            additional_results = await manager.search_memories(
                 query=enhanced_query, limit=limit * 2, min_score=max(0.1, similarity_threshold - 0.3)
             )
 
@@ -1245,14 +1195,13 @@ async def _perform_hierarchical_fallback_search(
     # Try centralized dependency manager first
     current_memory_manager = dependencies.memory_manager
     
-    # If not available, try factory approach
+    # If not available, try unified factory approach
     if not current_memory_manager:
-        from ..memory_factory import get_or_create_memory_manager
         try:
             current_memory_manager = await get_or_create_memory_manager()
-            await ctx.info("Using factory-created memory manager for fallback search")
+            await ctx.info("Using unified factory-created memory manager for fallback search")
         except Exception as e:
-            await ctx.warning(f"Factory memory manager creation failed: {e}")
+            await ctx.warning(f"Unified factory memory manager creation failed: {e}")
     
     if not current_memory_manager:
         await ctx.error("Memory manager not initialized for fallback search")
