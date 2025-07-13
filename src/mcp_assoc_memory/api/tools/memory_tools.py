@@ -409,8 +409,30 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
                 except Exception as e:
                     await ctx.warning(f"Failed to get associations for memory {memory.id}: {e}")
                     formatted_memory["associations"] = []
+            else:
+                formatted_memory["associations"] = None
 
-            formatted_results.append(formatted_memory)
+            # Create MemoryResponse object for proper validation
+            try:
+                memory_response = MemoryResponse(**formatted_memory)
+                formatted_results.append(memory_response)
+            except Exception as e:
+                await ctx.error(f"Failed to create MemoryResponse for memory {memory.id}: {e}")
+                # Fallback: create minimal valid response
+                memory_response = MemoryResponse(
+                    memory_id=memory.id,
+                    content=memory.content,
+                    scope=memory_scope,
+                    metadata=memory.metadata or {},
+                    tags=memory.tags or [],
+                    category=memory.category,
+                    created_at=memory.created_at,
+                    similarity_score=result["similarity"],
+                    associations=None,
+                    is_duplicate=False,
+                    duplicate_of=None
+                )
+                formatted_results.append(memory_response)
 
         await ctx.info(f"Found {len(formatted_results)} memories")
 
@@ -505,9 +527,8 @@ async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Cont
                 "similarity_score": similarity_score,
                 "tags": memory.tags,
                 "category": memory.category,
-                "created_at": memory.created_at.isoformat() if memory.created_at else None,
+                "created_at": memory.created_at,
                 "metadata": memory.metadata or {},
-                "associations": [],
             }
 
             # Include associations if requested
@@ -529,8 +550,30 @@ async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Cont
                 except Exception as e:
                     await ctx.warning(f"Failed to get associations for memory {memory.id}: {e}")
                     formatted_memory["associations"] = []
+            else:
+                formatted_memory["associations"] = None
 
-            formatted_results.append(formatted_memory)
+            # Create MemoryResponse object for proper validation
+            try:
+                memory_response = MemoryResponse(**formatted_memory)
+                formatted_results.append(memory_response)
+            except Exception as e:
+                await ctx.error(f"Failed to create MemoryResponse for memory {memory.id}: {e}")
+                # Fallback: create minimal valid response
+                memory_response = MemoryResponse(
+                    memory_id=memory.id,
+                    content=memory.content,
+                    scope=memory_scope,
+                    metadata=memory.metadata or {},
+                    tags=memory.tags or [],
+                    category=memory.category,
+                    created_at=memory.created_at,
+                    similarity_score=similarity_score,
+                    associations=None,
+                    is_duplicate=False,
+                    duplicate_of=None
+                )
+                formatted_results.append(memory_response)
 
         await ctx.info(f"Found {len(formatted_results)} diverse memories")
 
@@ -555,6 +598,9 @@ async def handle_memory_get(memory_id: str, ctx: Context, include_associations: 
     try:
         await ensure_initialized()
         await ctx.info(f"Retrieving memory: {memory_id}")
+
+        if not memory_manager:
+            return {"error": "Memory manager not available"}
 
         # Get memory
         memory = await memory_manager.get_memory(memory_id)
@@ -611,22 +657,29 @@ async def handle_memory_delete(memory_id: str, ctx: Context) -> Dict[str, Any]:
         await ctx.info(f"Deleting memory: {memory_id}")
 
         # Check if memory exists in advanced storage
-        memory = await memory_manager.get_memory(memory_id)
-        if not memory:
-            # Check simple storage
-            if memory_id not in memory_storage:
+        if memory_manager:
+            memory = await memory_manager.get_memory(memory_id)
+            if not memory:
+                # Check simple storage
+                if not memory_storage or memory_id not in memory_storage:
+                    await ctx.warning(f"Memory not found: {memory_id}")
+                    return {"success": False, "error": "Memory not found"}
+
+            # Delete from advanced storage
+            if memory:
+                await memory_manager.delete_memory(memory_id)
+                await ctx.info(f"Deleted memory from advanced storage: {memory_id}")
+        else:
+            # Fallback to simple storage only
+            if not memory_storage or memory_id not in memory_storage:
                 await ctx.warning(f"Memory not found: {memory_id}")
                 return {"success": False, "error": "Memory not found"}
 
-        # Delete from advanced storage
-        if memory:
-            await memory_manager.delete_memory(memory_id)
-            await ctx.info(f"Deleted memory from advanced storage: {memory_id}")
-
         # Delete from simple storage
-        if memory_id in memory_storage:
+        if memory_storage and memory_id in memory_storage:
             del memory_storage[memory_id]
-            persistence.save_memories(memory_storage)
+            if persistence:
+                persistence.save_memories(memory_storage)
             await ctx.info(f"Deleted memory from simple storage: {memory_id}")
 
         return {"success": True, "message": f"Memory {memory_id} deleted successfully"}

@@ -67,8 +67,23 @@ async def handle_memory_discover_associations(
     try:
         await ctx.info(f"Discovering associations for memory: {memory_id}")
 
+        # Use Singleton memory manager with fallback
+        manager = await get_memory_manager()
+        if not manager:
+            # Fallback to module-level memory_manager if available
+            if not memory_manager:
+                return {
+                    "success": False,
+                    "message": "No memory manager available",
+                    "data": {},
+                    "source_memory": None,
+                    "associations": [],
+                    "total_found": 0,
+                }
+            manager = memory_manager
+
         # Get the source memory
-        source_memory = await memory_manager.get_memory(memory_id)  # type: ignore
+        source_memory = await manager.get_memory(memory_id)
         if not source_memory:
             await ctx.warning(f"Memory not found: {memory_id}")
             return {
@@ -82,7 +97,7 @@ async def handle_memory_discover_associations(
 
         # Use search_memories to find semantically related memories
         # First try with the exact content
-        search_results = await memory_manager.search_memories(  # type: ignore
+        search_results = await manager.search_memories(
             query=source_memory.content,
             limit=limit + 1,  # +1 to account for source memory in results
             min_score=similarity_threshold,
@@ -91,7 +106,7 @@ async def handle_memory_discover_associations(
         # If no results, try with a shorter query from content
         if not search_results and len(source_memory.content) > 100:
             short_query = source_memory.content[:100]
-            search_results = await memory_manager.search_memories(  # type: ignore
+            search_results = await manager.search_memories(
                 query=short_query,
                 limit=limit + 1,
                 min_score=similarity_threshold,

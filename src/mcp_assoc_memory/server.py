@@ -540,6 +540,7 @@ async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> List[Mem
     result = await handle_unified_search(request, ctx)
     # Convert handler result to expected format
     if isinstance(result, dict) and "results" in result:
+        # Return the MemoryResponse objects directly
         return result["results"]
     # Return empty list if result format is unexpected
     return []
