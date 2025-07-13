@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
+from ...core.singleton_memory_manager import get_memory_manager, get_or_create_memory_manager
 from ...simple_persistence import get_persistent_storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
 from ..models.responses import (
@@ -13,7 +14,6 @@ from ..models.responses import (
     SessionInfo,
     SessionManageResponse,
 )
-from ...core.singleton_memory_manager import get_memory_manager, get_or_create_memory_manager
 
 # Module-level dependencies (for backward compatibility)
 memory_manager = None
@@ -56,19 +56,19 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
                 updated_memory = await memory_manager.update_memory(
                     memory_id=memory_id,
                     scope=request.target_scope,
-                    metadata={"scope": request.target_scope}  # Also update metadata scope
+                    metadata={"scope": request.target_scope},  # Also update metadata scope
                 )
-                
+
                 # Critical: Check if update_memory returned None
                 if updated_memory is None:
                     error_msg = f"Failed to update memory {memory_id} - update_memory returned None"
                     await ctx.warning(error_msg)
                     failed_memory_ids.append(memory_id)
                     continue
-                
+
                 moved_count += 1
                 await ctx.info(f"Successfully moved memory {memory_id} to {request.target_scope}")
-                
+
             except Exception as move_error:
                 error_msg = f"Failed to move memory {memory_id}: {move_error}"
                 await ctx.warning(error_msg)
@@ -77,7 +77,7 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
         success_msg = f"Successfully moved {moved_count} memories to {request.target_scope}"
         if failed_memory_ids:
             success_msg += f" ({len(failed_memory_ids)} failed)"
-        
+
         await ctx.info(success_msg)
 
         return MemoryMoveResponse(

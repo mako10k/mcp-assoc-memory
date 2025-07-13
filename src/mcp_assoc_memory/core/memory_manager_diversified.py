@@ -129,7 +129,7 @@ class MemoryManagerDiversified:
 
     async def _get_similarity_candidates(
         self,
-        query_embedding: Union[List[float], Any],  # Allow numpy arrays too
+        query_embedding: Any,  # Support numpy arrays, lists, and other formats
         scope: Optional[str],
         limit: int,
         min_score: float,
@@ -139,9 +139,9 @@ class MemoryManagerDiversified:
             # Convert embedding to list format for vector store
             try:
                 if hasattr(query_embedding, "tolist"):
-                    embedding_list = query_embedding.tolist()  # type: ignore[attr-defined]
+                    embedding_list = query_embedding.tolist()
                 elif hasattr(query_embedding, "flatten"):
-                    embedding_list = query_embedding.flatten().tolist()  # type: ignore[attr-defined]
+                    embedding_list = query_embedding.flatten().tolist()
                 else:
                     # Try to convert numpy array or other array-like objects
                     import numpy as np
@@ -230,7 +230,8 @@ class MemoryManagerDiversified:
             )
 
             # Add similar memory IDs to exclude set
-            for similar_memory, _ in similar_memories:
+            for result in similar_memories:
+                similar_memory = result["memory"]
                 exclude_set.add(similar_memory.id)
 
         except Exception as e:
@@ -332,7 +333,8 @@ class MemoryManagerDiversified:
 
                         # Select diverse candidates for next level
                         level_exclude: Set[Any] = set()
-                        for similar_memory, _ in similar_memories:
+                        for result in similar_memories:
+                            similar_memory = result["memory"]
                             if (
                                 len(next_level) < limit_per_level
                                 and similar_memory.id not in exclude_set

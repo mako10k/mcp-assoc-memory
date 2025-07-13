@@ -15,6 +15,7 @@ from typing import Annotated, Any, Dict, List, Optional
 from fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
+from .api.dependencies import set_global_dependencies
 from .api.models import (
     Association,
     DiversifiedSearchRequest,
@@ -76,7 +77,6 @@ from .api.tools import (
     set_scope_dependencies,
 )
 from .api.tools.other_tools import set_dependencies as set_other_dependencies
-from .api.dependencies import set_global_dependencies
 from .api.utils import get_child_scopes, get_parent_scope, validate_scope_path
 from .config import get_config
 from .core.embedding_service import (
@@ -87,8 +87,12 @@ from .core.embedding_service import (
 
 # Import the full associative memory architecture
 from .core.memory_manager import MemoryManager
-from .core.singleton_memory_manager import initialize_memory_manager, get_memory_manager, is_memory_manager_initialized
 from .core.similarity import SimilarityCalculator
+from .core.singleton_memory_manager import (
+    get_memory_manager,
+    initialize_memory_manager,
+    is_memory_manager_initialized,
+)
 from .simple_persistence import get_persistent_storage
 from .storage.graph_store import NetworkXGraphStore
 from .storage.metadata_store import SQLiteMetadataStore
@@ -141,7 +145,7 @@ async def ensure_initialized():
                 embedding_service=embedding_service,
                 similarity_calculator=similarity_calculator,
             )
-            
+
             # Set up tool dependencies - use centralized dependency manager
             set_global_dependencies(memory_manager, memory_storage, persistence)
 
@@ -151,10 +155,10 @@ async def ensure_initialized():
             set_resource_dependencies(memory_manager, memory_storage, persistence)
             set_prompt_dependencies(memory_manager, memory_storage, persistence)
             set_other_dependencies(memory_manager)
-            
+
             _initialized = True
             logger.info("Memory manager initialized successfully using singleton pattern")
-            
+
         except Exception as e:
             # Reset flag to allow retry
             _initialized = False
@@ -170,9 +174,9 @@ async def ensure_initialized():
 async def debug_memory_manager(ctx: Context) -> Dict[str, Any]:
     """Debug tool to check memory manager state"""
     # Import memory tools to check global state
-    from .api.tools.memory_tools import memory_manager as tools_memory_manager
     from .api.dependencies import dependencies
-    
+    from .api.tools.memory_tools import memory_manager as tools_memory_manager
+
     return {
         "server_memory_manager": str(memory_manager),
         "server_memory_manager_type": str(type(memory_manager)),

@@ -5,8 +5,9 @@ Solves the process isolation problem by creating memory manager instances dynami
 
 import logging
 from typing import Optional
-from ..core.memory_manager import MemoryManager
+
 from ..config import get_config
+from ..core.memory_manager import MemoryManager
 from ..simple_persistence import get_persistent_storage
 
 logger = logging.getLogger(__name__)
@@ -14,38 +15,41 @@ logger = logging.getLogger(__name__)
 
 class MemoryManagerFactory:
     """Factory for creating memory manager instances on demand"""
-    
-    _instance: Optional['MemoryManagerFactory'] = None
+
+    _instance: Optional["MemoryManagerFactory"] = None
     _cached_memory_manager: Optional[MemoryManager] = None
     _initialized: bool = False
-    
-    def __new__(cls) -> 'MemoryManagerFactory':
+
+    def __new__(cls) -> "MemoryManagerFactory":
         """Singleton pattern"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     async def get_memory_manager(self) -> Optional[MemoryManager]:
         """Get or create memory manager instance"""
         if self._cached_memory_manager is not None and self._initialized:
             return self._cached_memory_manager
-        
+
         try:
             # Create fresh memory manager instance following server.py pattern
-            config = get_config()
-            
+            get_config()  # Ensure config is loaded
+
             # Create all required components dynamically
-            from ..storage.vector_store import ChromaVectorStore
-            from ..storage.metadata_store import SQLiteMetadataStore
-            from ..storage.graph_store import NetworkXGraphStore
-            from ..core.embedding_service import SentenceTransformerEmbeddingService, MockEmbeddingService
+            from ..core.embedding_service import (
+                MockEmbeddingService,
+                SentenceTransformerEmbeddingService,
+            )
             from ..core.similarity import SimilarityCalculator
-            
+            from ..storage.graph_store import NetworkXGraphStore
+            from ..storage.metadata_store import SQLiteMetadataStore
+            from ..storage.vector_store import ChromaVectorStore
+
             # Initialize stores (same as server.py)
             vector_store = ChromaVectorStore()
             metadata_store = SQLiteMetadataStore()
             graph_store = NetworkXGraphStore()
-            
+
             # Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
             try:
                 embedding_service = SentenceTransformerEmbeddingService()
@@ -56,7 +60,7 @@ class MemoryManagerFactory:
                 logger.info("Falling back to MockEmbeddingService")
 
             similarity_calculator = SimilarityCalculator()
-            
+
             # Create memory manager
             memory_manager = MemoryManager(
                 vector_store=vector_store,
@@ -65,21 +69,21 @@ class MemoryManagerFactory:
                 embedding_service=embedding_service,
                 similarity_calculator=similarity_calculator,
             )
-            
+
             # Initialize it
             await memory_manager.initialize()
-            
+
             # Cache for future use
             self._cached_memory_manager = memory_manager
             self._initialized = True
-            
+
             logger.info("Memory manager created and initialized successfully via factory")
             return memory_manager
-            
+
         except Exception as e:
             logger.error(f"Failed to create memory manager via factory: {e}")
             return None
-    
+
     def reset(self) -> None:
         """Reset cached memory manager (for testing)"""
         self._cached_memory_manager = None

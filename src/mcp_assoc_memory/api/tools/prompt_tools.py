@@ -1,6 +1,7 @@
 """
 Prompt generation tools for MCP Associative Memory Server
 """
+
 from typing import Any, Dict, List, Optional
 
 from fastmcp import Context
@@ -34,7 +35,7 @@ async def handle_analyze_memories_prompt(
         # Fallback to module-level memory_storage if available
         if not memory_storage:
             raise ValueError("No memory manager or storage available")
-        
+
         scope_memories = []
         for memory_data in memory_storage.values():
             memory_scope = memory_data["scope"]
@@ -63,15 +64,17 @@ async def handle_analyze_memories_prompt(
                 memories = await manager.metadata_store.get_memories_by_scope(scope)
                 scope_memories = []
                 for memory in memories:
-                    scope_memories.append({
-                        "id": memory.id,
-                        "content": memory.content,
-                        "scope": memory.scope,
-                        "category": memory.category,
-                        "tags": memory.tags,
-                        "created_at": memory.created_at,
-                        "metadata": memory.metadata
-                    })
+                    scope_memories.append(
+                        {
+                            "id": memory.id,
+                            "content": memory.content,
+                            "scope": memory.scope,
+                            "category": memory.category,
+                            "tags": memory.tags,
+                            "created_at": memory.created_at,
+                            "metadata": memory.metadata,
+                        }
+                    )
         except Exception as e:
             if ctx:
                 await ctx.error(f"Failed to retrieve memories from manager: {e}")
@@ -108,7 +111,7 @@ async def handle_summarize_memory_prompt(memory_id: str, context_scope: str = ""
         # Fallback to module-level memory_storage if available
         if not memory_storage:
             raise ValueError("No memory manager or storage available")
-        
+
         memory_data = memory_storage.get(memory_id)
         if not memory_data:
             raise ValueError(f"Memory not found: {memory_id}")
@@ -118,13 +121,13 @@ async def handle_summarize_memory_prompt(memory_id: str, context_scope: str = ""
             memory = await manager.get_memory(memory_id)
             if not memory:
                 raise ValueError(f"Memory not found: {memory_id}")
-            
+
             memory_data = {
                 "memory_id": memory.id,
                 "scope": memory.scope,
                 "created_at": memory.created_at,
                 "content": memory.content,
-                "metadata": memory.metadata
+                "metadata": memory.metadata,
             }
         except Exception as e:
             if ctx:

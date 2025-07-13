@@ -17,9 +17,12 @@ from pydantic import Field
 
 from ...config import get_config
 from ...core.memory_manager import MemoryManager
-from ...core.singleton_memory_manager import get_memory_manager, is_memory_manager_initialized, get_or_create_memory_manager
+from ...core.singleton_memory_manager import (
+    get_memory_manager,
+    get_or_create_memory_manager,
+    is_memory_manager_initialized,
+)
 from ...simple_persistence import get_persistent_storage
-from .export_tools import handle_memory_export
 from ..dependencies import dependencies, ensure_dependencies_initialized
 from ..models import (
     DiversifiedSearchRequest,
@@ -35,6 +38,7 @@ from ..models import (
     PaginationInfo,
     UnifiedSearchRequest,
 )
+from .export_tools import handle_memory_export
 
 # Get the config instance
 config = get_config()
@@ -64,30 +68,30 @@ def get_local_memory_manager() -> Optional[MemoryManager]:
 async def ensure_initialized() -> MemoryManager:
     """Ensure memory manager is initialized using singleton pattern"""
     global _initialized, memory_manager
-    
+
     # Always get from singleton pattern
     memory_manager = await get_or_create_memory_manager()
-    
+
     # If memory_manager is still None, we cannot proceed with advanced operations
     if memory_manager is None:
         raise RuntimeError(
             "Memory manager is not initialized and could not be created dynamically. "
             "This suggests a configuration or dependency issue."
         )
-    
+
     # Initialize if needed
     if not _initialized:
         try:
             await memory_manager.initialize()
             _initialized = True
             # Verify storage initialization properly
-            if not hasattr(memory_manager, 'vector_store'):
+            if not hasattr(memory_manager, "vector_store"):
                 raise RuntimeError("Vector store not initialized after initialization")
         except Exception as e:
             # Reset flag to allow retry
             _initialized = False
             raise RuntimeError(f"Memory manager initialization failed: {e}")
-    
+
     return memory_manager
 
 
@@ -104,33 +108,31 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
             content="",
             scope="error",
             created_at=datetime.now(),
-            metadata={"error": error_msg}
+            metadata={"error": error_msg},
         )
-    
+
     try:
         # Get memory manager with early None check
         memory_manager = await ensure_initialized()
         if memory_manager is None:
             raise RuntimeError("Memory manager is None after initialization")
-        
+
         await ctx.info(f"Storing: {request.content[:50]}... in scope: {request.scope}")
-        
+
         # Store memory with explicit None check
         memory = await memory_manager.store_memory(
-            content=request.content,
-            scope=request.scope,
-            allow_duplicates=request.allow_duplicates
+            content=request.content, scope=request.scope, allow_duplicates=request.allow_duplicates
         )
-        
+
         # Early None check - this is the critical fix
         if memory is None:
             error_msg = "store_memory returned None - check memory manager implementation"
             await ctx.error(error_msg)
             raise RuntimeError(error_msg)
-        
+
         # Success - memory object is guaranteed to be non-None here
         await ctx.info(f"Successfully stored memory: {memory.id}")
-        
+
         return MemoryResponse(
             success=True,
             message="Memory stored successfully",
@@ -141,13 +143,13 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
             metadata=memory.metadata or {},
             tags=memory.tags or [],
             category=memory.category,
-            is_duplicate=False
+            is_duplicate=False,
         )
-        
+
     except Exception as e:
         error_msg = f"Failed to store memory: {str(e)}"
         await ctx.error(error_msg)
-        
+
         return MemoryResponse(
             success=False,
             message=error_msg,
@@ -155,11 +157,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
             content="",
             scope="error",
             created_at=datetime.now(),
-            metadata={
-                "error": error_msg,
-                "error_type": type(e).__name__,
-                "traceback": traceback.format_exc()
-            }
+            metadata={"error": error_msg, "error_type": type(e).__name__, "traceback": traceback.format_exc()},
         )
 
 
@@ -237,7 +235,7 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
                     similarity_score=result["similarity"],
                     associations=None,
                     is_duplicate=False,
-                    duplicate_of=None
+                    duplicate_of=None,
                 )
                 formatted_results.append(memory_response)
 
@@ -266,10 +264,10 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
                 ctx=ctx,
                 limit=request.limit,
                 similarity_threshold=request.similarity_threshold,
-                include_child_scopes=request.include_child_scopes
+                include_child_scopes=request.include_child_scopes,
             )
             response["suggestions"] = fallback_suggestions
-            
+
             # Keep legacy suggestions for backward compatibility
             response["legacy_suggestions"] = {
                 "try_include_child_scopes": not request.include_child_scopes,
@@ -282,22 +280,22 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
     except Exception as e:
         error_message = f"Failed to search memories: {str(e)}"
         await ctx.error(error_message)
-        
+
         # Provide helpful error response with fallback empty results
         return {
             "error": "Memory search failed",
             "details": str(e),
             "error_type": type(e).__name__,
             "results": [],  # Graceful fallback
-            "query": getattr(request, 'query', 'unknown'),
-            "scope": getattr(request, 'scope', 'unknown'),
+            "query": getattr(request, "query", "unknown"),
+            "scope": getattr(request, "scope", "unknown"),
             "suggestions": [
                 "Check if the query format is valid",
                 "Try a simpler search query",
                 "Verify the scope exists using scope_list",
-                "Try again in a moment if this was a temporary issue"
+                "Try again in a moment if this was a temporary issue",
             ],
-            "fallback_used": True
+            "fallback_used": True,
         }
 
 
@@ -374,7 +372,7 @@ async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Cont
                     similarity_score=similarity_score,
                     associations=None,
                     is_duplicate=False,
-                    duplicate_of=None
+                    duplicate_of=None,
                 )
                 formatted_results.append(memory_response)
 
@@ -494,7 +492,7 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
             category=request.category,
             metadata=request.metadata,
         )
-        
+
         # Critical: Check if update_memory returned None
         if updated_memory is None:
             error_msg = f"Memory update operation returned None for memory_id: {request.memory_id}"
@@ -505,7 +503,7 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
                 memory_id=request.memory_id,
                 content="",
                 scope="error",
-                created_at=datetime.now()
+                created_at=datetime.now(),
             )
 
         await ctx.info(f"Memory updated successfully: {request.memory_id}")
@@ -532,7 +530,7 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
             content="",
             scope="error",
             created_at=datetime.now(),
-            metadata={"error": error_msg, "error_type": type(e).__name__}
+            metadata={"error": error_msg, "error_type": type(e).__name__},
         )
 
 
@@ -810,9 +808,11 @@ async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optiona
         # Note: Currently memory_manager doesn't expose a list_all method
         # This is a limitation that should be addressed in the memory_manager interface
         if ctx:
-            await ctx.warning("Memory listing temporarily disabled due to singleton refactoring. Use memory_search with broad criteria instead.")
+            await ctx.warning(
+                "Memory listing temporarily disabled due to singleton refactoring. Use memory_search with broad criteria instead."
+            )
         all_memories = []
-        
+
         total_items = len(all_memories)
 
         # Calculate pagination
@@ -833,7 +833,7 @@ async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optiona
                 tags = memory_data.get("tags", [])
                 category = memory_data.get("category")
                 created_at = memory_data.get("created_at", datetime.now())
-                
+
                 results.append(
                     MemoryResponse(
                         memory_id=memory_id,
@@ -1063,16 +1063,16 @@ async def _perform_hierarchical_fallback_search(
     ctx: Context,
     limit: int = 5,
     similarity_threshold: float = 0.1,
-    include_child_scopes: bool = False
+    include_child_scopes: bool = False,
 ) -> Dict[str, Any]:
     """
     Perform hierarchical fallback search when original search returns 0 results.
-    
+
     Algorithm:
     1. Search parent scope level by level
     2. Return candidates immediately when results found
     3. If no results at any parent level, perform global search
-    
+
     Returns helpful suggestions even if memory_manager is not available.
     """
     # Get memory manager using unified approach
@@ -1094,34 +1094,36 @@ async def _perform_hierarchical_fallback_search(
                 "try_lower_threshold": max(0.05, similarity_threshold - 0.05),
                 "try_broader_search": "Remove scope restriction for global search",
                 "suggested_scopes": [
-                    "work/projects", "learning/programming", "personal/notes",
-                    original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global"
-                ]
+                    "work/projects",
+                    "learning/programming",
+                    "personal/notes",
+                    original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global",
+                ],
             },
-            "note": "Manual suggestions provided due to initialization issue"
+            "note": "Manual suggestions provided due to initialization issue",
         }
-    
+
     fallback_suggestions = {
         "type": "scope_fallback",
         "original_scope": original_scope,
         "found_in_scope": None,
         "candidates": [],
         "fallback_level": 0,
-        "search_strategy": "hierarchical"
+        "search_strategy": "hierarchical",
     }
-    
+
     current_scope = original_scope
     fallback_level = 0
-    
+
     # Try parent scopes level by level
     while current_scope:
         parent_scope = await _extract_parent_scope(current_scope)
         if not parent_scope:
             break
-            
+
         fallback_level += 1
         await ctx.info(f"Fallback search level {fallback_level}: searching in '{parent_scope}'")
-        
+
         # Search in parent scope
         try:
             results = await current_memory_manager.search_memories(
@@ -1131,7 +1133,7 @@ async def _perform_hierarchical_fallback_search(
                 limit=limit,
                 min_score=similarity_threshold,
             )
-            
+
             if results:
                 # Found results at this level - collect scope candidates
                 unique_scopes = set()
@@ -1139,22 +1141,24 @@ async def _perform_hierarchical_fallback_search(
                     memory = result["memory"]
                     memory_scope = memory.metadata.get("scope", memory.scope)
                     unique_scopes.add(memory_scope)
-                
-                fallback_suggestions.update({
-                    "found_in_scope": parent_scope,
-                    "candidates": list(unique_scopes)[:5],  # Max 5 candidates
-                    "fallback_level": fallback_level,
-                    "results_count": len(results)
-                })
-                
+
+                fallback_suggestions.update(
+                    {
+                        "found_in_scope": parent_scope,
+                        "candidates": list(unique_scopes)[:5],  # Max 5 candidates
+                        "fallback_level": fallback_level,
+                        "results_count": len(results),
+                    }
+                )
+
                 await ctx.info(f"Found {len(results)} results in parent scope '{parent_scope}'")
                 return fallback_suggestions
-                
+
         except Exception as e:
             await ctx.warning(f"Error during fallback search in scope '{parent_scope}': {e}")
-        
+
         current_scope = parent_scope
-    
+
     # If no results found at any parent level, try global search
     await ctx.info("No results in parent scopes, attempting global search")
     try:
@@ -1165,56 +1169,64 @@ async def _perform_hierarchical_fallback_search(
             limit=limit,
             min_score=max(0.05, similarity_threshold - 0.05),  # Lower threshold for global
         )
-        
+
         if global_results:
             unique_scopes = set()
             for result in global_results[:limit]:
                 memory = result["memory"]
                 memory_scope = memory.metadata.get("scope", memory.scope)
                 unique_scopes.add(memory_scope)
-            
-            fallback_suggestions.update({
-                "found_in_scope": "global",
-                "candidates": list(unique_scopes)[:5],
-                "fallback_level": fallback_level + 1,
-                "search_strategy": "global_fallback",
-                "results_count": len(global_results),
-                "note": "Results found via global search with relaxed threshold"
-            })
-            
+
+            fallback_suggestions.update(
+                {
+                    "found_in_scope": "global",
+                    "candidates": list(unique_scopes)[:5],
+                    "fallback_level": fallback_level + 1,
+                    "search_strategy": "global_fallback",
+                    "results_count": len(global_results),
+                    "note": "Results found via global search with relaxed threshold",
+                }
+            )
+
             await ctx.info(f"Found {len(global_results)} results via global search")
             return fallback_suggestions
-            
+
     except Exception as e:
         await ctx.warning(f"Error during global fallback search: {e}")
-    
+
     # No results found anywhere - provide helpful manual suggestions
-    fallback_suggestions.update({
-        "found_in_scope": None,
-        "candidates": [],
-        "fallback_level": fallback_level + 1,
-        "search_strategy": "no_results",
-        "manual_suggestions": {
-            "try_parent_scope": original_scope.rsplit("/", 1)[0] if "/" in original_scope else None,
-            "try_include_child_scopes": not include_child_scopes,
-            "try_lower_threshold": max(0.05, similarity_threshold - 0.05),
-            "try_different_keywords": "Rephrase query with different terms",
-            "suggested_scopes": [
-                "work/projects", "learning/programming", "personal/notes",
-                original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global"
-            ]
-        },
-        "note": "No results found - try suggestions below"
-    })
-    
+    fallback_suggestions.update(
+        {
+            "found_in_scope": None,
+            "candidates": [],
+            "fallback_level": fallback_level + 1,
+            "search_strategy": "no_results",
+            "manual_suggestions": {
+                "try_parent_scope": original_scope.rsplit("/", 1)[0] if "/" in original_scope else None,
+                "try_include_child_scopes": not include_child_scopes,
+                "try_lower_threshold": max(0.05, similarity_threshold - 0.05),
+                "try_different_keywords": "Rephrase query with different terms",
+                "suggested_scopes": [
+                    "work/projects",
+                    "learning/programming",
+                    "personal/notes",
+                    original_scope.rsplit("/", 1)[0] if "/" in original_scope else "global",
+                ],
+            },
+            "note": "No results found - try suggestions below",
+        }
+    )
+
     await ctx.info("No results found in hierarchical or global search")
     return fallback_suggestions
-    fallback_suggestions.update({
-        "found_in_scope": None,
-        "candidates": [],
-        "fallback_level": fallback_level + 1,
-        "search_strategy": "exhausted",
-        "note": "No results found in any scope or global search"
-    })
-    
+    fallback_suggestions.update(
+        {
+            "found_in_scope": None,
+            "candidates": [],
+            "fallback_level": fallback_level + 1,
+            "search_strategy": "exhausted",
+            "note": "No results found in any scope or global search",
+        }
+    )
+
     return fallback_suggestions

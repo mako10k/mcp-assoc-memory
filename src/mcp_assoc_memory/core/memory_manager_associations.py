@@ -3,7 +3,7 @@ Memory association management - auto-association and relationship handling
 Manages semantic relationships between memories
 """
 
-from typing import TYPE_CHECKING, List, Optional, Any
+from typing import TYPE_CHECKING, Any, List, Optional
 
 import numpy as np
 
@@ -37,10 +37,10 @@ class MemoryManagerAssociations:
         try:
             if embedding is None:
                 return
-            
+
             # Search for similar memories
             emb_list: List[float]
-            if hasattr(embedding, 'flatten'):
+            if hasattr(embedding, "flatten"):
                 emb_list = embedding.flatten().tolist()
             elif isinstance(embedding, list):
                 emb_list = embedding

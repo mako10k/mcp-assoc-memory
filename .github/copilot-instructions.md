@@ -181,8 +181,8 @@ learning/
 *Users can add project-specific guidance, temporary development focus areas, or special requirements here. This section should be regularly reviewed and cleaned up during maintenance cycles.*
 
 <!-- User requests go here -->
-`run_in_terminal` ツールより MCPの`*_shell_execute` ツールを使ってください。
-セキュリティガードに引っかかる場合や長時間の実行や端末実行が必要な場合は MCPの`*_terminal_create` ツールを使ってください
+Use MCP `*_shell_execute` tools instead of `run_in_terminal` tool.
+For security guard conflicts, long-running executions, or terminal sessions, use MCP `*_terminal_create` tools.
 
 
 ---
