@@ -117,7 +117,7 @@ try:
     logger.info("Using SentenceTransformerEmbeddingService for production")
 except Exception as e:
     logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
-    embedding_service = MockEmbeddingService()
+    embedding_service = MockEmbeddingService()  # type: ignore
     logger.info("Falling back to MockEmbeddingService")
 
 similarity_calculator = SimilarityCalculator()
@@ -132,7 +132,7 @@ memory_storage, persistence = get_persistent_storage()
 _initialized = False
 
 
-async def ensure_initialized():
+async def ensure_initialized() -> None:
     """Ensure memory manager is initialized using singleton pattern"""
     global _initialized, memory_manager
     if not _initialized:
@@ -367,9 +367,10 @@ Provides complete session lifecycle management including creation, listing, and 
         "idempotentHint": False,
     },
 )
-async def session_manage(request: SessionManageRequest, ctx: Context):
+async def session_manage(request: SessionManageRequest, ctx: Context) -> Dict[str, Any]:
     """Manage sessions and cleanup"""
-    return await handle_session_manage(request, ctx)
+    response = await handle_session_manage(request, ctx)
+    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
 
 
 @mcp.tool(
@@ -401,9 +402,10 @@ Displays the hierarchical structure of all scopes with memory counts, helping yo
         "idempotentHint": True,
     },
 )
-async def scope_list(request: ScopeListRequest, ctx: Context):
+async def scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str, Any]:
     """List scopes with pagination and hierarchy"""
-    return await handle_scope_list(request, ctx)
+    response = await handle_scope_list(request, ctx)
+    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
 
 
 @mcp.tool(
@@ -435,9 +437,10 @@ Analyzes your content using keyword detection and context patterns to recommend 
         "idempotentHint": True,
     },
 )
-async def scope_suggest(request: ScopeSuggestRequest, ctx: Context):
+async def scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Dict[str, Any]:
     """Suggest scope based on content analysis"""
-    return await handle_scope_suggest(request, ctx)
+    response = await handle_scope_suggest(request, ctx)
+    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
 
 
 # Old memory_export deleted - replaced by memory_sync export operation
@@ -470,9 +473,10 @@ Moves specified memories from their current scopes to a new target scope, preser
 ➡️ What's next: Use scope_list to verify new organization, memory_search in new scope to confirm placement""",
     annotations={"title": "Memory Move", "readOnlyHint": False, "destructiveHint": False, "idempotentHint": False},
 )
-async def memory_move(request: MemoryMoveRequest, ctx: Context):
+async def memory_move(request: MemoryMoveRequest, ctx: Context) -> Dict[str, Any]:
     """Move memories to a new scope"""
-    return await handle_memory_move(request, ctx)
+    response = await handle_memory_move(request, ctx)
+    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
 
 
 @mcp.tool(
@@ -505,9 +509,10 @@ Takes a specific memory as starting point and finds semantically related memorie
 )
 async def memory_discover_associations(
     memory_id: str, limit: int = 10, similarity_threshold: float = 0.1, ctx: Optional[Context] = None
-):
+) -> Dict[str, Any]:
     """Discover semantic associations for a specific memory"""
-    return await handle_memory_discover_associations(memory_id, ctx, limit, similarity_threshold)
+    response = await handle_memory_discover_associations(memory_id, ctx, limit, similarity_threshold)
+    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
 
 
 @mcp.tool(
@@ -545,7 +550,7 @@ async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> List[Mem
     # Convert handler result to expected format
     if isinstance(result, dict) and "results" in result:
         # Return the MemoryResponse objects directly
-        return result["results"]
+        return result["results"]  # type: ignore
     # Return empty list if result format is unexpected
     return []
 
@@ -620,7 +625,7 @@ async def memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[str, Any
 
 if __name__ == "__main__":
 
-    async def startup():
+    async def startup() -> None:
         """Initialize the memory system on startup"""
         try:
             await ensure_initialized()

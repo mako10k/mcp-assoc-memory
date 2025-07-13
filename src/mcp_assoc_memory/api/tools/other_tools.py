@@ -170,10 +170,10 @@ async def handle_memory_discover_associations(
                 # If result is already a dict with memory key
                 memory = result.get("memory")
                 similarity = result.get("similarity", result.get("similarity_score", 1.0))
-            else:
-                # If result is a memory object directly
-                memory = result
-                similarity = getattr(result, "similarity_score", 1.0)
+            # else:
+            #     # If result is a memory object directly (currently unreachable)
+            #     memory = result
+            #     similarity = getattr(result, "similarity_score", 1.0)
 
             if not memory:
                 continue
@@ -219,7 +219,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
             session_scope = f"session/{session_id}"
 
             # Add a session marker memory
-            session_memory = {
+            session_memory: Dict[str, Any] = {
                 "memory_id": str(uuid.uuid4()),
                 "content": f"Session created: {session_id}",
                 "scope": session_scope,

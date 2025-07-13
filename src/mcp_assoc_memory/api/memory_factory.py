@@ -7,6 +7,7 @@ import logging
 from typing import Optional
 
 from ..config import get_config
+from ..core.embedding_service import EmbeddingService
 from ..core.memory_manager import MemoryManager
 from ..simple_persistence import get_persistent_storage
 
@@ -51,6 +52,8 @@ class MemoryManagerFactory:
             graph_store = NetworkXGraphStore()
 
             # Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
+            # Initialize embedding service with fallback
+            embedding_service: EmbeddingService
             try:
                 embedding_service = SentenceTransformerEmbeddingService()
                 logger.info("Using SentenceTransformerEmbeddingService for production")

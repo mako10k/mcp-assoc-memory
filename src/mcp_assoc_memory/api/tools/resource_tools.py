@@ -62,20 +62,21 @@ async def handle_memory_stats(ctx: Context) -> dict:
                 "recent_memories": [],
             }
 
+            # Initialize scope tracking for manager path
+            manager_scope_counts: Dict[str, int] = {}
+
             # Get scope information
             all_scopes = await manager.get_all_scopes()
-            scope_counts: Dict[str, int] = {}
             session_scopes = set()
 
             for scope in all_scopes:
                 count = await manager.get_memory_count_by_scope(scope)
-                scope_counts[scope] = count
+                manager_scope_counts[scope] = count
                 if scope.startswith("session/"):
                     session_scopes.add(scope)
 
-            for scope in scope_counts.keys():
-                if scope.startswith("session/"):
-                    session_scopes.add(scope)
+            # Copy manager scope counts to common variable
+            scope_counts = manager_scope_counts.copy()
         except Exception as e:
             if ctx:
                 await ctx.error(f"Failed to get statistics from manager: {e}")
@@ -99,7 +100,7 @@ async def handle_memory_stats(ctx: Context) -> dict:
         else:
             last_updated = None
 
-        stats["scopes"][scope] = {
+        stats["scopes"][scope] = {  # type: ignore
             "count": count,
             "child_scopes": child_scopes,
             "last_updated": last_updated.isoformat() if last_updated else None,

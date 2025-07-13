@@ -65,7 +65,7 @@ class MCPError(Exception):
 class MemoryNotFoundError(MCPError):
     """Memory with specified ID not found"""
 
-    def __init__(self, memory_id: str, context: Dict[str, Any] = None):
+    def __init__(self, memory_id: str, context: Optional[Dict[str, Any]] = None):
         details = ErrorDetails(
             code="MEMORY_NOT_FOUND",
             category=ErrorCategory.USER_INPUT,
@@ -86,7 +86,7 @@ class MemoryNotFoundError(MCPError):
 class InvalidScopeError(MCPError):
     """Invalid scope format or non-existent scope"""
 
-    def __init__(self, scope: str, context: Dict[str, Any] = None):
+    def __init__(self, scope: str, context: Optional[Dict[str, Any]] = None):
         details = ErrorDetails(
             code="INVALID_SCOPE",
             category=ErrorCategory.USER_INPUT,
@@ -107,7 +107,7 @@ class InvalidScopeError(MCPError):
 class DatabaseConnectionError(MCPError):
     """Database connection or query failure"""
 
-    def __init__(self, operation: str, original_error: Exception, context: Dict[str, Any] = None):
+    def __init__(self, operation: str, original_error: Exception, context: Optional[Dict[str, Any]] = None):
         details = ErrorDetails(
             code="DATABASE_CONNECTION_ERROR",
             category=ErrorCategory.SYSTEM,
@@ -129,7 +129,7 @@ class DatabaseConnectionError(MCPError):
 class MemoryManagerNotInitializedError(MCPError):
     """Memory manager not properly initialized"""
 
-    def __init__(self, operation: str, context: Dict[str, Any] = None):
+    def __init__(self, operation: str, context: Optional[Dict[str, Any]] = None):
         details = ErrorDetails(
             code="MEMORY_MANAGER_NOT_INITIALIZED",
             category=ErrorCategory.SYSTEM,
@@ -150,7 +150,7 @@ class MemoryManagerNotInitializedError(MCPError):
 class ValidationError(MCPError):
     """Input validation failure"""
 
-    def __init__(self, field: str, value: Any, reason: str, context: Dict[str, Any] = None):
+    def __init__(self, field: str, value: Any, reason: str, context: Optional[Dict[str, Any]] = None):
         details = ErrorDetails(
             code="VALIDATION_ERROR",
             category=ErrorCategory.USER_INPUT,
@@ -171,7 +171,7 @@ class ValidationError(MCPError):
 class ResourceLimitError(MCPError):
     """Resource limit exceeded (memory, disk, etc.)"""
 
-    def __init__(self, resource: str, limit: str, current: str, context: Dict[str, Any] = None):
+    def __init__(self, resource: str, limit: str, current: str, context: Optional[Dict[str, Any]] = None):
         details = ErrorDetails(
             code="RESOURCE_LIMIT_ERROR",
             category=ErrorCategory.RESOURCE,
@@ -222,7 +222,7 @@ class ErrorHandler:
         await ErrorHandler._log_error(ctx, details)
 
         # Return structured response
-        response = {
+        response: Dict[str, Any] = {
             "success": False,
             "error": {
                 "code": details.code,

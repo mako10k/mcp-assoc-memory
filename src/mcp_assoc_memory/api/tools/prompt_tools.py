@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastmcp import Context
 
 from ...core.singleton_memory_manager import get_memory_manager
+from ...models.memory import Memory
 
 # Module-level dependencies (for backward compatibility)
 memory_manager: Optional[Any] = None
@@ -55,14 +56,16 @@ async def handle_analyze_memories_prompt(
                 # Use search to get all memories and filter
                 all_memories = await manager.search_memories("", scope=scope, limit=1000, min_score=0.0)
                 scope_memories = []
-                for memory in all_memories:
-                    memory_scope = memory.get("scope", "")
+                search_result: Dict[str, Any]  # Type annotation for search result
+                for search_result in all_memories:
+                    memory_scope = search_result.get("scope", "")
                     if memory_scope == scope or memory_scope.startswith(scope + "/"):
-                        scope_memories.append(memory)
+                        scope_memories.append(search_result)
             else:
                 # Direct scope query
                 memories = await manager.metadata_store.get_memories_by_scope(scope)
                 scope_memories = []
+                memory: Memory  # Type annotation to help mypy
                 for memory in memories:
                     scope_memories.append(
                         {

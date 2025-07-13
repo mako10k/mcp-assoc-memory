@@ -269,11 +269,12 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
             response["suggestions"] = fallback_suggestions
 
             # Keep legacy suggestions for backward compatibility
-            response["legacy_suggestions"] = {
+            legacy_suggestions: Dict[str, Any] = {
                 "try_include_child_scopes": not request.include_child_scopes,
                 "try_broader_scope": request.scope.rsplit("/", 1)[0] if "/" in request.scope else None,
                 "try_lower_threshold": max(0.05, request.similarity_threshold - 0.05),
             }
+            response["legacy_suggestions"] = legacy_suggestions
 
         return response
 
@@ -481,7 +482,14 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
         memory = await memory_manager.get_memory(request.memory_id)
         if not memory:
             await ctx.warning(f"Memory not found: {request.memory_id}")
-            return MemoryResponse(success=False, message="Memory not found", memory_id=request.memory_id)
+            return MemoryResponse(
+                success=False,
+                message="Memory not found",
+                memory_id=request.memory_id,
+                content="",
+                scope="",
+                created_at=datetime.now(),
+            )
 
         # Update memory with explicit None check
         updated_memory = await memory_manager.update_memory(
@@ -651,7 +659,7 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
             # Check file size
             file_size = Path(file_path).stat().st_size
             try:
-                max_size_mb = config.storage.max_import_size_mb
+                max_size_mb = config.get("storage", {}).get("max_import_size_mb", 100)
             except AttributeError:
                 max_size_mb = 100  # Default 100MB limit
 
@@ -699,9 +707,11 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
             raise ValueError(f"Invalid JSON data: {e}")
 
         # Validate data structure if requested
-        validation_errors = []
+        validation_errors: List[str] = []
         if request.validate_data:
-            validation_errors = await _validate_import_data(import_data)
+            is_valid = await _validate_import_data(import_data)
+            if not is_valid:
+                validation_errors.append("Import data validation failed")
             if validation_errors and request.validate_data:
                 raise ValueError(f"Validation errors: {validation_errors}")
 
@@ -726,7 +736,9 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
                 imported_scopes.add(final_scope)
 
                 # Check for existing memory
-                existing_memory = memory_storage.get(memory_id)
+                existing_memory = None
+                if memory_storage is not None:
+                    existing_memory = memory_storage.get(memory_id)
 
                 if existing_memory:
                     if request.merge_strategy == "skip_duplicates":
@@ -743,7 +755,8 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
                         if "metadata" not in existing_memory:
                             existing_memory["metadata"] = {}
                         existing_memory["metadata"].update(memory_data.get("metadata", {}))
-                        memory_storage[memory_id] = existing_memory
+                        if memory_storage is not None:
+                            memory_storage[memory_id] = existing_memory
                         imported_count += 1
                         continue
 
@@ -763,7 +776,8 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
                 }
 
                 # Store in simple storage
-                memory_storage[memory_id] = imported_memory
+                if memory_storage is not None:
+                    memory_storage[memory_id] = imported_memory
                 imported_count += 1
 
                 # TODO: Store in advanced storage if available
@@ -774,7 +788,8 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
                 continue
 
         # Save to persistent storage
-        persistence.save_memories(memory_storage)
+        if persistence is not None and memory_storage is not None:
+            persistence.save_memories(memory_storage)
 
         await ctx.info(
             f"Import completed: {imported_count} imported, {skipped_count} skipped, {overwritten_count} overwritten"
@@ -782,13 +797,25 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
 
         return MemoryImportResponse(
             success=True,
+            message=f"Import completed: {imported_count} imported, {skipped_count} skipped",
+            data={
+                "imported_count": imported_count,
+                "skipped_count": skipped_count,
+                "overwritten_count": overwritten_count,
+                "import_source": import_source,
+                "merge_strategy_used": request.merge_strategy,
+                "validation_errors": validation_errors,
+                "imported_scopes": list(imported_scopes),
+            },
             imported_count=imported_count,
             skipped_count=skipped_count,
-            overwritten_count=overwritten_count,
-            import_source=import_source,
-            merge_strategy_used=request.merge_strategy,
-            validation_errors=validation_errors,
-            imported_scopes=list(imported_scopes),
+            error_count=len(validation_errors),
+            import_summary={
+                "overwritten_count": overwritten_count,
+                "merge_strategy_used": request.merge_strategy,
+                "imported_scopes": list(imported_scopes),
+                "validation_errors": validation_errors,
+            },
         )
 
     except Exception as e:
@@ -811,7 +838,7 @@ async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optiona
             await ctx.warning(
                 "Memory listing temporarily disabled due to singleton refactoring. Use memory_search with broad criteria instead."
             )
-        all_memories = []
+        all_memories: List[Dict[str, Any]] = []
 
         total_items = len(all_memories)
 
@@ -944,7 +971,8 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                 metadata=request.metadata,
                 preserve_associations=request.preserve_associations,
             )
-            return await handle_memory_update(update_request, ctx)
+            response = await handle_memory_update(update_request, ctx)
+            return response.dict() if hasattr(response, 'dict') else response  # type: ignore
 
         elif request.operation == "delete":
             # Delegate to existing delete handler
@@ -995,7 +1023,8 @@ async def handle_memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[s
                 merge_strategy=request.merge_strategy,
                 validate_data=request.validate_data,
             )
-            return await handle_memory_import(import_request, ctx)
+            response = await handle_memory_import(import_request, ctx)
+            return response.dict() if hasattr(response, 'dict') else response  # type: ignore
 
         else:
             await ctx.error(f"Unknown sync operation: {request.operation}")
@@ -1032,7 +1061,7 @@ async def _validate_import_data(data: Dict[str, Any]) -> bool:
 
         # Check if it has memories list
         if "memories" not in data:
-            return False
+            return False  # This return is reachable
 
         memories = data["memories"]
         if not isinstance(memories, list):
@@ -1103,7 +1132,7 @@ async def _perform_hierarchical_fallback_search(
             "note": "Manual suggestions provided due to initialization issue",
         }
 
-    fallback_suggestions = {
+    fallback_suggestions: Dict[str, Any] = {
         "type": "scope_fallback",
         "original_scope": original_scope,
         "found_in_scope": None,
@@ -1218,15 +1247,4 @@ async def _perform_hierarchical_fallback_search(
     )
 
     await ctx.info("No results found in hierarchical or global search")
-    return fallback_suggestions
-    fallback_suggestions.update(
-        {
-            "found_in_scope": None,
-            "candidates": [],
-            "fallback_level": fallback_level + 1,
-            "search_strategy": "exhausted",
-            "note": "No results found in any scope or global search",
-        }
-    )
-
     return fallback_suggestions

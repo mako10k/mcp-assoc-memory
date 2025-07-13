@@ -38,7 +38,7 @@ class SingletonMemoryManager:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize singleton (called only once)"""
         # Prevent re-initialization
         if hasattr(self, "_singleton_initialized"):
@@ -128,6 +128,12 @@ class SingletonMemoryManager:
 
         # Try to create if all required dependencies are provided
         if all([vector_store, metadata_store, graph_store, embedding_service]):
+            # Type assertions after None check
+            assert vector_store is not None
+            assert metadata_store is not None
+            assert graph_store is not None
+            assert embedding_service is not None
+
             return await self.initialize(
                 vector_store=vector_store,
                 metadata_store=metadata_store,
@@ -244,6 +250,7 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
         graph_store = NetworkXGraphStore(graph_path="data/memory_graph.pkl")
 
         # Use same embedding service logic as server.py
+        embedding_service: EmbeddingService
         try:
             embedding_service = SentenceTransformerEmbeddingService()
         except Exception:

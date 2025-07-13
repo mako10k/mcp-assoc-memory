@@ -51,9 +51,7 @@ class MemoryManagerCore:
             logger.info("Memory manager initialized successfully")
 
         except Exception as e:
-            logger.error(
-                f"Failed to initialize memory manager: {str(e)}", error_code="MEMORY_MANAGER_INIT_ERROR"
-            )
+            logger.error(f"Failed to initialize memory manager: {str(e)}", error_code="MEMORY_MANAGER_INIT_ERROR")
             raise
 
     async def close(self) -> None:
@@ -66,9 +64,7 @@ class MemoryManagerCore:
             logger.info("Memory manager closed successfully")
 
         except Exception as e:
-            logger.warning(
-                f"Error during memory manager cleanup: {str(e)}", error_code="MEMORY_MANAGER_CLOSE_ERROR"
-            )
+            logger.warning(f"Error during memory manager cleanup: {str(e)}", error_code="MEMORY_MANAGER_CLOSE_ERROR")
 
     async def check_content_duplicate(
         self, content: str, scope: Optional[str] = None, similarity_threshold: float = 0.95
@@ -411,7 +407,7 @@ class MemoryManagerCore:
                 new_embedding = await self.embedding_service.get_embedding(content)
                 if new_embedding is not None:
                     # Convert embedding to appropriate format for storage
-                    if hasattr(new_embedding, 'tolist'):
+                    if hasattr(new_embedding, "tolist"):
                         update_data["embedding"] = new_embedding.tolist()
                     else:
                         update_data["embedding"] = list(new_embedding)

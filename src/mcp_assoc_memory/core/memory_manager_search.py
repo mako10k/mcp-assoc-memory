@@ -1,5 +1,10 @@
 """
-Memory search operations - semantic, tag, and advanced search functionality
+Memory search operations - semantic, tag, and advanced searc            for result in vector_results:
+                memory_id = result["memory_id"]
+                score = result["similarity"]
+                memory = await self.get_memory(memory_id)  # type: ignore
+                if memory:
+                    memories_with_scores.append({"memory": memory, "similarity": score})tionality
 Handles all search-related operations including complex queries
 """
 
@@ -24,12 +29,9 @@ class MemoryManagerSearch:
     embedding_service: "EmbeddingService"
     vector_store: "BaseVectorStore"
     metadata_store: "BaseMetadataStore"
-    similarity_calculator: Optional["SimilarityCalculator"]
+    # similarity_calculator inherited from MemoryManagerCore
 
-    # Method stubs for inherited methods
-    async def get_memory(self, memory_id: str) -> Optional[Memory]:
-        """Stub - implemented in MemoryManagerCore"""
-        raise NotImplementedError("This method should be inherited from MemoryManagerCore")
+    # Inherited attributes type annotations only
 
     async def search_memories(
         self,
@@ -68,7 +70,7 @@ class MemoryManagerSearch:
             for result in results:
                 memory_id = result["memory_id"]
                 score = result["similarity"]
-                memory = await self.get_memory(memory_id)
+                memory = await self.get_memory(memory_id)  # type: ignore
                 if memory:
                     memories_with_scores.append({"memory": memory, "similarity": score})
 
@@ -122,7 +124,7 @@ class MemoryManagerSearch:
             for result in results:
                 memory_id = result["memory_id"]
                 score = result["similarity"]
-                memory = await self.get_memory(memory_id)
+                memory = await self.get_memory(memory_id)  # type: ignore
                 if memory:
                     memories_with_scores.append({"memory": memory, "similarity": score})
 
@@ -192,8 +194,8 @@ class MemoryManagerSearch:
             for memory in memories:
                 # Get memory embedding
                 memory_embedding = await self.vector_store.get_embedding(memory.id)
-                if memory_embedding and self.similarity_calculator:
-                    score = self.similarity_calculator.cosine_similarity(query_embedding, memory_embedding)
+                if memory_embedding and self.similarity_calculator:  # type: ignore
+                    score = self.similarity_calculator.cosine_similarity(query_embedding, memory_embedding)  # type: ignore
                     if score >= min_score:
                         scored_memories.append({"memory": memory, "similarity": score})
 
@@ -246,7 +248,7 @@ class MemoryManagerSearch:
                 memory_id = result["memory_id"]
                 score = result["similarity"]
                 if memory_id != reference_id:
-                    memory = await self.get_memory(memory_id)
+                    memory = await self.get_memory(memory_id)  # type: ignore
                     if memory:
                         memories_with_scores.append({"memory": memory, "similarity": score})
 
