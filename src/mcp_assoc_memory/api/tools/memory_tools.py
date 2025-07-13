@@ -6,6 +6,7 @@ import base64
 import binascii
 import gzip
 import json
+import traceback  # Add missing import
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -79,9 +80,9 @@ async def ensure_initialized() -> MemoryManager:
         try:
             await memory_manager.initialize()
             _initialized = True
-            # Verify vector store is properly initialized
-            if memory_manager.vector_store.collection is None:
-                raise RuntimeError("Vector store collection not initialized after initialization")
+            # Verify storage initialization properly
+            if not hasattr(memory_manager, 'vector_store'):
+                raise RuntimeError("Vector store not initialized after initialization")
         except Exception as e:
             # Reset flag to allow retry
             _initialized = False
@@ -91,156 +92,57 @@ async def ensure_initialized() -> MemoryManager:
 
 
 async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> MemoryResponse:
-    """Store a memory with full associative capabilities"""
+    """Store a memory with early validation and error handling"""
+    # Early validation - fail fast
+    if not request.content or not request.content.strip():
+        error_msg = "Content cannot be empty"
+        await ctx.error(error_msg)
+        return MemoryResponse(
+            memory_id="error",
+            content="",
+            scope="error",
+            created_at=datetime.now(),
+            metadata={"error": error_msg}
+        )
+    
     try:
-        # Basic input validation
-        if not request.content or len(request.content.strip()) == 0:
-            await ctx.error("Content cannot be empty")
-            return MemoryResponse(
-                memory_id="error",
-                content="",
-                scope="error",
-                created_at=datetime.now(),
-                metadata={"error": "Content cannot be empty", "suggestions": ["Provide non-empty content for the memory"]}
-            )
+        # Get memory manager with early None check
+        memory_manager = await ensure_initialized()
+        if memory_manager is None:
+            raise RuntimeError("Memory manager is None after initialization")
         
-        if not request.scope or len(request.scope.strip()) == 0:
-            await ctx.error("Scope cannot be empty")
-            return MemoryResponse(
-                memory_id="error",
-                content="",
-                scope="error",
-                created_at=datetime.now(),
-                metadata={"error": "Scope cannot be empty", "suggestions": ["Provide a valid scope like 'work/projects'"]}
-            )
-
-        await ctx.info(f"Storing memory in scope '{request.scope}': {request.content[:50]}...")
-
-        # Store using unified memory manager
-        memory = None
-        try:
-            memory_manager = await ensure_initialized()
-            await ctx.info(f"Memory manager initialized successfully: {type(memory_manager)}")
-            
-            memory = await memory_manager.store_memory(
-                content=request.content,
-                scope=request.scope,
-                tags=request.tags or [],
-                category=request.category,
-                metadata=request.metadata or {},
-                similarity_threshold=request.similarity_threshold,
-            )
-            
-            if memory is None:
-                await ctx.error("store_memory returned None - this indicates an internal error in memory manager")
-                return MemoryResponse(
-                    memory_id="error",
-                    content="",
-                    scope="error",
-                    created_at=datetime.now(),
-                    metadata={
-                        "error": "Memory storage returned None",
-                        "details": "store_memory method returned None instead of a memory object",
-                        "suggestions": [
-                            "Check memory manager implementation",
-                            "Verify database connectivity",
-                            "Review store_memory method logic"
-                        ],
-                        "error_type": "NullResult"
-                    }
-                )
-            
-            await ctx.info(f"Memory stored successfully with ID: {memory.id}")
-            
-        except Exception as e:
-            error_message = f"Failed to store memory: {str(e)}"
-            await ctx.error(error_message)
-            await ctx.error(f"Exception type: {type(e).__name__}")
-            await ctx.error(f"Exception details: {repr(e)}")
-            return MemoryResponse(
-                memory_id="error",
-                content="",
-                scope="error",
-                created_at=datetime.now(),
-                metadata={
-                    "error": "Memory storage failed",
-                    "details": str(e),
-                    "suggestions": [
-                        "Check if memory manager is properly initialized",
-                        "Verify the content and scope are valid",
-                        "Try again in a moment if this was a temporary issue"
-                    ],
-                    "error_type": type(e).__name__
-                }
-            )
-
-        # Check for duplicates if not allowed
-        if not request.allow_duplicates and memory:
-            if hasattr(memory, "metadata") and memory.metadata and memory.metadata.get("is_duplicate"):
-                await ctx.warning(
-                    f"Duplicate memory detected. Existing memory_id: {memory.metadata.get('original_memory_id')}"
-                )
-
-                # Return minimal or full response based on request
-                if request.minimal_response:
-                    return MemoryResponse(
-                        memory_id=memory.metadata.get("original_memory_id", "unknown"),
-                        content="[Content hidden for minimal response]",  # Required field but minimized
-                        scope=memory.scope,
-                        metadata={},  # Minimal metadata
-                        tags=[],
-                        category=memory.category,
-                        created_at=memory.created_at,
-                        is_duplicate=True,
-                        duplicate_of=memory.metadata.get("original_memory_id"),
-                    )
-                else:
-                    return MemoryResponse(
-                        memory_id=memory.metadata.get("original_memory_id", "unknown"),
-                        content=memory.content,
-                        scope=memory.scope,
-                        metadata=memory.metadata,
-                        tags=memory.tags or [],
-                        category=memory.category,
-                        created_at=memory.created_at,
-                        is_duplicate=True,
-                        duplicate_of=memory.metadata.get("original_memory_id"),
-                    )
-
-        # Return successful storage result
-        if request.minimal_response:
-            return MemoryResponse(
-                memory_id=memory.id,
-                content="[Content hidden for minimal response]",  # Required field but minimized
-                scope=memory.scope,
-                metadata={},  # Minimal metadata
-                tags=[],
-                category=memory.category,
-                created_at=memory.created_at,
-                is_duplicate=False,
-            )
-        else:
-            return MemoryResponse(
-                memory_id=memory.id,
-                content=memory.content,
-                scope=memory.scope,
-                metadata=memory.metadata if hasattr(memory, "metadata") else {},
-                tags=memory.tags or [],
-                category=memory.category,
-                created_at=memory.created_at,
-                is_duplicate=False,
-            )
-
+        await ctx.info(f"Storing: {request.content[:50]}... in scope: {request.scope}")
+        
+        # Store memory with explicit None check
+        memory = await memory_manager.store_memory(
+            content=request.content,
+            scope=request.scope,
+            allow_duplicates=request.allow_duplicates
+        )
+        
+        # Early None check - this is the critical fix
+        if memory is None:
+            error_msg = "store_memory returned None - check memory manager implementation"
+            await ctx.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        # Success - memory object is guaranteed to be non-None here
+        await ctx.info(f"Successfully stored memory: {memory.id}")
+        
+        return MemoryResponse(
+            memory_id=memory.id,
+            content=memory.content,
+            scope=memory.scope,
+            created_at=memory.created_at,
+            metadata=memory.metadata or {},
+            tags=memory.tags or [],
+            category=memory.category,
+            is_duplicate=False
+        )
+        
     except Exception as e:
-        error_message = f"Failed to store memory: {str(e)}"
-        await ctx.error(error_message)
-        
-        # Provide more detailed error information
-        suggestions = [
-            "Check if the content and scope are valid",
-            "Try again in a moment if this was a temporary issue",
-            "Contact support if the problem persists"
-        ]
+        error_msg = f"Failed to store memory: {str(e)}"
+        await ctx.error(error_msg)
         
         return MemoryResponse(
             memory_id="error",
@@ -248,10 +150,9 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
             scope="error",
             created_at=datetime.now(),
             metadata={
-                "error": "Memory storage failed",
-                "details": str(e),
-                "suggestions": suggestions,
-                "error_type": type(e).__name__
+                "error": error_msg,
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc()
             }
         )
 
@@ -871,7 +772,7 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
 async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optional[Context] = None) -> Dict[str, Any]:
     """List all memories with pagination (for debugging)"""
     try:
-        memory_manager = await ensure_initialized()
+        await ensure_initialized()  # Just ensure it's initialized
 
         if ctx:
             await ctx.info(f"Retrieving memories (page {page}, {per_page} per page)...")

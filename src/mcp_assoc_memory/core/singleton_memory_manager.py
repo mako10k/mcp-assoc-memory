@@ -225,11 +225,10 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
         if is_memory_manager_initialized():
             return await get_memory_manager()
     except Exception:
-        pass  # Fall through to other options
+        pass  # Fall through to initialization
     
-    # Try to create new instance as fallback
+    # Initialize singleton if not already done
     try:
-        from ..core.memory_manager import MemoryManager
         from ..storage.vector_store import ChromaVectorStore
         from ..storage.metadata_store import SQLiteMetadataStore
         from ..storage.graph_store import NetworkXGraphStore
@@ -244,8 +243,8 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
         embedding_service = EmbeddingService()
         similarity_calculator = SimilarityCalculator()
         
-        # Create memory manager
-        mm = MemoryManager(
+        # Initialize singleton memory manager
+        return await initialize_memory_manager(
             vector_store=vector_store,
             metadata_store=metadata_store,
             graph_store=graph_store,
@@ -253,9 +252,16 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
             similarity_calculator=similarity_calculator,
         )
         
-        await mm.initialize()
-        return mm
-        
-    except Exception:
-        # Log the error but don't raise - allows graceful degradation
+    except Exception as e:
+        # Import logging for error reporting
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                "Failed to create memory manager",
+                extra={"error_code": "MEMORY_MANAGER_CREATION_ERROR", "exception": str(e)},
+            )
+        except ImportError:
+            # Fallback if logger not available
+            print(f"Failed to create memory manager: {e}")
         return None
