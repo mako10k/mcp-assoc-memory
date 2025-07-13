@@ -232,7 +232,7 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
         from ..storage.vector_store import ChromaVectorStore
         from ..storage.metadata_store import SQLiteMetadataStore
         from ..storage.graph_store import NetworkXGraphStore
-        from ..core.embedding_service import EmbeddingService
+        from ..core.embedding_service import SentenceTransformerEmbeddingService, MockEmbeddingService
         from ..core.similarity import SimilarityCalculator
         
         # Create dependencies
@@ -240,7 +240,12 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
         metadata_store = SQLiteMetadataStore(database_path="data/memory.db")
         graph_store = NetworkXGraphStore(graph_path="data/memory_graph.pkl")
         
-        embedding_service = EmbeddingService()
+        # Use same embedding service logic as server.py
+        try:
+            embedding_service = SentenceTransformerEmbeddingService()
+        except Exception:
+            embedding_service = MockEmbeddingService()
+            
         similarity_calculator = SimilarityCalculator()
         
         # Initialize singleton memory manager
