@@ -13,6 +13,9 @@ from .memory_tools import (
     handle_memory_search,
     handle_memory_store,
     handle_memory_update,
+    handle_unified_search,
+    handle_memory_manage,
+    handle_memory_sync,
     set_dependencies,
 )
 
@@ -51,6 +54,9 @@ __all__ = [
     "handle_memory_get",
     "handle_memory_delete",
     "handle_memory_update",
+    "handle_unified_search",
+    "handle_memory_manage",
+    "handle_memory_sync",
     "handle_memory_import",
     "handle_memory_list_all",
     "handle_scope_list",
