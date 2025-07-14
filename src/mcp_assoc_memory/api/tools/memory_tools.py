@@ -100,7 +100,6 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
             message=error_msg,
             memory_id="",  # Empty for error
             content="",    # Empty for error
-            scope="",      # Empty for error
             created_at=datetime.now(),
         )
 
@@ -170,7 +169,6 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
             message=error_msg,
             memory_id="",
             content="",
-            scope="",
             created_at=datetime.now(),
         )
 
@@ -502,7 +500,6 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
                 message="Memory not found",
                 memory_id=request.memory_id,
                 content="",
-                scope="",
                 created_at=datetime.now(),
             )
 
@@ -525,7 +522,6 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
                 message="Memory update failed",
                 memory_id=request.memory_id,
                 content="",
-                scope="error",
                 created_at=datetime.now(),
             )
 
@@ -551,7 +547,6 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
             message=error_msg,
             memory_id=request.memory_id,
             content="",
-            scope="error",
             created_at=datetime.now(),
             metadata={"error": error_msg, "error_type": type(e).__name__},
         )

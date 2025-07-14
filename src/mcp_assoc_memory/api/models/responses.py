@@ -237,7 +237,7 @@ class MemoryResponse(BaseModel):
     message: str = Field(default="", description="Operation status message")
     memory_id: str = Field(description="Memory identifier")
     content: str = Field(description="Memory content")
-    scope: str = Field(description="Memory scope")
+    scope: Optional[str] = Field(default=None, description="Memory scope (optional for lightweight responses)")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Memory metadata")
     tags: List[str] = Field(default_factory=list, description="Memory tags")
     category: Optional[str] = Field(default=None, description="Memory category")
