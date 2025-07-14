@@ -18,20 +18,25 @@ from ...core.memory_manager import MemoryManager
 from ...core.singleton_memory_manager import (
     get_or_create_memory_manager,
 )
+from ..processing import process_tool_response
 from ..models import (
     DiversifiedSearchRequest,
+    Memory,
     MemoryExportRequest,
     MemoryImportRequest,
     MemoryImportResponse,
     MemoryManageRequest,
     MemoryResponse,
     MemorySearchRequest,
+    MemorySearchResponse,
     MemoryStoreRequest,
+    MemoryStoreResponse,
     MemorySyncRequest,
     MemoryUpdateRequest,
     PaginationInfo,
     UnifiedSearchRequest,
 )
+from ..models.responses import SearchResultWithAssociations, Association
 from .export_tools import handle_memory_export
 
 # Get the config instance
@@ -89,20 +94,18 @@ async def ensure_initialized() -> MemoryManager:
     return memory_manager
 
 
-async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> MemoryResponse:
-    """Store a memory with early validation and error handling"""
+async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict[str, Any]:
+    """Store a memory with optimized response structure"""
     # Early validation - fail fast
     if not request.content or not request.content.strip():
         error_msg = "Content cannot be empty"
         await ctx.error(error_msg)
-        return MemoryResponse(
+        return MemoryStoreResponse(
             success=False,
             message=error_msg,
-            memory_id="error",
-            content="",
-            scope="error",
-            created_at=datetime.now(),
-            metadata={"error": error_msg},
+            data={},
+            memory=None,
+            associations_created=[]
         )
 
     try:
@@ -115,7 +118,9 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
 
         # Store memory with explicit None check
         memory = await memory_manager.store_memory(
-            content=request.content, scope=request.scope, allow_duplicates=request.allow_duplicates
+            content=request.content,
+            scope=request.scope,
+            allow_duplicates=request.allow_duplicates
         )
 
         # Early None check - this is the critical fix
@@ -124,35 +129,50 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
             await ctx.error(error_msg)
             raise RuntimeError(error_msg)
 
-        # Success - memory object is guaranteed to be non-None here
+        # Success - return using proper response class
         await ctx.info(f"Successfully stored memory: {memory.id}")
 
-        return MemoryResponse(
-            success=True,
-            message="Memory stored successfully",
-            memory_id=memory.id,
+        # Convert to Memory model
+        memory_model = Memory(
+            id=memory.id,
             content=memory.content,
             scope=memory.scope,
-            created_at=memory.created_at,
-            metadata=memory.metadata or {},
             tags=memory.tags or [],
             category=memory.category,
-            is_duplicate=False,
+            created_at=memory.created_at,
+            updated_at=memory.updated_at,
+            metadata=memory.metadata or {}
         )
+
+        response = MemoryStoreResponse(
+            success=True,
+            message=f"Memory stored successfully: {memory.id}",
+            data={
+                "memory_id": memory.id,
+                "created_at": memory.created_at.isoformat(),
+                "scope": memory.scope
+            },
+            memory=memory_model,
+            associations_created=[]  # Will be populated if auto-associations are created
+        )
+        
+        # Use unified response processing instead of direct to_minimal_dict()
+        return process_tool_response(request, response)
 
     except Exception as e:
         error_msg = f"Failed to store memory: {str(e)}"
         await ctx.error(error_msg)
 
-        return MemoryResponse(
+        error_response = MemoryStoreResponse(
             success=False,
-            message=error_msg,
-            memory_id="error",
-            content="",
-            scope="error",
-            created_at=datetime.now(),
-            metadata={"error": error_msg, "error_type": type(e).__name__, "traceback": traceback.format_exc()},
+            message=f"{error_msg}: {str(e)}",
+            data={},
+            memory=None,
+            associations_created=[]
         )
+        
+        # Use unified response processing for error responses too
+        return process_tool_response(request, error_response)
 
 
 async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Dict[str, Any]:
@@ -236,63 +256,45 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
 
         await ctx.info(f"Found {len(formatted_results)} memories")
 
-        # Enhanced response with search metadata
-        response = {
-            "results": formatted_results,
-            "query": request.query,
-            "scope": request.scope,
-            "include_child_scopes": request.include_child_scopes,
-            "total_found": len(formatted_results),
-            "similarity_threshold": request.similarity_threshold,
-            "search_metadata": {
-                "scope_coverage": "hierarchical" if request.include_child_scopes else "exact",
-                "fallback_used": len(formatted_results) > 0 and request.scope is not None,
+        # Use unified response processing
+        response = MemorySearchResponse(
+            success=True,
+            message=f"Found {len(formatted_results)} memories for query: {request.query}",
+            data={
+                "scope": request.scope,
+                "include_child_scopes": request.include_child_scopes,
+                "similarity_threshold": request.similarity_threshold,
+                "search_metadata": {
+                    "scope_coverage": "hierarchical" if request.include_child_scopes else "exact",
+                    "fallback_used": len(formatted_results) > 0 and request.scope is not None,
+                },
             },
-        }
-
-        # Add enhanced scope suggestions with hierarchical fallback if no results found
-        if not formatted_results and request.scope:
-            await ctx.info("No results found, performing hierarchical fallback search")
-            fallback_suggestions = await _perform_hierarchical_fallback_search(
-                query=request.query,
-                original_scope=request.scope,
-                ctx=ctx,
-                limit=request.limit,
-                similarity_threshold=request.similarity_threshold,
-                include_child_scopes=request.include_child_scopes,
-            )
-            response["suggestions"] = fallback_suggestions
-
-            # Keep legacy suggestions for backward compatibility
-            legacy_suggestions: Dict[str, Any] = {
-                "try_include_child_scopes": not request.include_child_scopes,
-                "try_broader_scope": request.scope.rsplit("/", 1)[0] if "/" in request.scope else None,
-                "try_lower_threshold": max(0.05, request.similarity_threshold - 0.05),
-            }
-            response["legacy_suggestions"] = legacy_suggestions
-
-        return response
+            results=formatted_results,
+            query=request.query,
+            total_found=len(formatted_results)
+        )
+        
+        return process_tool_response(request, response)
 
     except Exception as e:
         error_message = f"Failed to search memories: {str(e)}"
         await ctx.error(error_message)
 
-        # Provide helpful error response with fallback empty results
-        return {
-            "error": "Memory search failed",
-            "details": str(e),
-            "error_type": type(e).__name__,
-            "results": [],  # Graceful fallback
-            "query": getattr(request, "query", "unknown"),
-            "scope": getattr(request, "scope", "unknown"),
-            "suggestions": [
-                "Check if the query format is valid",
-                "Try a simpler search query",
-                "Verify the scope exists using scope_list",
-                "Try again in a moment if this was a temporary issue",
-            ],
-            "fallback_used": True,
-        }
+        # Use unified response processing for error responses
+        error_response = MemorySearchResponse(
+            success=False,
+            message=error_message,
+            data={
+                "error_type": type(e).__name__,
+                "query": getattr(request, "query", "unknown"),
+                "scope": getattr(request, "scope", "unknown"),
+            },
+            results=[],
+            query=getattr(request, "query", "unknown"),
+            total_found=0
+        )
+        
+        return process_tool_response(request, error_response)
 
 
 async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Context) -> Dict[str, Any]:

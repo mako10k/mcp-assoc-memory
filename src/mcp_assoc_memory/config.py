@@ -68,6 +68,26 @@ class SecurityConfig:
 
 
 @dataclass
+class APIConfig:
+    """API configuration for response processing"""
+    
+    # Response level configuration
+    default_response_level: str = "minimal"  # minimal, standard, full
+    enable_response_metadata: bool = False
+    enable_audit_trail: bool = False
+    force_minimal_metadata: bool = False
+    minimal_response_max_size: int = 1024  # bytes
+    
+    # Response processing configuration
+    remove_null_values: bool = True
+    response_levels: Dict[str, str] = field(default_factory=dict)  # request_type -> level
+    
+    # Caching configuration
+    enable_response_caching: bool = False
+    cache_ttl_seconds: int = 300
+
+
+@dataclass
 class TransportConfig:
     """Transport configuration"""
 
@@ -90,6 +110,7 @@ class Config:
     storage: StorageConfig = field(default_factory=StorageConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     transport: TransportConfig = field(default_factory=TransportConfig)
+    api: APIConfig = field(default_factory=APIConfig)
 
     log_level: str = "INFO"
     debug_mode: bool = False

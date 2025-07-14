@@ -2,12 +2,60 @@
 Request models for MCP Associative Memory Server API
 """
 
+from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 
-class MemoryStoreRequest(BaseModel):
+class MCPRequestBase(BaseModel, ABC):
+    """
+    Abstract base class for all MCP request types
+    
+    Provides common functionality for:
+    - Request validation
+    - Metadata extraction
+    - Response level determination
+    - Debugging and audit trails
+    """
+    
+    def get_request_type(self) -> str:
+        """Get request type for logging and processing"""
+        return self.__class__.__name__
+    
+    def get_operation_id(self) -> str:
+        """Get unique operation identifier for tracking"""
+        return f"{self.get_request_type()}_{id(self)}"
+    
+    @abstractmethod
+    def get_primary_identifier(self) -> str:
+        """Get primary identifier for this request (e.g., memory_id, query)"""
+        pass
+    
+    def get_response_level(self) -> str:
+        """
+        Determine response detail level based on request characteristics
+        
+        Returns:
+            str: "minimal", "standard", or "full"
+        """
+        # Default implementation - can be overridden by specific request types
+        if hasattr(self, 'minimal_response') and self.minimal_response:
+            return "minimal"
+        return "standard"
+    
+    def get_processing_metadata(self) -> Dict[str, Any]:
+        """Get metadata for request processing and debugging"""
+        return {
+            "request_type": self.get_request_type(),
+            "operation_id": self.get_operation_id(),
+            "primary_identifier": self.get_primary_identifier(),
+            "response_level": self.get_response_level(),
+            "model_dump_size": len(str(self.model_dump())),
+        }
+
+
+class MemoryStoreRequest(MCPRequestBase):
     content: str = Field(description="Memory content to store")
     scope: str = Field(
         default="user/default",
@@ -58,9 +106,13 @@ class MemoryStoreRequest(BaseModel):
         Strategy: Use minimal=True for storage operations, False for retrieval
         Target: Minimal responses < 1KB vs full responses with associations""",
     )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the content preview"""
+        return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
 
 
-class MemorySearchRequest(BaseModel):
+class MemorySearchRequest(MCPRequestBase):
     query: str = Field(description="Search query")
     scope: Optional[str] = Field(
         default=None,
@@ -105,15 +157,18 @@ class MemorySearchRequest(BaseModel):
         • 0.2-0.4: Broader associations (idea expansion, new perspectives)
         • 0.1-0.2: Creative connections (brainstorming, unexpected links) ← RECOMMENDED
 
-        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while \
-        LLM judges relevance via similarity scores
+        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
         Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
         examples=[0.1, 0.2, 0.4],
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the search query"""
+        return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
 
 
-class DiversifiedSearchRequest(BaseModel):
+class DiversifiedSearchRequest(MCPRequestBase):
     """Diversified similarity search request for broader knowledge exploration"""
 
     query: str = Field(description="Search query")
@@ -208,9 +263,13 @@ class DiversifiedSearchRequest(BaseModel):
         examples=[5.0, 7.0, 3.0],
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the search query"""
+        return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
 
 
-class MemoryUpdateRequest(BaseModel):
+class MemoryUpdateRequest(MCPRequestBase):
     memory_id: str = Field(description="ID of the memory to update")
     content: Optional[str] = Field(default=None, description="New content for the memory (optional)")
     scope: Optional[str] = Field(
@@ -232,9 +291,13 @@ class MemoryUpdateRequest(BaseModel):
     preserve_associations: bool = Field(
         default=True, description="Whether to preserve existing associations when updating content"
     )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the memory ID"""
+        return self.memory_id
 
 
-class MemoryMoveRequest(BaseModel):
+class MemoryMoveRequest(MCPRequestBase):
     memory_ids: List[str] = Field(
         description="""List of memory IDs to move to new scope:
 
@@ -276,9 +339,13 @@ class MemoryMoveRequest(BaseModel):
 
         Example: target_scope="work/projects/mcp-improvements" for project reorganization"""
     )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the list of memory IDs"""
+        return f"memory_ids:{','.join(self.memory_ids)}"
 
 
-class ScopeListRequest(BaseModel):
+class ScopeListRequest(MCPRequestBase):
     parent_scope: Optional[str] = Field(
         default=None,
         description="""Parent scope to filter hierarchy view:
@@ -312,9 +379,13 @@ class ScopeListRequest(BaseModel):
 
         Example: include_memory_counts=False for rapid scope exploration""",
     )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the parent scope"""
+        return self.parent_scope if self.parent_scope else "root"
 
 
-class ScopeSuggestRequest(BaseModel):
+class ScopeSuggestRequest(MCPRequestBase):
     content: str = Field(
         description="""Content to analyze for scope recommendation:
 
@@ -349,9 +420,13 @@ class ScopeSuggestRequest(BaseModel):
         Example: current_scope="work/projects" for project-related content""",
         examples=[None, "work/projects", "learning", "personal"],
     )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the content preview"""
+        return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
 
 
-class SessionManageRequest(BaseModel):
+class SessionManageRequest(MCPRequestBase):
     action: str = Field(
         description="""Session management action to perform:
 
@@ -402,9 +477,13 @@ class SessionManageRequest(BaseModel):
         Example: max_age_days=14 for bi-weekly session cleanup""",
         examples=[1, 7, 14, 30],
     )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the action and session ID"""
+        return f"action:{self.action}, session_id:{self.session_id}"
 
 
-class MemoryExportRequest(BaseModel):
+class MemoryExportRequest(MCPRequestBase):
     scope: Optional[str] = Field(
         default=None,
         description="""Scope to export (optional):
@@ -441,9 +520,13 @@ class MemoryExportRequest(BaseModel):
         Security: Server validates paths against configured allowed directories""",
     )
     compression: bool = Field(default=False, description="Compress export data (gzip)")
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the scope and file path"""
+        return f"scope:{self.scope}, file_path:{self.file_path}"
 
 
-class MemoryImportRequest(BaseModel):
+class MemoryImportRequest(MCPRequestBase):
     file_path: Optional[str] = Field(
         default=None,
         description="""Server-side file path for import (Pattern A):
@@ -504,9 +587,17 @@ class MemoryImportRequest(BaseModel):
         Use Cases: Isolate imported memories, avoid scope conflicts""",
     )
     validate_data: bool = Field(default=True, description="Validate imported data structure and content")
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the file path or import data preview"""
+        if self.file_path:
+            return f"file_path:{self.file_path}"
+        if self.import_data:
+            return f"import_data:{self.import_data[:50]}..." if len(self.import_data) > 50 else f"import_data:{self.import_data}"
+        return "no_identifier"
 
 
-class UnifiedSearchRequest(BaseModel):
+class UnifiedSearchRequest(MCPRequestBase):
     """Unified search request supporting both standard and diversified search modes"""
 
     query: str = Field(description="Search query")
@@ -631,9 +722,13 @@ class UnifiedSearchRequest(BaseModel):
         Example: max_expansion_factor=5.0 for balanced fallback""",
         examples=[5, 7, 3],
     )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the query preview"""
+        return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
 
 
-class MemoryManageRequest(BaseModel):
+class MemoryManageRequest(MCPRequestBase):
     """Unified CRUD operations request model"""
 
     operation: str = Field(
@@ -676,9 +771,13 @@ class MemoryManageRequest(BaseModel):
         default=True,
         description="Whether to preserve existing associations when updating content (update operation only)",
     )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the memory ID"""
+        return self.memory_id
 
 
-class MemorySyncRequest(BaseModel):
+class MemorySyncRequest(MCPRequestBase):
     """Unified import/export operations request model"""
 
     operation: str = Field(
@@ -730,39 +829,9 @@ class MemorySyncRequest(BaseModel):
         default=True, description="Include association relationships in export (export operation only)"
     )
     compression: bool = Field(default=False, description="Compress export data with gzip (export operation only)")
-    export_format: str = Field(default="json", description="Export format: json or yaml (export operation only)")
-
-    # Import-specific parameters
-    import_data: Optional[str] = Field(
-        default=None,
-        description="""Direct import data (import operation only):
-
-        Data Format:
-        • JSON string containing exported memory data
-        • Used when file_path is None
-        • Enables cross-node memory transfer
-        • Supports compressed data (base64 encoded gzip)
-
-        Usage Pattern:
-        1. Export from source environment with file_path=None
-        2. Copy export response data
-        3. Import to target environment with import_data=<copied_data>""",
-    )
-    merge_strategy: str = Field(
-        default="skip_duplicates",
-        description="""How to handle duplicate memories (import operation only):
-
-        Merge Strategies:
-        • "skip_duplicates": Keep existing, skip imports (safe default)
-        • "overwrite": Replace existing with imported data
-        • "create_versions": Create new versions of duplicates
-        • "merge_metadata": Combine metadata while keeping content
-
-        Use Cases:
-        • skip_duplicates: Safe import without conflicts
-        • overwrite: Force update from authoritative source
-        • create_versions: Preserve both local and imported versions""",
-    )
-    validate_data: bool = Field(
-        default=True, description="Validate imported data structure and content (import operation only)"
-    )
+    
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the operation and optional file path"""
+        if self.file_path:
+            return f"{self.operation}:{self.file_path}"
+        return f"{self.operation}:direct_data"

@@ -4,66 +4,144 @@ FastMCP-compliant memory management server implementation with associative memor
 
 import asyncio
 import logging
+import sys
+import traceback
+from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
 
-from fastmcp import Context, FastMCP
-from pydantic import Field
 
-from .api.dependencies import set_global_dependencies
-from .api.models import (
-    MemoryManageRequest,
-    MemoryMoveRequest,
-    MemoryResponse,
-    MemoryStoreRequest,
-    MemorySyncRequest,
-    ScopeListRequest,
-    ScopeSuggestRequest,
-    SessionManageRequest,
-    UnifiedSearchRequest,
-)
-from .api.tools import (
-    handle_analyze_memories_prompt,
-    handle_memory_discover_associations,
-    handle_memory_list_all,
-    handle_memory_get,
-    handle_memory_update,
-    handle_memory_delete,
-    handle_memory_move,
-    handle_memory_stats,
-    handle_scope_memories,
-    handle_memory_store,
-    handle_memory_export,
-    handle_memory_import,
-    handle_scope_list,
-    handle_scope_suggest,
-    handle_session_manage,
-    handle_summarize_memory_prompt,
-    handle_memory_search,
-    handle_unified_search,
-    handle_memory_manage,
-    handle_memory_sync,
-    handle_diversified_search,
-    set_dependencies,
-    set_prompt_dependencies,
-    set_resource_dependencies,
-    set_scope_dependencies,
-)
-from .api.tools.other_tools import set_dependencies as set_other_dependencies
-from .config import get_config
-from .core.embedding_service import (
-    MockEmbeddingService,
-    SentenceTransformerEmbeddingService,
-)
+# CRITICAL: Initialize logging first, before any imports that might fail
+def initialize_early_logging():
+    """Initialize logging before anything else to capture startup errors"""
+    try:
+        # Ensure logs directory exists
+        log_dir = Path("logs")
+        log_dir.mkdir(exist_ok=True)
+        
+        # Configure logging immediately - only file handler to avoid duplicates
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s [%(levelname)s][%(name)s] %(message)s',
+            handlers=[
+                logging.FileHandler('logs/mcp_server.log', mode='a')
+            ]
+        )
+        
+        logger = logging.getLogger(__name__)
+        logger.info("=" * 80)
+        logger.info("MCP Associative Memory Server - Starting up")
+        logger.info(f"Python version: {sys.version}")
+        logger.info(f"Working directory: {Path.cwd()}")
+        logger.info(f"Python path: {sys.path[:3]}")  # First 3 entries
+        
+        return logger
+    except Exception as e:
+        # Fallback: write to stderr directly
+        print(f"CRITICAL: Failed to initialize logging: {e}", file=sys.stderr)
+        print(f"CRITICAL: Traceback: {traceback.format_exc()}", file=sys.stderr)
+        sys.exit(1)
 
-# Import the full associative memory architecture
-from .core.similarity import SimilarityCalculator
-from .core.singleton_memory_manager import (
-    initialize_memory_manager,
-)
-from .simple_persistence import get_persistent_storage
-from .storage.graph_store import NetworkXGraphStore
-from .storage.metadata_store import SQLiteMetadataStore
-from .storage.vector_store import ChromaVectorStore
+
+# Initialize logging immediately
+logger = initialize_early_logging()
+
+try:
+    logger.info("Importing FastMCP and Pydantic...")
+    from fastmcp import Context, FastMCP
+    from pydantic import Field
+    logger.info("Core imports successful")
+    
+    logger.info("Importing project dependencies...")
+    from .api.dependencies import set_global_dependencies
+    logger.info("Dependencies import successful")
+    
+    logger.info("Importing API models...")
+    from .api.models import (
+        MemoryManageRequest,
+        MemoryMoveRequest,
+        MemoryResponse,
+        MemoryStoreRequest,
+        MemoryStoreResponse,
+        MemorySyncRequest,
+        ScopeListRequest,
+        ScopeSuggestRequest,
+        SessionManageRequest,
+        UnifiedSearchRequest,
+    )
+    logger.info("API models import successful")
+    
+    logger.info("Importing API tools...")
+    from .api.tools import (
+        handle_analyze_memories_prompt,
+        handle_memory_discover_associations,
+        handle_memory_list_all,
+        handle_memory_get,
+        handle_memory_update,
+        handle_memory_delete,
+        handle_memory_move,
+        handle_memory_stats,
+        handle_scope_memories,
+        handle_memory_store,
+        handle_memory_export,
+        handle_memory_import,
+        handle_scope_list,
+        handle_scope_suggest,
+        handle_session_manage,
+        handle_summarize_memory_prompt,
+        handle_memory_search,
+        handle_unified_search,
+        handle_memory_manage,
+        handle_memory_sync,
+        handle_diversified_search,
+        set_dependencies,
+        set_prompt_dependencies,
+        set_resource_dependencies,
+        set_scope_dependencies,
+    )
+    logger.info("API tools import successful")
+    
+    logger.info("Importing additional tools...")
+    from .api.tools.other_tools import set_dependencies as set_other_dependencies
+    logger.info("Additional tools import successful")
+    
+    logger.info("Importing configuration...")
+    from .config import get_config
+    logger.info("Configuration import successful")
+    
+    logger.info("Importing embedding services...")
+    from .core.embedding_service import (
+        MockEmbeddingService,
+        SentenceTransformerEmbeddingService,
+    )
+    logger.info("Embedding services import successful")
+
+    logger.info("Importing core similarity and memory manager...")
+    # Import the full associative memory architecture
+    from .core.similarity import SimilarityCalculator
+    from .core.singleton_memory_manager import (
+        initialize_memory_manager,
+    )
+    logger.info("Memory manager import successful")
+    
+    logger.info("Importing storage components...")
+    from .simple_persistence import get_persistent_storage
+    from .storage.graph_store import NetworkXGraphStore
+    from .storage.metadata_store import SQLiteMetadataStore
+    from .storage.vector_store import ChromaVectorStore
+    logger.info("Storage components import successful")
+    
+    logger.info("All imports completed successfully")
+
+except ImportError as e:
+    logger.error(f"IMPORT ERROR: {e}")
+    logger.error(f"Failed import traceback: {traceback.format_exc()}")
+    print(f"CRITICAL: Import failed: {e}", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    logger.error(f"UNEXPECTED ERROR during imports: {e}")
+    logger.error(f"Full traceback: {traceback.format_exc()}")
+    print(f"CRITICAL: Unexpected error: {e}", file=sys.stderr)
+    sys.exit(1)
 
 logger = logging.getLogger(__name__)
 
@@ -71,20 +149,35 @@ logger = logging.getLogger(__name__)
 mcp: FastMCP = FastMCP(name="AssocMemoryServer")
 
 # Initialize the associative memory system
-config = get_config()
-
-# Initialize storage components
-vector_store = ChromaVectorStore()
-metadata_store = SQLiteMetadataStore()
-graph_store = NetworkXGraphStore()
-
-# Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
 try:
-    embedding_service = SentenceTransformerEmbeddingService()
-    logger.info("Using SentenceTransformerEmbeddingService for production")
+    logger.info("Initializing configuration...")
+    config = get_config()
+    logger.info("Configuration initialized successfully")
+    
+    logger.info("Initializing storage components...")
+    # Initialize storage components
+    vector_store = ChromaVectorStore()
+    metadata_store = SQLiteMetadataStore()
+    graph_store = NetworkXGraphStore()
+    logger.info("Storage components initialized successfully")
+    
+    logger.info("Initializing embedding service...")
+    # Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
+    try:
+        embedding_service = SentenceTransformerEmbeddingService()
+        logger.info("Using SentenceTransformerEmbeddingService for production")
+    except Exception as e:
+        logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
+        embedding_service = MockEmbeddingService()  # type: ignore
+        logger.info("Using MockEmbeddingService as fallback")
+    
+    logger.info("All components initialized successfully")
+
 except Exception as e:
-    logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
-    embedding_service = MockEmbeddingService()  # type: ignore
+    logger.error(f"INITIALIZATION ERROR: {e}")
+    logger.error(f"Full traceback: {traceback.format_exc()}")
+    print(f"CRITICAL: Initialization failed: {e}", file=sys.stderr)
+    sys.exit(1)
     logger.info("Falling back to MockEmbeddingService")
 
 similarity_calculator = SimilarityCalculator()
@@ -185,7 +278,7 @@ Stores your content as a searchable memory, automatically discovers connections 
         "idempotentHint": False,
     },
 )
-async def memory_store(request: MemoryStoreRequest, ctx: Context) -> MemoryResponse:
+async def memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict[str, Any]:
     """Store a memory with full associative capabilities"""
     return await handle_memory_store(request, ctx)
 
@@ -510,7 +603,7 @@ Provides unified interface for both standard semantic search and diversified sea
         "idempotentHint": True,
     },
 )
-async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> List[MemoryResponse]:
+async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> Dict[str, Any]:
     """Unified search supporting both standard and diversified modes"""
     # Delegate to handler
     result = await handle_unified_search(request, ctx)
@@ -596,10 +689,17 @@ def main() -> None:
     async def startup() -> None:
         """Initialize the memory system on startup"""
         try:
+            # Initialize response processor
+            from .api.processing import create_response_processor, set_global_processor
+            processor = create_response_processor(config)
+            set_global_processor(processor)
+            logger.info("Response processor initialized successfully")
+            
+            # Initialize memory system
             await ensure_initialized()
             logger.info("Associative memory system initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize associative memory system: {e}")
+            logger.error(f"Failed to initialize systems: {e}")
             # Continue with simple storage as fallback
 
     # Initialize before running

@@ -76,6 +76,28 @@ except TimeoutError:
 - **When modifying files**: Convert any encountered Japanese text to English
 - **Exception**: User-facing content specifically for Japanese users
 
+### 🚨 **CRITICAL: DECISION MAKING LIMITATIONS** 🚨
+**ABSOLUTE REQUIREMENT: Recognition of AI Assistant Limitations**
+- **NEVER make independent decisions on branching issues**
+- **ALWAYS consult user when multiple approaches are possible**
+- **MANDATORY: Ask for guidance when uncertainty exists**
+- **REQUIRED: Report errors and request user instructions before attempting fixes**
+- **FORBIDDEN: Self-directed problem solving without user approval on complex issues**
+- **PRINCIPLE: AI context understanding has limitations - defer to user judgment**
+
+Example of CORRECT behavior:
+```
+ERROR: Found type mismatch in memory_tools.py line 265
+QUESTION: Should I (A) fix by changing parameter type, (B) update response class, or (C) investigate root cause first?
+WAITING: For user decision before proceeding
+```
+
+Example of FORBIDDEN behavior:
+```
+ERROR: Found type mismatch - attempting automatic fix...
+FIXING: Changing parameter type based on my analysis...  # FORBIDDEN
+```
+
 ## ✅ Critical Operations
 
 ### Server Management
