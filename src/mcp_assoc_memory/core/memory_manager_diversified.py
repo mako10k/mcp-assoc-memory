@@ -3,7 +3,7 @@ Diversified memory search algorithms - for broader knowledge exploration
 Implements diversity-based result filtering for creative exploration
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger

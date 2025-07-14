@@ -3,14 +3,12 @@ Scope management tool handlers for MCP Associative Memory Server
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastmcp import Context
 
-from ...core.singleton_memory_manager import get_memory_manager, get_or_create_memory_manager
+from ...core.singleton_memory_manager import get_or_create_memory_manager
 from ..models import (
-    ErrorResponse,
-    MCPResponse,
     ScopeInfo,
     ScopeListRequest,
     ScopeListResponse,
@@ -18,7 +16,7 @@ from ..models import (
     ScopeSuggestRequest,
     ScopeSuggestResponse,
 )
-from ..utils import get_child_scopes, get_parent_scope, validate_scope_path
+from ..utils import get_child_scopes, validate_scope_path
 
 logger = logging.getLogger(__name__)
 

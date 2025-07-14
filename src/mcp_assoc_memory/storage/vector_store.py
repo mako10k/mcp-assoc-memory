@@ -2,7 +2,6 @@
 ChromaDB Vector Store Implementation - Scope-based single collection
 """
 
-import asyncio
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 

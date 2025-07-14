@@ -9,7 +9,6 @@ from typing import Optional
 from ..config import get_config
 from ..core.embedding_service import EmbeddingService
 from ..core.memory_manager import MemoryManager
-from ..simple_persistence import get_persistent_storage
 
 logger = logging.getLogger(__name__)
 

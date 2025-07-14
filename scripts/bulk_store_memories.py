@@ -14,7 +14,7 @@ memories = [
     {"content": "テスト用メモリAの類似文", "metadata": {"tag": "test", "purpose": "bulk"}},
     {"content": "これは全く違う内容です", "metadata": {"tag": "other", "purpose": "bulk"}},
     {"content": "テスト用メモリBの関連文", "metadata": {"tag": "test", "purpose": "bulk"}},
-    {"content": "テスト用メモリCの追加文", "metadata": {"tag": "test", "purpose": "bulk"}}
+    {"content": "テスト用メモリCの追加文", "metadata": {"tag": "test", "purpose": "bulk"}},
 ]
 
 results = []
@@ -26,20 +26,11 @@ for i, mem in enumerate(memories):
         "method": "tools/call",
         "params": {
             "name": "memory_store",
-            "arguments": {
-                "request": {
-                    "content": mem["content"],
-                    "scope": "user/test",
-                    "metadata": mem["metadata"]
-                }
-            }
-        }
+            "arguments": {"request": {"content": mem["content"], "scope": "user/test", "metadata": mem["metadata"]}},
+        },
     }
     print(f"[{i + 1}/{len(memories)}] POST {MCP_URL} : {mem['content']}")
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream"
-    }
+    headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
     response = requests.post(MCP_URL, json=store_request, headers=headers, timeout=10)
     try:
         resp_json = response.json()

@@ -2,15 +2,13 @@
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-from ...core.singleton_memory_manager import get_memory_manager, get_or_create_memory_manager
+from ...core.singleton_memory_manager import get_or_create_memory_manager
 from ...simple_persistence import get_persistent_storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
 from ..models.responses import (
-    MemoryDiscoverAssociationsResponse,
     MemoryMoveResponse,
-    SearchResultWithAssociations,
     SessionInfo,
     SessionManageResponse,
 )

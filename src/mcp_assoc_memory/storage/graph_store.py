@@ -108,7 +108,7 @@ class NetworkXGraphStore(BaseGraphStore):
     async def detect_communities(self) -> Dict[str, List[str]]:
         """コミュニティを検出"""
         try:
-            import collections.abc
+            pass
 
             import networkx.algorithms.community as nx_comm
 

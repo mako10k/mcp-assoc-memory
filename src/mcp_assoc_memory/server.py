@@ -3,68 +3,33 @@ FastMCP-compliant memory management server implementation with associative memor
 """
 
 import asyncio
-import base64
-import gzip
-import json
 import logging
-import uuid
-from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
 
 from fastmcp import Context, FastMCP
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from .api.dependencies import set_global_dependencies
 from .api.models import (
-    Association,
-    DiversifiedSearchRequest,
-    ErrorResponse,
-    MCPResponse,
-    Memory,
-    MemoryExportRequest,
-    MemoryExportResponse,
-    MemoryImportRequest,
-    MemoryImportResponse,
     MemoryManageRequest,
     MemoryMoveRequest,
-    MemoryMoveResponse,
     MemoryResponse,
-    MemorySearchRequest,
     MemoryStoreRequest,
     MemorySyncRequest,
-    MemoryUpdateRequest,
-    MemoryWithAssociations,
-    PaginationInfo,
-    ScopeInfo,
     ScopeListRequest,
-    ScopeListResponse,
-    ScopeRecommendation,
     ScopeSuggestRequest,
-    ScopeSuggestResponse,
-    SearchResult,
-    SearchResultWithAssociations,
-    SessionInfo,
     SessionManageRequest,
-    SessionManageResponse,
     UnifiedSearchRequest,
 )
 from .api.tools import (
     handle_analyze_memories_prompt,
-    handle_diversified_search,
-    handle_memory_delete,
     handle_memory_discover_associations,
-    handle_memory_export,
-    handle_memory_get,
-    handle_memory_import,
     handle_memory_list_all,
     handle_memory_manage,
     handle_memory_move,
-    handle_memory_search,
     handle_memory_stats,
     handle_memory_store,
     handle_memory_sync,
-    handle_memory_update,
     handle_scope_list,
     handle_scope_memories,
     handle_scope_suggest,
@@ -77,21 +42,16 @@ from .api.tools import (
     set_scope_dependencies,
 )
 from .api.tools.other_tools import set_dependencies as set_other_dependencies
-from .api.utils import get_child_scopes, get_parent_scope, validate_scope_path
 from .config import get_config
 from .core.embedding_service import (
-    EmbeddingService,
     MockEmbeddingService,
     SentenceTransformerEmbeddingService,
 )
 
 # Import the full associative memory architecture
-from .core.memory_manager import MemoryManager
 from .core.similarity import SimilarityCalculator
 from .core.singleton_memory_manager import (
-    get_memory_manager,
     initialize_memory_manager,
-    is_memory_manager_initialized,
 )
 from .simple_persistence import get_persistent_storage
 from .storage.graph_store import NetworkXGraphStore
@@ -370,7 +330,7 @@ Provides complete session lifecycle management including creation, listing, and 
 async def session_manage(request: SessionManageRequest, ctx: Context) -> Dict[str, Any]:
     """Manage sessions and cleanup"""
     response = await handle_session_manage(request, ctx)
-    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
+    return response.dict() if hasattr(response, "dict") else response  # type: ignore
 
 
 @mcp.tool(
@@ -405,7 +365,7 @@ Displays the hierarchical structure of all scopes with memory counts, helping yo
 async def scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str, Any]:
     """List scopes with pagination and hierarchy"""
     response = await handle_scope_list(request, ctx)
-    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
+    return response.dict() if hasattr(response, "dict") else response  # type: ignore
 
 
 @mcp.tool(
@@ -440,7 +400,7 @@ Analyzes your content using keyword detection and context patterns to recommend 
 async def scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Dict[str, Any]:
     """Suggest scope based on content analysis"""
     response = await handle_scope_suggest(request, ctx)
-    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
+    return response.dict() if hasattr(response, "dict") else response  # type: ignore
 
 
 # Old memory_export deleted - replaced by memory_sync export operation
@@ -476,7 +436,7 @@ Moves specified memories from their current scopes to a new target scope, preser
 async def memory_move(request: MemoryMoveRequest, ctx: Context) -> Dict[str, Any]:
     """Move memories to a new scope"""
     response = await handle_memory_move(request, ctx)
-    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
+    return response.dict() if hasattr(response, "dict") else response  # type: ignore
 
 
 @mcp.tool(
@@ -512,7 +472,7 @@ async def memory_discover_associations(
 ) -> Dict[str, Any]:
     """Discover semantic associations for a specific memory"""
     response = await handle_memory_discover_associations(memory_id, ctx, limit, similarity_threshold)
-    return response.dict() if hasattr(response, 'dict') else response  # type: ignore
+    return response.dict() if hasattr(response, "dict") else response  # type: ignore
 
 
 @mcp.tool(

@@ -7,7 +7,6 @@ import asyncio
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
 
 if TYPE_CHECKING:

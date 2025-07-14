@@ -2,7 +2,7 @@
 Prompt generation tools for MCP Associative Memory Server
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastmcp import Context
 

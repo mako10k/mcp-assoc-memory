@@ -12,7 +12,7 @@ memories = [
     {"content": "Test memory A details", "scope": "user/test", "metadata": {"tag": "similar_test"}},
     {"content": "Test memory A supplementary info", "scope": "user/test", "metadata": {"tag": "similar_test"}},
     {"content": "Test memory A related information", "scope": "user/test", "metadata": {"tag": "similar_test"}},
-    {"content": "Test memory A additional info", "scope": "user/test", "metadata": {"tag": "similar_test"}}
+    {"content": "Test memory A additional info", "scope": "user/test", "metadata": {"tag": "similar_test"}},
 ]
 
 results = []
@@ -22,18 +22,10 @@ for i, mem in enumerate(memories):
         "jsonrpc": "2.0",
         "id": i + 1,
         "method": "tools/call",
-        "params": {
-            "name": "memory_store",
-            "arguments": {
-                "request": mem
-            }
-        }
+        "params": {"name": "memory_store", "arguments": {"request": mem}},
     }
     print(f"[{i + 1}/{len(memories)}] POST {MCP_URL} : {mem['content']}")
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream"
-    }
+    headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
     response = requests.post(MCP_URL, json=store_request, headers=headers, timeout=10)
     try:
         resp_json = response.json()

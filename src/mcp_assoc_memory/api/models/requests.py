@@ -2,7 +2,6 @@
 Request models for MCP Associative Memory Server API
 """
 
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -106,7 +105,8 @@ class MemorySearchRequest(BaseModel):
         • 0.2-0.4: Broader associations (idea expansion, new perspectives)
         • 0.1-0.2: Creative connections (brainstorming, unexpected links) ← RECOMMENDED
 
-        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
+        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while \
+        LLM judges relevance via similarity scores
         Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
         examples=[0.1, 0.2, 0.4],
     )

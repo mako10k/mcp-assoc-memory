@@ -7,23 +7,17 @@ import binascii
 import gzip
 import json
 import traceback  # Add missing import
-import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastmcp import Context
-from pydantic import Field
 
 from ...config import get_config
 from ...core.memory_manager import MemoryManager
 from ...core.singleton_memory_manager import (
-    get_memory_manager,
     get_or_create_memory_manager,
-    is_memory_manager_initialized,
 )
-from ...simple_persistence import get_persistent_storage
-from ..dependencies import dependencies, ensure_dependencies_initialized
 from ..models import (
     DiversifiedSearchRequest,
     MemoryExportRequest,
@@ -167,7 +161,8 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
         # Get memory manager using unified function
         manager_instance = await ensure_initialized()
         await ctx.info(
-            f"Searching memories: '{request.query[:50]}...' in scope: {request.scope} (include_child_scopes: {request.include_child_scopes})"
+            f"Searching memories: '{request.query[:50]}...' in scope: {request.scope} "
+            f"(include_child_scopes: {request.include_child_scopes})"
         )
 
         # Perform search using memory manager with enhanced parameters
@@ -972,7 +967,7 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                 preserve_associations=request.preserve_associations,
             )
             response = await handle_memory_update(update_request, ctx)
-            return response.dict() if hasattr(response, 'dict') else response  # type: ignore
+            return response.dict() if hasattr(response, "dict") else response  # type: ignore
 
         elif request.operation == "delete":
             # Delegate to existing delete handler
@@ -1024,7 +1019,7 @@ async def handle_memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[s
                 validate_data=request.validate_data,
             )
             response = await handle_memory_import(import_request, ctx)
-            return response.dict() if hasattr(response, 'dict') else response  # type: ignore
+            return response.dict() if hasattr(response, "dict") else response  # type: ignore
 
         else:
             await ctx.error(f"Unknown sync operation: {request.operation}")

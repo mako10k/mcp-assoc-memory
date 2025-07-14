@@ -2,7 +2,6 @@ import asyncio
 
 from mcp_assoc_memory.config import Config
 from mcp_assoc_memory.core.embedding_service import create_embedding_service
-from mcp_assoc_memory.storage.graph_store import NetworkXGraphStore
 from mcp_assoc_memory.storage.metadata_store import SQLiteMetadataStore
 from mcp_assoc_memory.storage.vector_store import ChromaVectorStore
 
@@ -26,6 +25,7 @@ async def reindex_all_embeddings():
         else:
             print(f"[NG] {mem.id} : embedding生成失敗")
     print(f"完了: {updated}/{len(memories)} 件 embedding再投入")
+
 
 if __name__ == "__main__":
     asyncio.run(reindex_all_embeddings())

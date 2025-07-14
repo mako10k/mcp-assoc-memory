@@ -5,8 +5,6 @@ Manages semantic relationships between memories
 
 from typing import TYPE_CHECKING, Any, List, Optional
 
-import numpy as np
-
 from ..models.association import Association
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
