@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-ChromaDB状態確認スクリプト
-削除機能のデバッグ用
+ChromaDB state verification script
+For debugging deletion functionality
 """
 
 import asyncio
@@ -10,45 +10,45 @@ import sys
 
 from mcp_assoc_memory.storage.vector_store import ChromaVectorStore
 
-# プロジェクトルートを追加
+# Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 
-async def debug_chroma_state():
-    """ChromaDB状態をデバッグ"""
-    print("🔍 ChromaDB削除機能デバッグ")
+async def debug_chroma_state() -> None:
+    """Debug ChromaDB state"""
+    print("🔍 ChromaDB deletion functionality debug")
     print("=" * 50)
 
-    # ChromaVectorStoreインスタンス作成
+    # ChromaVectorStore instance creation
     vector_store = ChromaVectorStore(persist_directory="./data/chroma_db")
 
     try:
-        # Single collection への移行確認
+        # Verify migration to single collection
         print(f"Available collection: {vector_store.collection}")
 
         collection = vector_store.collection
         if collection:
             print("\n📁 Scope-based Collection:")
 
-            # コレクション内のアイテム数確認
+            # Check number of items in collection
             count = collection.count()
             print(f"   Total items: {count}")
 
             if count > 0:
-                # 最初の10アイテムのIDを取得
+                # Get IDs of first 10 items
                 result = collection.get(limit=min(10, count))
                 ids = result.get("ids", [])
                 print(f"   Sample IDs: {ids[:5] if len(ids) > 5 else ids}")
 
-                # 削除したはずのIDをチェック
+                # Check IDs that should have been deleted
                 test_ids = [
-                    "be08b812-fd35-4d16-b000-10aa0e6de085",  # 削除したPython記憶
-                    "c40cb0c0-854a-4033-8743-15989e64ebcf",  # 削除したPython記憶
-                    "4622723d-45ce-43e8-9fbf-efecd8285a11",  # 削除したML記憶
+                    "be08b812-fd35-4d16-b000-10aa0e6de085",  # Deleted Python memory
+                    "c40cb0c0-854a-4033-8743-15989e64ebcf",  # Deleted Python memory
+                    "4622723d-45ce-43e8-9fbf-efecd8285a11",  # Deleted ML memory
                 ]
 
                 for test_id in test_ids:
-                    # 直接チェック
+                    # Direct check
                     try:
                         direct_result = collection.get(ids=[test_id])
                         if direct_result["ids"]:
@@ -63,13 +63,13 @@ async def debug_chroma_state():
             else:
                 print("   📭 Empty collection")
 
-        print("\n🔄 削除テスト実行")
-        # 既知の削除されるべき記憶IDで削除をテスト
+        print("\n🔄 Execute deletion test")
+        # Test deletion with known IDs that should be deleted
         test_delete_id = "be08b812-fd35-4d16-b000-10aa0e6de085"
         result = await vector_store.delete_vector(test_delete_id)
         print(f"   Delete result for {test_delete_id}: {result}")
 
-        # 削除後の確認（single collectionベースに変更）
+        # Verification after deletion (changed to single collection base)
         if vector_store.collection:
             try:
                 check_result = vector_store.collection.get(ids=[test_delete_id])
