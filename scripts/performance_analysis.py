@@ -122,11 +122,11 @@ class PerformanceProfiler:
 
         with self.measure_time("search_5_queries"):
             for query in search_queries:
-                results = await memory_manager.search_memories(query=query, limit=10)
+                await memory_manager.search_memories(query=query, limit=10)
 
         # Measure single search performance
         with self.measure_time("single_search_detailed"):
-            results = await memory_manager.search_memories(query="Python programming FastAPI", limit=10, min_score=0.1)
+            await memory_manager.search_memories(query="Python programming FastAPI", limit=10, min_score=0.1)
 
         # Measure retrieval performance
         if stored_memories and stored_memories[0] is not None:

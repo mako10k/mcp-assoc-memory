@@ -136,7 +136,7 @@ class OptimizedPerformanceProfiler:
 
         with self.measure_time("optimized_search_5_queries"):
             for query in search_queries:
-                results = await memory_manager.search_memories(query=query, limit=10)
+                await memory_manager.search_memories(query=query, limit=10)
 
         # Test concurrent operations
         with self.measure_time("concurrent_10_searches"):

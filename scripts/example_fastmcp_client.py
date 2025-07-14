@@ -119,7 +119,7 @@ async def test_stdio_client_connection():
             print(f"📋 Available tools via STDIO: {[tool.name for tool in tools]}")
 
             # Store a memory via STDIO
-            _store_result = await client.call_tool(
+            await client.call_tool(
                 "memory_store",
                 {
                     "request": {
@@ -132,7 +132,7 @@ async def test_stdio_client_connection():
             print("💾 STDIO store successful")
 
             # Test session management
-            _session_result = await client.call_tool(
+            await client.call_tool(
                 "session_manage", {"request": {"action": "create", "session_id": "fastmcp-client-test"}}
             )
             print("🔄 Session management test successful")
@@ -176,7 +176,7 @@ async def demonstrate_client_patterns():
     print("\n📌 Pattern 3: Prompt Usage")
     async with Client("http://localhost:8000/mcp") as client:
         # First get a memory to analyze
-        memories = await client.call_tool("memory_list_all", {"request": {"page": 1, "per_page": 1}})
+        await client.call_tool("memory_list_all", {"request": {"page": 1, "per_page": 1}})
 
         prompt = await client.get_prompt("analyze_memories", {"scope": "examples"})
         print(f"   Prompt messages: {len(prompt.messages)}")
