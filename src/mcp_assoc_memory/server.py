@@ -11,13 +11,13 @@ from typing import Annotated, Any, Dict, List, Optional
 
 
 # CRITICAL: Initialize logging first, before any imports that might fail
-def initialize_early_logging():
+def initialize_early_logging() -> None:
     """Initialize logging before anything else to capture startup errors"""
     try:
         # Ensure logs directory exists
         log_dir = Path("logs")
         log_dir.mkdir(exist_ok=True)
-        
+
         # Configure logging immediately - only file handler to avoid duplicates
         logging.basicConfig(
             level=logging.DEBUG,
@@ -26,14 +26,14 @@ def initialize_early_logging():
                 logging.FileHandler('logs/mcp_server.log', mode='a')
             ]
         )
-        
+
         logger = logging.getLogger(__name__)
         logger.info("=" * 80)
         logger.info("MCP Associative Memory Server - Starting up")
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Working directory: {Path.cwd()}")
         logger.info(f"Python path: {sys.path[:3]}")  # First 3 entries
-        
+
         return logger
     except Exception as e:
         # Fallback: write to stderr directly
@@ -50,11 +50,11 @@ try:
     from fastmcp import Context, FastMCP
     from pydantic import Field
     logger.info("Core imports successful")
-    
+
     logger.info("Importing project dependencies...")
     from .api.dependencies import set_global_dependencies
     logger.info("Dependencies import successful")
-    
+
     logger.info("Importing API models...")
     from .api.models import (
         MemoryManageRequest,
@@ -69,7 +69,7 @@ try:
         UnifiedSearchRequest,
     )
     logger.info("API models import successful")
-    
+
     logger.info("Importing API tools...")
     from .api.tools import (
         handle_analyze_memories_prompt,
@@ -99,15 +99,15 @@ try:
         set_scope_dependencies,
     )
     logger.info("API tools import successful")
-    
+
     logger.info("Importing additional tools...")
     from .api.tools.other_tools import set_dependencies as set_other_dependencies
     logger.info("Additional tools import successful")
-    
+
     logger.info("Importing configuration...")
-    from .config import get_config
+    from .config import get_config, initialize_config
     logger.info("Configuration import successful")
-    
+
     logger.info("Importing embedding services...")
     from .core.embedding_service import (
         MockEmbeddingService,
@@ -122,14 +122,14 @@ try:
         initialize_memory_manager,
     )
     logger.info("Memory manager import successful")
-    
+
     logger.info("Importing storage components...")
     from .simple_persistence import get_persistent_storage
     from .storage.graph_store import NetworkXGraphStore
     from .storage.metadata_store import SQLiteMetadataStore
     from .storage.vector_store import ChromaVectorStore
     logger.info("Storage components import successful")
-    
+
     logger.info("All imports completed successfully")
 
 except ImportError as e:
@@ -151,16 +151,22 @@ mcp: FastMCP = FastMCP(name="AssocMemoryServer")
 # Initialize the associative memory system
 try:
     logger.info("Initializing configuration...")
-    config = get_config()
+    # Initialize configuration singleton with explicit config file path
+    config_path = "config.json"  # Explicitly specify the config file
+    config = initialize_config(config_path)
+    logger.info(f"Server initialized with config from: {config_path}")
+    logger.info(f"API configuration loaded: {hasattr(config.api, 'default_response_level')}")
+    if hasattr(config.api, 'default_response_level'):
+        logger.info(f"Default response level: {config.api.default_response_level}")
     logger.info("Configuration initialized successfully")
-    
+
     logger.info("Initializing storage components...")
     # Initialize storage components
     vector_store = ChromaVectorStore()
     metadata_store = SQLiteMetadataStore()
     graph_store = NetworkXGraphStore()
     logger.info("Storage components initialized successfully")
-    
+
     logger.info("Initializing embedding service...")
     # Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
     try:
@@ -170,7 +176,7 @@ try:
         logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
         embedding_service = MockEmbeddingService()  # type: ignore
         logger.info("Using MockEmbeddingService as fallback")
-    
+
     logger.info("All components initialized successfully")
 
 except Exception as e:
@@ -178,7 +184,6 @@ except Exception as e:
     logger.error(f"Full traceback: {traceback.format_exc()}")
     print(f"CRITICAL: Initialization failed: {e}", file=sys.stderr)
     sys.exit(1)
-    logger.info("Falling back to MockEmbeddingService")
 
 similarity_calculator = SimilarityCalculator()
 
@@ -607,12 +612,11 @@ async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> Dict[str
     """Unified search supporting both standard and diversified modes"""
     # Delegate to handler
     result = await handle_unified_search(request, ctx)
-    # Convert handler result to expected format
-    if isinstance(result, dict) and "results" in result:
-        # Return the MemoryResponse objects directly
-        return result["results"]  # type: ignore
-    # Return empty list if result format is unexpected
-    return []
+    # Return the complete handler result
+    if isinstance(result, dict):
+        return result
+    # Return empty results structure if result format is unexpected
+    return {"results": [], "success": False, "message": "Unexpected result format"}
 
 
 @mcp.tool(
@@ -694,7 +698,7 @@ def main() -> None:
             processor = create_response_processor(config)
             set_global_processor(processor)
             logger.info("Response processor initialized successfully")
-            
+
             # Initialize memory system
             await ensure_initialized()
             logger.info("Associative memory system initialized successfully")
@@ -705,19 +709,19 @@ def main() -> None:
     # Initialize before running
     asyncio.run(startup())
 
-    # Use transport configuration from config file
-    transport_config = config.get("transport", {})
+    # Use transport configuration from config object
+    transport_config = config.transport
 
-    if transport_config.get("http_enabled", False):
+    if transport_config.http_enabled:
         # HTTP transport
-        port = transport_config.get("http_port", 8000)
-        host = transport_config.get("http_host", "0.0.0.0")
+        port = transport_config.http_port
+        host = getattr(transport_config, 'http_host', "0.0.0.0")
         logger.info(f"Starting server on HTTP transport: {host}:{port}")
         mcp.run(transport="http", host=host, port=port)
-    elif transport_config.get("sse_enabled", False):
+    elif transport_config.sse_enabled:
         # SSE transport
-        port = transport_config.get("sse_port", 8000)
-        host = transport_config.get("sse_host", "0.0.0.0")
+        port = getattr(transport_config, 'sse_port', 8000)
+        host = getattr(transport_config, 'sse_host', "0.0.0.0")
         logger.info(f"Starting server on SSE transport: {host}:{port}")
         mcp.run(transport="sse", host=host, port=port)
     else:

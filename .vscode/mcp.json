@@ -9,7 +9,11 @@
         "ShellServer": {
             "command": "npm",
             "args": ["start"],
-            "cwd": "${workspaceFolder}/../mcp-shell-server"
+            "cwd": "${workspaceFolder}/../mcp-shell-server",
+            "env": {
+                "MCP_SHELL_DEFAULT_WORKDIR": "${workspaceFolder}",
+                "MCP_SHELL_ALLOWED_WORKDIRS": "/workspaces,/home,/tmp"
+            }
         }
 
     }

@@ -16,12 +16,46 @@ start() {
     fi
     echo "Starting MCP server..."
     cd "$APP_DIR"
+    
+    # Ensure logs directory exists
+    mkdir -p "$(dirname "$LOG_FILE")"
+    
+    # Log startup attempt
+    echo "========================================================================================" >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] Starting MCP server..." >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] Working directory: $(pwd)" >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] PYTHONPATH: $PYTHONPATH" >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] Python executable: $PYTHON" >> "$LOG_FILE"
+    
     # Start MCP server (single entry point: server.py)
     CONFIG_ARG="--config $APP_DIR/config.json"
-
+    
+    # Test syntax and imports first - capture any immediate errors
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] Testing Python syntax and imports..." >> "$LOG_FILE"
+    if ! $PYTHON -c "import src.mcp_assoc_memory.server" >> "$LOG_FILE" 2>&1; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] ERROR: Failed to import server module" >> "$LOG_FILE"
+        echo "FAILED: Import test failed. Check logs/mcp_server.log for details."
+        exit 1
+    fi
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] Import test successful" >> "$LOG_FILE"
+    
+    # Start server with enhanced error capture
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] Launching server process..." >> "$LOG_FILE"
     nohup $PYTHON -m mcp_assoc_memory.server $CONFIG_ARG >> "$LOG_FILE" 2>&1 &
-    echo $! > "$PID_FILE"
-    echo "Started successfully (PID: $(cat $PID_FILE))"
+    SERVER_PID=$!
+    echo $SERVER_PID > "$PID_FILE"
+    
+    # Wait a moment and check if process is still running
+    sleep 3
+    if kill -0 $SERVER_PID 2>/dev/null; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] Server started successfully (PID: $SERVER_PID)" >> "$LOG_FILE"
+        echo "Started successfully (PID: $SERVER_PID)"
+    else
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] ERROR: Server process died immediately after startup" >> "$LOG_FILE"
+        rm -f "$PID_FILE"
+        echo "FAILED: Server died immediately. Check logs/mcp_server.log for details."
+        exit 1
+    fi
 }
 
 stop() {
@@ -60,7 +94,7 @@ stop() {
 
 restart() {
     stop
-    sleep 10
+    sleep 1
     start
 }
 

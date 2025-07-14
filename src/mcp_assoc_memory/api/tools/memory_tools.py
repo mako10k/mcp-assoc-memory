@@ -39,9 +39,6 @@ from ..models import (
 from ..models.responses import SearchResultWithAssociations, Association
 from .export_tools import handle_memory_export
 
-# Get the config instance
-config = get_config()
-
 # Global references (will be set by server.py)
 memory_manager: Optional[MemoryManager] = None
 memory_storage: Optional[Dict[str, Any]] = None
@@ -106,7 +103,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
             data={},
             memory=None,
             associations_created=[]
-        )
+        ).to_response_dict(level="minimal")
 
     try:
         # Get memory manager with early None check
@@ -144,6 +141,34 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
             metadata=memory.metadata or {}
         )
 
+        # Search for similar memories (95%+ similarity) for duplicate candidates
+        similar_memories = []
+        try:
+            search_results = await memory_manager.search_memories(
+                query=memory.content,
+                scope=None,  # Search across all scopes
+                limit=5
+                # Note: similarity_threshold not supported by current memory manager
+            )
+            
+            # Filter out the just-stored memory and format for response
+            # Apply similarity threshold filtering manually
+            for result in search_results:
+                if (result.memory.id != memory.id and
+                        result.similarity_score >= 0.95):  # Exclude just-stored & apply threshold
+                    similar_memories.append({
+                        "memory_id": result.memory.id,
+                        "similarity_score": result.similarity_score,
+                        "content": result.memory.content,
+                        "metadata": result.memory.metadata or {},
+                        "scope": result.memory.scope
+                    })
+                    if len(similar_memories) >= 3:  # Limit to top 3
+                        break
+                        
+        except Exception as e:
+            await ctx.warning(f"Failed to search for similar memories: {e}")
+
         response = MemoryStoreResponse(
             success=True,
             message=f"Memory stored successfully: {memory.id}",
@@ -153,9 +178,10 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
                 "scope": memory.scope
             },
             memory=memory_model,
-            associations_created=[]  # Will be populated if auto-associations are created
+            associations_created=[],  # Will be populated if auto-associations are created
+            similar_memories=similar_memories
         )
-        
+
         # Use unified response processing instead of direct to_minimal_dict()
         return process_tool_response(request, response)
 
@@ -170,7 +196,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
             memory=None,
             associations_created=[]
         )
-        
+
         # Use unified response processing for error responses too
         return process_tool_response(request, error_response)
 
@@ -232,27 +258,44 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
             else:
                 formatted_memory["associations"] = None
 
-            # Create MemoryResponse object for proper validation
+            # Create SearchResultWithAssociations object for proper validation
             try:
-                memory_response = MemoryResponse(**formatted_memory)
-                formatted_results.append(memory_response)
-            except Exception as e:
-                await ctx.error(f"Failed to create MemoryResponse for memory {memory.id}: {e}")
-                # Fallback: create minimal valid response
-                memory_response = MemoryResponse(
-                    memory_id=memory.id,
+                # Create proper Memory instance for SearchResultWithAssociations
+                memory_instance = Memory(
+                    id=memory.id,
                     content=memory.content,
                     scope=memory_scope,
                     metadata=memory.metadata or {},
                     tags=memory.tags or [],
                     category=memory.category,
                     created_at=memory.created_at,
-                    similarity_score=result["similarity"],
-                    associations=None,
-                    is_duplicate=False,
-                    duplicate_of=None,
+                    updated_at=memory.updated_at
                 )
-                formatted_results.append(memory_response)
+                search_result = SearchResultWithAssociations(
+                    memory=memory_instance,
+                    similarity_score=result["similarity"],
+                    associations=formatted_memory.get("associations", [])
+                )
+                formatted_results.append(search_result)
+            except Exception as e:
+                await ctx.error(f"Failed to create SearchResultWithAssociations for memory {memory.id}: {e}")
+                # Fallback: create minimal valid response with Memory instance
+                memory_instance = Memory(
+                    id=memory.id,
+                    content=memory.content,
+                    scope=memory_scope,
+                    metadata=memory.metadata or {},
+                    tags=memory.tags or [],
+                    category=memory.category,
+                    created_at=memory.created_at,
+                    updated_at=memory.updated_at
+                )
+                search_result = SearchResultWithAssociations(
+                    memory=memory_instance,
+                    similarity_score=result["similarity"],
+                    associations=formatted_memory.get("associations", [])
+                )
+                formatted_results.append(search_result)
 
         await ctx.info(f"Found {len(formatted_results)} memories")
 
@@ -273,7 +316,7 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
             query=request.query,
             total_found=len(formatted_results)
         )
-        
+
         return process_tool_response(request, response)
 
     except Exception as e:
@@ -293,7 +336,7 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
             query=getattr(request, "query", "unknown"),
             total_found=0
         )
-        
+
         return process_tool_response(request, error_response)
 
 
@@ -656,7 +699,8 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
             # Check file size
             file_size = Path(file_path).stat().st_size
             try:
-                max_size_mb = config.get("storage", {}).get("max_import_size_mb", 100)
+                config = get_config()
+                max_size_mb = config.storage.max_import_size_mb if hasattr(config.storage, 'max_import_size_mb') else 100
             except AttributeError:
                 max_size_mb = 100  # Default 100MB limit
 
@@ -1017,7 +1061,7 @@ async def handle_memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[s
                 file_path=request.file_path,
                 include_associations=request.include_associations,
                 compression=request.compression,
-                export_format=request.export_format,
+                export_format="json",  # Default format
             )
             return await handle_memory_export(export_request, ctx)
 
@@ -1025,13 +1069,13 @@ async def handle_memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[s
             # Create import request from sync request
             import_request = MemoryImportRequest(
                 file_path=request.file_path,
-                import_data=request.import_data,
-                target_scope_prefix=request.scope,  # Use scope as target_scope_prefix for import
-                merge_strategy=request.merge_strategy,
-                validate_data=request.validate_data,
+                import_data=None,  # Will be loaded from file
+                target_scope_prefix=request.scope,  # Use scope as target_scope_prefix
+                merge_strategy="skip_duplicates",  # Default strategy
+                validate_data=True,  # Default validation
             )
             response = await handle_memory_import(import_request, ctx)
-            return response.dict() if hasattr(response, "dict") else response  # type: ignore
+            return response.dict() if hasattr(response, "dict") else response
 
         else:
             await ctx.error(f"Unknown sync operation: {request.operation}")

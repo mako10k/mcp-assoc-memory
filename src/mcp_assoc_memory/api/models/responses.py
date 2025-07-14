@@ -16,11 +16,11 @@ class MCPResponseBase(BaseModel, ABC):
     def to_response_dict(self, level: str = "minimal", **kwargs: Any) -> Dict[str, Any]:
         """
         Generate response dictionary with specified detail level.
-        
+
         Args:
             level: Response detail level ("minimal", "standard", "full")
             **kwargs: Additional arguments for response customization
-            
+
         Returns:
             Dict containing response data appropriate for the specified level
         """
@@ -190,9 +190,11 @@ class MemoryStoreResponse(MCPResponseBase):
     data: Dict[str, Any] = Field(description="Response data")
     memory: Optional[Memory] = Field(default=None, description="Stored memory (if successful)")
     associations_created: List[Association] = Field(default_factory=list, description="Auto-created associations")
+    similar_memories: List[Dict[str, Any]] = Field(default_factory=list, description="Similar memories found (95%+ similarity)")
 
     def to_response_dict(self, level: str = "minimal", **kwargs: Any) -> Dict[str, Any]:
         """Generate response dictionary with specified detail level"""
+        print(f"DEBUG MemoryStoreResponse.to_response_dict called with level={level}")
         if level == "minimal":
             return {
                 "success": self.success,
@@ -200,23 +202,37 @@ class MemoryStoreResponse(MCPResponseBase):
                 "created_at": self.memory.created_at.isoformat() if self.memory else None,
             }
         elif level == "standard":
-            response = {
+            response: Dict[str, Any] = {
                 "success": self.success,
-                "message": self.message,
                 "memory_id": self.memory.id if self.memory else None,
                 "created_at": self.memory.created_at.isoformat() if self.memory else None,
             }
-            if self.associations_created:
-                response["associations_created_count"] = len(self.associations_created)
+            # Add duplicate candidates (memory IDs only for standard)
+            if self.similar_memories:
+                response["duplicate_candidates"] = [
+                    mem["memory_id"] for mem in self.similar_memories[:3]
+                ]
             return response
         elif level == "full":
-            return {
+            response: Dict[str, Any] = {
                 "success": self.success,
-                "message": self.message,
-                "data": self.data,
-                "memory": self.memory.model_dump() if self.memory else None,
-                "associations_created": [assoc.model_dump() for assoc in self.associations_created],
+                "memory_id": self.memory.id if self.memory else None,
+                "created_at": self.memory.created_at.isoformat() if self.memory else None,
             }
+            # Add detailed duplicate candidates for full
+            if self.similar_memories:
+                response["duplicate_candidates"] = [
+                    {
+                        "memory_id": mem["memory_id"],
+                        "similarity_score": mem.get("similarity_score", 0.0),
+                        "content_preview": mem.get("content", "")[:100] + ("..." if len(mem.get("content", "")) > 100 else ""),
+                        "metadata": mem.get("metadata", {})
+                    }
+                    for mem in self.similar_memories[:3]
+                ]
+            if self.associations_created:
+                response["associations_created"] = [assoc.model_dump() for assoc in self.associations_created]
+            return response
         else:
             # Default to minimal for unknown levels
             return self.to_response_dict(level="minimal", **kwargs)
@@ -241,21 +257,38 @@ class MemorySearchResponse(MCPResponseBase):
                 "total_found": self.total_found,
             }
         elif level == "standard":
+            # Content truncated to 100 characters
+            results_truncated = []
+            for r in self.results[:5]:
+                result_dict = r.model_dump()
+                if "memory" in result_dict and "content" in result_dict["memory"]:
+                    content = result_dict["memory"]["content"]
+                    if len(content) > 100:
+                        result_dict["memory"]["content"] = content[:100] + "..."
+                results_truncated.append(result_dict)
+            
             return {
                 "success": self.success,
-                "message": self.message,
                 "query": self.query,
                 "total_found": self.total_found,
-                "results": [{"memory_id": r.memory.id, "similarity_score": r.similarity_score} for r in self.results[:5]],
+                "results": results_truncated,
             }
         elif level == "full":
+            # Content truncated to 100 characters for full as well
+            results_truncated = []
+            for r in self.results:
+                result_dict = r.model_dump()
+                if "memory" in result_dict and "content" in result_dict["memory"]:
+                    content = result_dict["memory"]["content"]
+                    if len(content) > 100:
+                        result_dict["memory"]["content"] = content[:100] + "..."
+                results_truncated.append(result_dict)
+            
             return {
                 "success": self.success,
-                "message": self.message,
-                "data": self.data,
                 "query": self.query,
                 "total_found": self.total_found,
-                "results": [r.model_dump() for r in self.results],
+                "results": results_truncated,
             }
         else:
             return self.to_response_dict(level="minimal", **kwargs)

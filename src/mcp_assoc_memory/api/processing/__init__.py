@@ -22,21 +22,29 @@ logger = logging.getLogger(__name__)
 class ResponseProcessor:
     """
     Unified response processor for all MCP tool responses
-    
+
     Handles:
     - Response level determination (minimal, standard, full)
     - Configuration-driven output control
     - Request metadata integration
     - Debugging and audit trail
     """
-    
+
     def __init__(self, config: Config):
         """Initialize response processor with configuration"""
         self.config = config
         self._default_response_level = "standard"
-        self._enable_audit_trail = config.get("api", {}).get("enable_audit_trail", False)
-        self._enable_response_metadata = config.get("api", {}).get("enable_response_metadata", True)
-    
+
+        # Access API config safely
+        api_config = config.get("api")
+        self._enable_audit_trail = False
+        self._enable_response_metadata = True
+
+        if api_config and hasattr(api_config, 'enable_audit_trail'):
+            self._enable_audit_trail = bool(api_config.enable_audit_trail)
+        if api_config and hasattr(api_config, 'enable_response_metadata'):
+            self._enable_response_metadata = bool(api_config.enable_response_metadata)
+
     def process_tool_response(
         self,
         request: MCPRequestBase,
@@ -45,38 +53,35 @@ class ResponseProcessor:
     ) -> Dict[str, Any]:
         """
         Process tool response with unified configuration and request context
-        
+
         Args:
             request: Original request object with metadata
             response: Response object from tool handler
             operation_context: Additional operation context (optional)
-            
+
         Returns:
             Dict[str, Any]: Final response dictionary ready for tool return
         """
         # Determine response level from multiple sources
         response_level = self._determine_response_level(request, operation_context)
-        
+
         # Generate base response using response object
         base_response = response.to_response_dict(level=response_level)
-        
-        # Enhance with metadata if enabled
-        if self._enable_response_metadata:
-            base_response = self._enhance_with_metadata(
-                base_response, request, response_level, operation_context
-            )
-        
+
+        # Note: Response metadata is disabled per user request
+        # Metadata is kept for internal processing but not included in API response
+
         # Add audit trail if enabled
         if self._enable_audit_trail:
             base_response = self._add_audit_trail(base_response, request, operation_context)
-        
+
         # Apply any final transformations
         final_response = self._apply_final_transformations(base_response, response_level)
-        
+
         self._log_response_processing(request, response_level, len(str(final_response)))
-        
+
         return final_response
-    
+
     def _determine_response_level(
         self,
         request: MCPRequestBase,
@@ -84,7 +89,7 @@ class ResponseProcessor:
     ) -> str:
         """
         Determine response detail level from multiple sources
-        
+
         Priority order:
         1. Operation context override
         2. Request-specific level
@@ -93,27 +98,32 @@ class ResponseProcessor:
         """
         # 1. Operation context override (highest priority)
         if operation_context and "response_level" in operation_context:
-            return operation_context["response_level"]
-        
+            level = operation_context["response_level"]
+            if isinstance(level, str):
+                return level
+
         # 2. Request-specific level
         request_level = request.get_response_level()
         if request_level != "standard":  # Non-default value
             return request_level
-        
+
         # 3. Configuration default for this request type
         request_type = request.get_request_type()
-        config_level = self.config.get("api", {}).get("response_levels", {}).get(request_type)
-        if config_level:
-            return config_level
-        
+        api_config = self.config.get("api")
+        if api_config and hasattr(api_config, 'response_levels'):
+            config_level = api_config.response_levels.get(request_type)
+            if config_level:
+                return str(config_level)
+
         # 4. Global configuration default
-        global_level = self.config.get("api", {}).get("default_response_level")
-        if global_level:
-            return global_level
-        
+        if api_config and hasattr(api_config, 'default_response_level'):
+            global_level = api_config.default_response_level
+            if global_level:
+                return str(global_level)
+
         # 5. System default
         return self._default_response_level
-    
+
     def _enhance_with_metadata(
         self,
         response: Dict[str, Any],
@@ -122,31 +132,37 @@ class ResponseProcessor:
         operation_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Add response metadata if enabled"""
-        metadata = {
+        metadata: Dict[str, Any] = {
             "request_type": request.get_request_type(),
             "response_level": response_level,
             "processed_at": datetime.now().isoformat(),
             "operation_id": request.get_operation_id(),
         }
-        
+
         # Add operation context metadata if available
         if operation_context:
             metadata["operation_context"] = {
                 k: v for k, v in operation_context.items()
                 if k not in ["response_level"]  # Avoid duplication
             }
-        
+
         # Add metadata to response based on level
         if response_level in ["standard", "full"]:
             response["_metadata"] = metadata
-        elif response_level == "minimal" and self.config.get("api", {}).get("force_minimal_metadata", False):
-            response["_meta"] = {
-                "request_type": metadata["request_type"],
-                "operation_id": metadata["operation_id"]
-            }
-        
+        elif response_level == "minimal":
+            api_config = self.config.get("api")
+            force_minimal = False
+            if api_config and hasattr(api_config, 'force_minimal_metadata'):
+                force_minimal = bool(api_config.force_minimal_metadata)
+
+            if force_minimal:
+                response["_meta"] = {
+                    "request_type": metadata["request_type"],
+                    "operation_id": metadata["operation_id"]
+                }
+
         return response
-    
+
     def _add_audit_trail(
         self,
         response: Dict[str, Any],
@@ -160,38 +176,48 @@ class ResponseProcessor:
             "primary_identifier": request.get_primary_identifier(),
             "processing_metadata": request.get_processing_metadata(),
         }
-        
+
         if operation_context:
             audit_info["operation_context"] = operation_context
-        
+
         # Only add audit trail for standard and full responses
         if response.get("_metadata"):
             response["_metadata"]["audit_trail"] = audit_info
         else:
             response["_audit"] = audit_info
-        
+
         return response
-    
+
     def _apply_final_transformations(
         self,
         response: Dict[str, Any],
         response_level: str
     ) -> Dict[str, Any]:
         """Apply final response transformations based on configuration"""
+        # Get API config
+        api_config = self.config.get("api")
+
         # Remove null values if configured
-        if self.config.get("api", {}).get("remove_null_values", False):
+        remove_nulls = False
+        if api_config and hasattr(api_config, 'remove_null_values'):
+            remove_nulls = bool(api_config.remove_null_values)
+
+        if remove_nulls:
             response = self._remove_null_values(response)
-        
+
         # Apply size limits for minimal responses
         if response_level == "minimal":
-            max_size = self.config.get("api", {}).get("minimal_response_max_size", 1024)
+            max_size = 1024  # Default
+            if api_config and hasattr(api_config, 'minimal_response_max_size'):
+                max_size = int(api_config.minimal_response_max_size)
+
             if len(str(response)) > max_size:
                 logger.warning(
                     f"Minimal response size ({len(str(response))}) exceeds limit ({max_size})"
                 )
-        
+
         return response
-    
+
     def _remove_null_values(self, obj: Any) -> Any:
         """Recursively remove null values from response"""
         if isinstance(obj, dict):
@@ -199,7 +225,7 @@ class ResponseProcessor:
         elif isinstance(obj, list):
             return [self._remove_null_values(item) for item in obj if item is not None]
         return obj
-    
+
     def _log_response_processing(
         self,
         request: MCPRequestBase,
@@ -243,7 +269,7 @@ def process_tool_response(
 ) -> Dict[str, Any]:
     """
     Convenience function for processing tool responses
-    
+
     Uses global processor instance for unified response processing
     """
     processor = get_response_processor()

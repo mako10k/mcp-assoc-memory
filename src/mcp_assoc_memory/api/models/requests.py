@@ -11,31 +11,31 @@ from pydantic import BaseModel, Field
 class MCPRequestBase(BaseModel, ABC):
     """
     Abstract base class for all MCP request types
-    
+
     Provides common functionality for:
     - Request validation
     - Metadata extraction
     - Response level determination
     - Debugging and audit trails
     """
-    
+
     def get_request_type(self) -> str:
         """Get request type for logging and processing"""
         return self.__class__.__name__
-    
+
     def get_operation_id(self) -> str:
         """Get unique operation identifier for tracking"""
         return f"{self.get_request_type()}_{id(self)}"
-    
+
     @abstractmethod
     def get_primary_identifier(self) -> str:
         """Get primary identifier for this request (e.g., memory_id, query)"""
         pass
-    
+
     def get_response_level(self) -> str:
         """
         Determine response detail level based on request characteristics
-        
+
         Returns:
             str: "minimal", "standard", or "full"
         """
@@ -43,7 +43,7 @@ class MCPRequestBase(BaseModel, ABC):
         if hasattr(self, 'minimal_response') and self.minimal_response:
             return "minimal"
         return "standard"
-    
+
     def get_processing_metadata(self) -> Dict[str, Any]:
         """Get metadata for request processing and debugging"""
         return {
@@ -106,7 +106,7 @@ class MemoryStoreRequest(MCPRequestBase):
         Strategy: Use minimal=True for storage operations, False for retrieval
         Target: Minimal responses < 1KB vs full responses with associations""",
     )
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the content preview"""
         return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
@@ -162,7 +162,7 @@ class MemorySearchRequest(MCPRequestBase):
         examples=[0.1, 0.2, 0.4],
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the search query"""
         return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
@@ -263,7 +263,7 @@ class DiversifiedSearchRequest(MCPRequestBase):
         examples=[5.0, 7.0, 3.0],
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the search query"""
         return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
@@ -291,7 +291,7 @@ class MemoryUpdateRequest(MCPRequestBase):
     preserve_associations: bool = Field(
         default=True, description="Whether to preserve existing associations when updating content"
     )
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the memory ID"""
         return self.memory_id
@@ -339,7 +339,7 @@ class MemoryMoveRequest(MCPRequestBase):
 
         Example: target_scope="work/projects/mcp-improvements" for project reorganization"""
     )
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the list of memory IDs"""
         return f"memory_ids:{','.join(self.memory_ids)}"
@@ -379,7 +379,7 @@ class ScopeListRequest(MCPRequestBase):
 
         Example: include_memory_counts=False for rapid scope exploration""",
     )
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the parent scope"""
         return self.parent_scope if self.parent_scope else "root"
@@ -420,7 +420,7 @@ class ScopeSuggestRequest(MCPRequestBase):
         Example: current_scope="work/projects" for project-related content""",
         examples=[None, "work/projects", "learning", "personal"],
     )
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the content preview"""
         return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
@@ -477,7 +477,7 @@ class SessionManageRequest(MCPRequestBase):
         Example: max_age_days=14 for bi-weekly session cleanup""",
         examples=[1, 7, 14, 30],
     )
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the action and session ID"""
         return f"action:{self.action}, session_id:{self.session_id}"
@@ -520,7 +520,7 @@ class MemoryExportRequest(MCPRequestBase):
         Security: Server validates paths against configured allowed directories""",
     )
     compression: bool = Field(default=False, description="Compress export data (gzip)")
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the scope and file path"""
         return f"scope:{self.scope}, file_path:{self.file_path}"
@@ -587,7 +587,7 @@ class MemoryImportRequest(MCPRequestBase):
         Use Cases: Isolate imported memories, avoid scope conflicts""",
     )
     validate_data: bool = Field(default=True, description="Validate imported data structure and content")
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the file path or import data preview"""
         if self.file_path:
@@ -722,7 +722,7 @@ class UnifiedSearchRequest(MCPRequestBase):
         Example: max_expansion_factor=5.0 for balanced fallback""",
         examples=[5, 7, 3],
     )
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the query preview"""
         return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
@@ -771,7 +771,7 @@ class MemoryManageRequest(MCPRequestBase):
         default=True,
         description="Whether to preserve existing associations when updating content (update operation only)",
     )
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the memory ID"""
         return self.memory_id
@@ -829,7 +829,7 @@ class MemorySyncRequest(MCPRequestBase):
         default=True, description="Include association relationships in export (export operation only)"
     )
     compression: bool = Field(default=False, description="Compress export data with gzip (export operation only)")
-    
+
     def get_primary_identifier(self) -> str:
         """Primary identifier is the operation and optional file path"""
         if self.file_path:
