@@ -61,6 +61,33 @@ Use memory_store to save: "FastAPI is excellent for building APIs because of its
 }
 ```
 
+### Duplicate Detection Control
+The `memory_store` tool offers flexible duplicate handling:
+
+**No duplicate checking (default):**
+```instructions
+Store this memory: "Python is great for data science"
+```
+
+**Prevent similar content:**
+```instructions
+Store this memory with duplicate detection: "Python is excellent for data science" 
+Set duplicate_threshold to 0.85
+```
+
+**Force storage even if duplicate detected:**
+```instructions
+Store this memory even if similar exists: "Python is awesome for data science"
+Set duplicate_threshold to 0.85 and allow_duplicates to true
+```
+
+### Duplicate Detection Benefits:
+- **Storage efficiency**: Avoid accumulating similar content
+- **Content quality**: Maintain focused, unique insights
+- **Flexible control**: Choose when to enforce or bypass duplicate checking
+- **Similarity scoring**: Transparent relevance metrics (0.0-1.0)
+```
+
 ### Search for Memories
 ```instructions
 Use memory_search to find memories about API development

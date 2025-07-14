@@ -80,20 +80,22 @@ class MemoryStoreRequest(MCPRequestBase):
     category: Optional[str] = Field(default=None, description="Memory category")
     auto_associate: bool = Field(default=True, description="Enable automatic association discovery")
     allow_duplicates: bool = Field(default=False, description="Allow storing duplicate content")
-    similarity_threshold: float = Field(
-        default=0.95,
+    duplicate_threshold: Optional[float] = Field(
+        default=None,
         ge=0.0,
         le=1.0,
-        description="""Duplicate detection threshold:
+        description="""Duplicate detection threshold for pre-registration check:
 
         Values & Use Cases:
-        • 0.95-1.0: Prevent only near-identical content ← RECOMMENDED
-        • 0.85-0.95: Block similar variations (stricter)
-        • 0.70-0.85: Aggressive duplicate prevention
+        • None: No duplicate checking - allow any content including duplicates ← DEFAULT
+        • 0.95-1.0: Strict - only prevent near-identical content
+        • 0.85-0.95: Standard - prevent similar variations ← RECOMMENDED
+        • 0.70-0.85: Aggressive - prevent related content duplication
 
-        Strategy: Keep high (0.95) unless you need strict deduplication
-        Example: similarity_threshold=0.95 for most cases""",
-        examples=[0.95, 0.90, 0.85],
+        Strategy: Leave None for no duplicate checking, use 0.85-0.95 for duplicate prevention
+        If similarity score ≥ threshold, registration will fail with duplicate error
+        Example: duplicate_threshold=0.85 for standard duplicate prevention""",
+        examples=[None, 0.85, 0.90, 0.95],
     )
     minimal_response: bool = Field(
         default=False,

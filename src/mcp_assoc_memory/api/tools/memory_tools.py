@@ -92,7 +92,7 @@ async def ensure_initialized() -> MemoryManager:
 
 
 async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict[str, Any]:
-    """Store a memory with optimized response structure"""
+    """Store a memory with pre-registration duplicate checking"""
     # Early validation - fail fast
     if not request.content or not request.content.strip():
         error_msg = "Content cannot be empty"
@@ -112,6 +112,69 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
             raise RuntimeError("Memory manager is None after initialization")
 
         await ctx.info(f"Storing: {request.content[:50]}... in scope: {request.scope}")
+        await ctx.info(f"DEBUG: duplicate_threshold = {request.duplicate_threshold} (type: {type(request.duplicate_threshold)})")
+
+        # Pre-registration duplicate check if threshold specified
+        if request.duplicate_threshold is not None:
+            await ctx.info(f"Checking for duplicates with threshold: {request.duplicate_threshold}")
+            try:
+                # Use the same search method as handle_memory_search for consistency
+                search_results = await memory_manager.search_memories(
+                    query=request.content,
+                    scope=None,  # Search across all scopes for duplicates
+                    limit=5,
+                    min_score=0.1  # Low threshold to find potential duplicates
+                )
+                
+                await ctx.info(f"DEBUG: Found {len(search_results)} search results")
+                for i, result in enumerate(search_results):
+                    # Handle both result formats for compatibility
+                    if hasattr(result, 'memory'):
+                        # SearchResultWithAssociations format
+                        memory = result.memory
+                        similarity = result.similarity_score
+                    else:
+                        # Dict format
+                        memory = result["memory"]
+                        similarity = result["similarity"]
+                    await ctx.info(f"DEBUG: Result {i}: ID={memory.id}, similarity={similarity}")
+                
+                # Check if any result exceeds the duplicate threshold
+                for result in search_results:
+                    # Handle both result formats for compatibility
+                    if hasattr(result, 'memory'):
+                        memory = result.memory
+                        similarity = result.similarity_score
+                    else:
+                        memory = result["memory"]
+                        similarity = result["similarity"]
+                        
+                    await ctx.info(f"DEBUG: Comparing {similarity} >= {request.duplicate_threshold}: {similarity >= request.duplicate_threshold}")
+                    if similarity >= request.duplicate_threshold:
+                        duplicate_candidate = {
+                            "memory_id": memory.id,
+                            "similarity_score": similarity,
+                            "content_preview": memory.content[:100] + ("..." if len(memory.content) > 100 else ""),
+                            "scope": memory.scope,
+                            "created_at": memory.created_at.isoformat()
+                        }
+                        
+                        error_msg = f"Duplicate content detected (similarity: {similarity:.3f} >= {request.duplicate_threshold})"
+                        await ctx.warning(error_msg)
+                        
+                        return MemoryStoreResponse(
+                            success=False,
+                            message=error_msg,
+                            data={"duplicate_threshold": request.duplicate_threshold},
+                            memory=None,
+                            associations_created=[],
+                            duplicate_found=True,
+                            duplicate_candidate=duplicate_candidate
+                        ).model_dump()
+                        
+            except Exception as e:
+                await ctx.warning(f"Failed to check for duplicates: {e}")
+                # Continue with storage if duplicate check fails
 
         # Store memory with explicit None check
         memory = await memory_manager.store_memory(
@@ -141,45 +204,18 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
             metadata=memory.metadata or {}
         )
 
-        # Search for similar memories (95%+ similarity) for duplicate candidates
-        similar_memories = []
-        try:
-            search_results = await memory_manager.search_memories(
-                query=memory.content,
-                scope=None,  # Search across all scopes
-                limit=5
-                # Note: similarity_threshold not supported by current memory manager
-            )
-            
-            # Filter out the just-stored memory and format for response
-            # Apply similarity threshold filtering manually
-            for result in search_results:
-                if (result.memory.id != memory.id and
-                        result.similarity_score >= 0.95):  # Exclude just-stored & apply threshold
-                    similar_memories.append({
-                        "memory_id": result.memory.id,
-                        "similarity_score": result.similarity_score,
-                        "content": result.memory.content,
-                        "metadata": result.memory.metadata or {},
-                        "scope": result.memory.scope
-                    })
-                    if len(similar_memories) >= 3:  # Limit to top 3
-                        break
-                        
-        except Exception as e:
-            await ctx.warning(f"Failed to search for similar memories: {e}")
-
         response = MemoryStoreResponse(
             success=True,
             message=f"Memory stored successfully: {memory.id}",
             data={
                 "memory_id": memory.id,
                 "created_at": memory.created_at.isoformat(),
-                "scope": memory.scope
+                "scope": memory.scope,
+                "duplicate_check_performed": request.duplicate_threshold is not None
             },
             memory=memory_model,
             associations_created=[],  # Will be populated if auto-associations are created
-            similar_memories=similar_memories
+            duplicate_found=False
         )
 
         # Use unified response processing instead of direct to_minimal_dict()

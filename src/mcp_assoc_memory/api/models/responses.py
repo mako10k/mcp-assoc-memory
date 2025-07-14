@@ -190,7 +190,8 @@ class MemoryStoreResponse(MCPResponseBase):
     data: Dict[str, Any] = Field(description="Response data")
     memory: Optional[Memory] = Field(default=None, description="Stored memory (if successful)")
     associations_created: List[Association] = Field(default_factory=list, description="Auto-created associations")
-    similar_memories: List[Dict[str, Any]] = Field(default_factory=list, description="Similar memories found (95%+ similarity)")
+    duplicate_found: Optional[bool] = Field(default=None, description="Whether duplicate was found during pre-check")
+    duplicate_candidate: Optional[Dict[str, Any]] = Field(default=None, description="Similar memory found if duplicate threshold exceeded")
 
     def to_response_dict(self, level: str = "minimal", **kwargs: Any) -> Dict[str, Any]:
         """Generate response dictionary with specified detail level"""
@@ -202,37 +203,28 @@ class MemoryStoreResponse(MCPResponseBase):
                 "created_at": self.memory.created_at.isoformat() if self.memory else None,
             }
         elif level == "standard":
-            response: Dict[str, Any] = {
+            standard_response: Dict[str, Any] = {
                 "success": self.success,
+                "message": self.message,
                 "memory_id": self.memory.id if self.memory else None,
                 "created_at": self.memory.created_at.isoformat() if self.memory else None,
             }
-            # Add duplicate candidates (memory IDs only for standard)
-            if self.similar_memories:
-                response["duplicate_candidates"] = [
-                    mem["memory_id"] for mem in self.similar_memories[:3]
-                ]
-            return response
+            if self.duplicate_found:
+                standard_response["duplicate_found"] = self.duplicate_found
+            return standard_response
         elif level == "full":
-            response: Dict[str, Any] = {
+            full_response: Dict[str, Any] = {
                 "success": self.success,
-                "memory_id": self.memory.id if self.memory else None,
-                "created_at": self.memory.created_at.isoformat() if self.memory else None,
+                "message": self.message,
+                "data": self.data,
+                "memory": self.memory.model_dump() if self.memory else None,
+                "associations_created": [assoc.model_dump() for assoc in self.associations_created],
             }
-            # Add detailed duplicate candidates for full
-            if self.similar_memories:
-                response["duplicate_candidates"] = [
-                    {
-                        "memory_id": mem["memory_id"],
-                        "similarity_score": mem.get("similarity_score", 0.0),
-                        "content_preview": mem.get("content", "")[:100] + ("..." if len(mem.get("content", "")) > 100 else ""),
-                        "metadata": mem.get("metadata", {})
-                    }
-                    for mem in self.similar_memories[:3]
-                ]
-            if self.associations_created:
-                response["associations_created"] = [assoc.model_dump() for assoc in self.associations_created]
-            return response
+            if self.duplicate_found:
+                full_response["duplicate_found"] = self.duplicate_found
+                if self.duplicate_candidate:
+                    full_response["duplicate_candidate"] = self.duplicate_candidate
+            return full_response
         else:
             # Default to minimal for unknown levels
             return self.to_response_dict(level="minimal", **kwargs)

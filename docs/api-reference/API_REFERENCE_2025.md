@@ -29,25 +29,71 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
     "metadata": {"project": "mcp-server"},
     "allow_duplicates": false,
     "auto_associate": true,
-    "similarity_threshold": 0.95,
+    "duplicate_threshold": 0.85,
     "minimal_response": false
   }
 }
 ```
 
+**Duplicate Detection**:
+- `duplicate_threshold`: Float (0.0-1.0) or null
+  - `null` (default): No duplicate checking - allow any content
+  - `0.85-0.95`: Standard duplicate prevention (recommended)
+  - `0.95-1.0`: Strict - prevent only near-identical content
+- `allow_duplicates`: Boolean (default: false)
+  - `true`: Store even if duplicate detected (when threshold specified)
+  - `false`: Reject storage if duplicate found
+
+**Use Cases**:
+- **No checking**: `duplicate_threshold=null` (default behavior)
+- **Standard prevention**: `duplicate_threshold=0.85`
+- **Force storage**: `duplicate_threshold=0.85, allow_duplicates=true`
+```
+
 **Response**:
 ```json
 {
-  "memory_id": "uuid-string",
-  "content": "Your memory content here",
-  "scope": "work/projects/example",
-  "metadata": {"project": "mcp-server"},
-  "tags": ["python", "fastapi"],
-  "category": "programming",
-  "created_at": "2025-07-12T10:30:00Z",
-  "is_duplicate": false,
-  "duplicate_of": null
+  "success": true,
+  "message": "Memory stored successfully: uuid-string",
+  "data": {
+    "memory_id": "uuid-string",
+    "created_at": "2025-07-12T10:30:00Z",
+    "scope": "work/projects/example",
+    "duplicate_check_performed": true
+  },
+  "memory": {
+    "id": "uuid-string",
+    "content": "Your memory content here",
+    "scope": "work/projects/example",
+    "metadata": {"project": "mcp-server"},
+    "tags": ["python", "fastapi"],
+    "category": "programming",
+    "created_at": "2025-07-12T10:30:00Z",
+    "updated_at": "2025-07-12T10:30:00Z"
+  },
+  "associations_created": [],
+  "duplicate_found": false
 }
+```
+
+**Duplicate Detection Response**:
+```json
+{
+  "success": false,
+  "message": "Duplicate content detected (similarity: 0.947 >= 0.85)",
+  "data": {"duplicate_threshold": 0.85},
+  "memory": null,
+  "associations_created": [],
+  "duplicate_found": true,
+  "duplicate_candidate": {
+    "memory_id": "existing-uuid",
+    "similarity_score": 0.947,
+    "content_preview": "Similar existing content...",
+    "scope": "work/projects/example",
+    "created_at": "2025-07-11T15:20:00Z"
+  }
+}
+```
 ```
 
 ---

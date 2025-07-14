@@ -269,9 +269,9 @@ Stores your content as a searchable memory, automatically discovers connections 
 
 💡 Quick Start:
 - Auto-categorize: Let scope_suggest recommend the best scope
-- Prevent duplicates: allow_duplicates=False (default) saves space
+- Duplicate handling: duplicate_threshold=0.85 (prevent similar content), =null (no checking)
+- Force storage: allow_duplicates=true (store even if duplicate detected)
 - Enable connections: auto_associate=True (default) builds knowledge links
-- Quality control: similarity_threshold=0.95 prevents near-duplicates
 
 ⚠️ Important: Duplicate detection may block intentionally similar content
 

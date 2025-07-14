@@ -20,6 +20,15 @@ start() {
     # Ensure logs directory exists
     mkdir -p "$(dirname "$LOG_FILE")"
     
+    # Check if log rotation is needed before starting
+    if [ -f "$LOG_FILE" ]; then
+        log_size_mb=$(du -m "$LOG_FILE" | cut -f1)
+        if [ "$log_size_mb" -ge 10 ]; then
+            echo "Log file is large ($log_size_mb MB), rotating before start..."
+            "$APP_DIR/scripts/rotate_logs.sh" >/dev/null 2>&1
+        fi
+    fi
+    
     # Log startup attempt
     echo "========================================================================================" >> "$LOG_FILE"
     echo "$(date '+%Y-%m-%d %H:%M:%S') [DAEMON] Starting MCP server..." >> "$LOG_FILE"
