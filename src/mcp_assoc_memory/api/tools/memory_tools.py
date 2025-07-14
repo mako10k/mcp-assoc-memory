@@ -98,11 +98,10 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
         return MemoryResponse(
             success=False,
             message=error_msg,
-            memory_id="error",
-            content="",
-            scope="error",
+            memory_id="",  # Empty for error
+            content="",    # Empty for error
+            scope="",      # Empty for error
             created_at=datetime.now(),
-            metadata={"error": error_msg},
         )
 
     try:
@@ -127,18 +126,40 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
         # Success - memory object is guaranteed to be non-None here
         await ctx.info(f"Successfully stored memory: {memory.id}")
 
-        return MemoryResponse(
-            success=True,
-            message="Memory stored successfully",
-            memory_id=memory.id,
-            content=memory.content,
-            scope=memory.scope,
-            created_at=memory.created_at,
-            metadata=memory.metadata or {},
-            tags=memory.tags or [],
-            category=memory.category,
-            is_duplicate=False,
-        )
+        # Build minimal response based on request.minimal_response
+        if request.minimal_response:
+            response_data = {
+                "success": True,
+                "memory_id": memory.id,
+                "content": "",  # Empty to reduce context size
+                "created_at": memory.created_at,
+            }
+            # Include scope only if it was modified/normalized from the request
+            if memory.scope != request.scope:
+                response_data["scope"] = memory.scope
+            return MemoryResponse(**response_data)
+        
+        # Standard response - exclude content echo and empty fields
+        response_data = {
+            "success": True,
+            "memory_id": memory.id,
+            "content": "",  # Don't echo input content
+            "created_at": memory.created_at,
+        }
+        
+        # Include scope only if it was modified/normalized from the request
+        if memory.scope != request.scope:
+            response_data["scope"] = memory.scope
+        
+        # Only include non-empty generated fields
+        if memory.metadata:
+            response_data["metadata"] = memory.metadata
+        if memory.tags:
+            response_data["tags"] = memory.tags
+        if memory.category:
+            response_data["category"] = memory.category
+            
+        return MemoryResponse(**response_data)
 
     except Exception as e:
         error_msg = f"Failed to store memory: {str(e)}"
@@ -147,11 +168,10 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Memo
         return MemoryResponse(
             success=False,
             message=error_msg,
-            memory_id="error",
+            memory_id="",
             content="",
-            scope="error",
+            scope="",
             created_at=datetime.now(),
-            metadata={"error": error_msg, "error_type": type(e).__name__, "traceback": traceback.format_exc()},
         )
 
 
