@@ -590,7 +590,8 @@ async def memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[str, Any
     return await handle_memory_sync(request, ctx)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Main entry point for the MCP server"""
 
     async def startup() -> None:
         """Initialize the memory system on startup"""
@@ -623,3 +624,7 @@ if __name__ == "__main__":
         # Default to STDIO transport
         logger.info("Starting server on STDIO transport")
         mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

@@ -827,13 +827,23 @@ async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optiona
             await ctx.info(f"Retrieving memories (page {page}, {per_page} per page)...")
 
         # Get all memories from memory manager
-        # Note: Currently memory_manager doesn't expose a list_all method
-        # This is a limitation that should be addressed in the memory_manager interface
-        if ctx:
-            await ctx.warning(
-                "Memory listing temporarily disabled due to singleton refactoring. Use memory_search with broad criteria instead."
-            )
+        memory_mgr = await get_or_create_memory_manager()
+        all_memory_objects = await memory_mgr.metadata_store.get_all_memories(limit=10000)  # type: ignore
+
+        # Convert Memory objects to dictionaries
         all_memories: List[Dict[str, Any]] = []
+        for memory in all_memory_objects:
+            all_memories.append(
+                {
+                    "memory_id": memory.id,
+                    "content": memory.content,
+                    "scope": memory.scope,
+                    "metadata": memory.metadata,
+                    "tags": memory.tags,
+                    "category": memory.category,
+                    "created_at": memory.created_at,
+                }
+            )
 
         total_items = len(all_memories)
 
