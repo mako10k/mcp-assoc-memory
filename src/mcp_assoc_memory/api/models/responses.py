@@ -8,6 +8,30 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
+class MCPResponseBase(BaseModel):
+    """Base class for all MCP response models with standardized response methods"""
+
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Return minimal response dictionary with only essential fields.
+
+        Returns:
+            Dict containing only essential fields required for the response type
+        """
+        # Default implementation returns basic model dict
+        return self.model_dump(exclude_unset=True)
+
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Return lightweight response dictionary optimized for reduced context size.
+
+        Returns:
+            Dict containing response without verbose fields like content echo
+        """
+        # Default implementation returns basic model dict
+        return self.model_dump(exclude_unset=True)
+
+
 class Memory(BaseModel):
     """Memory model with all fields"""
 
@@ -91,7 +115,7 @@ class PaginationInfo(BaseModel):
 
 
 # Response models for each operation
-class MemoryStoreResponse(BaseModel):
+class MemoryStoreResponse(MCPResponseBase):
     """Response for memory store operation"""
 
     success: bool = Field(description="Operation success status")
@@ -100,8 +124,35 @@ class MemoryStoreResponse(BaseModel):
     memory: Optional[Memory] = Field(default=None, description="Stored memory (if successful)")
     associations_created: List[Association] = Field(default_factory=list, description="Auto-created associations")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal response with only essential fields"""
+        minimal_response = {
+            "success": self.success,
+            "message": self.message,
+        }
+        if self.memory:
+            minimal_response["memory_id"] = self.memory.id
+            minimal_response["created_at"] = self.memory.created_at.isoformat()
+        return minimal_response
 
-class MemorySearchResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight response without verbose data"""
+        lightweight_response = {
+            "success": self.success,
+            "message": self.message,
+            "data": self.data,
+        }
+        if self.memory:
+            # Include memory without full content
+            lightweight_response["memory"] = {
+                "id": self.memory.id,
+                "scope": self.memory.scope,
+                "created_at": self.memory.created_at.isoformat(),
+            }
+        return lightweight_response
+
+
+class MemorySearchResponse(MCPResponseBase):
     """Response for memory search operation"""
 
     success: bool = Field(description="Operation success status")
@@ -111,8 +162,26 @@ class MemorySearchResponse(BaseModel):
     query: str = Field(description="Original search query")
     total_found: int = Field(default=0, description="Total number of results found")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal search response"""
+        return {
+            "success": self.success,
+            "query": self.query,
+            "total_found": self.total_found,
+        }
 
-class MemoryGetResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight search response without full content"""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "query": self.query,
+            "total_found": self.total_found,
+            "results": [{"memory_id": r.memory.id, "similarity_score": r.similarity_score} for r in self.results[:5]],
+        }
+
+
+class MemoryGetResponse(MCPResponseBase):
     """Response for memory get operation"""
 
     success: bool = Field(description="Operation success status")
@@ -120,8 +189,31 @@ class MemoryGetResponse(BaseModel):
     data: Dict[str, Any] = Field(description="Response data")
     memory: Optional[MemoryWithAssociations] = Field(default=None, description="Retrieved memory with associations")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal get response"""
+        return {
+            "success": self.success,
+            "memory_id": self.memory.memory.id if self.memory else None,
+        }
 
-class MemoryUpdateResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight get response with basic memory info"""
+        if not self.memory:
+            return {"success": self.success, "message": self.message}
+        return {
+            "success": self.success,
+            "message": self.message,
+            "memory": {
+                "id": self.memory.memory.id,
+                "category": self.memory.memory.category,
+                "scope": self.memory.memory.scope,
+                "tags": self.memory.memory.tags,
+                "content_length": len(self.memory.memory.content),
+            },
+        }
+
+
+class MemoryUpdateResponse(MCPResponseBase):
     """Response for memory update operation"""
 
     success: bool = Field(description="Operation success status")
@@ -130,8 +222,33 @@ class MemoryUpdateResponse(BaseModel):
     memory: Optional[Memory] = Field(default=None, description="Updated memory (if successful)")
     associations_updated: List[Association] = Field(default_factory=list, description="Updated associations")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal update response"""
+        minimal_response = {
+            "success": self.success,
+            "message": self.message,
+        }
+        if self.memory:
+            minimal_response["memory_id"] = self.memory.id
+        return minimal_response
 
-class MemoryDeleteResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight update response"""
+        lightweight_response = {
+            "success": self.success,
+            "message": self.message,
+            "data": self.data,
+        }
+        if self.memory:
+            lightweight_response["memory"] = {
+                "id": self.memory.id,
+                "scope": self.memory.scope,
+                "updated_at": self.memory.updated_at.isoformat(),
+            }
+        return lightweight_response
+
+
+class MemoryDeleteResponse(MCPResponseBase):
     """Response for memory delete operation"""
 
     success: bool = Field(description="Operation success status")
@@ -140,8 +257,24 @@ class MemoryDeleteResponse(BaseModel):
     deleted_memory_id: Optional[str] = Field(default=None, description="ID of deleted memory")
     associations_removed: int = Field(default=0, description="Number of associations removed")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal delete response"""
+        return {
+            "success": self.success,
+            "deleted_memory_id": self.deleted_memory_id,
+        }
 
-class MemoryMoveResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight delete response"""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "deleted_memory_id": self.deleted_memory_id,
+            "associations_removed": self.associations_removed,
+        }
+
+
+class MemoryMoveResponse(MCPResponseBase):
     """Response for memory move operation"""
 
     success: bool = Field(description="Operation success status")
@@ -150,8 +283,26 @@ class MemoryMoveResponse(BaseModel):
     moved_memories: List[Memory] = Field(default_factory=list, description="Successfully moved memories")
     failed_memory_ids: List[str] = Field(default_factory=list, description="Memory IDs that failed to move")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal move response"""
+        return {
+            "success": self.success,
+            "moved_count": len(self.moved_memories),
+            "failed_count": len(self.failed_memory_ids),
+        }
 
-class MemoryListAllResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight move response"""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "moved_count": len(self.moved_memories),
+            "failed_count": len(self.failed_memory_ids),
+            "failed_memory_ids": self.failed_memory_ids,
+        }
+
+
+class MemoryListAllResponse(MCPResponseBase):
     """Response for memory list all operation"""
 
     success: bool = Field(description="Operation success status")
@@ -160,8 +311,26 @@ class MemoryListAllResponse(BaseModel):
     memories: List[Memory] = Field(default_factory=list, description="List of memories")
     pagination: PaginationInfo = Field(description="Pagination information")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal list response"""
+        return {
+            "success": self.success,
+            "total_memories": len(self.memories),
+            "page": self.pagination.page,
+            "total_pages": self.pagination.total_pages,
+        }
 
-class MemoryDiscoverAssociationsResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight list response"""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "total_memories": len(self.memories),
+            "pagination": self.pagination.dict(),
+        }
+
+
+class MemoryDiscoverAssociationsResponse(MCPResponseBase):
     """Response for memory discover associations operation"""
 
     success: bool = Field(description="Operation success status")
@@ -173,8 +342,29 @@ class MemoryDiscoverAssociationsResponse(BaseModel):
     )
     total_found: int = Field(default=0, description="Total number of associations found")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal associations response"""
+        minimal_response: Dict[str, Any] = {
+            "success": self.success,
+            "total_found": self.total_found,
+        }
+        if self.source_memory:
+            minimal_response["source_memory_id"] = self.source_memory.id
+        return minimal_response
 
-class ScopeListResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight associations response"""
+        lightweight_response = {
+            "success": self.success,
+            "message": self.message,
+            "total_found": self.total_found,
+        }
+        if self.source_memory:
+            lightweight_response["source_memory_id"] = self.source_memory.id
+        return lightweight_response
+
+
+class ScopeListResponse(MCPResponseBase):
     """Response for scope list operation"""
 
     success: bool = Field(description="Operation success status")
@@ -183,8 +373,24 @@ class ScopeListResponse(BaseModel):
     scopes: List[ScopeInfo] = Field(default_factory=list, description="List of scopes")
     total_scopes: int = Field(default=0, description="Total number of scopes")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal scope list response"""
+        return {
+            "success": self.success,
+            "total_scopes": self.total_scopes,
+        }
 
-class ScopeSuggestResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight scope list response"""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "total_scopes": self.total_scopes,
+            "scopes": [{"scope": scope.scope, "memory_count": scope.memory_count} for scope in self.scopes],
+        }
+
+
+class ScopeSuggestResponse(MCPResponseBase):
     """Response for scope suggest operation"""
 
     success: bool = Field(description="Operation success status")
@@ -193,8 +399,32 @@ class ScopeSuggestResponse(BaseModel):
     recommendation: Optional[ScopeRecommendation] = Field(default=None, description="Primary recommendation")
     alternatives: List[ScopeRecommendation] = Field(default_factory=list, description="Alternative suggestions")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal scope suggestion response"""
+        minimal_response: Dict[str, Any] = {
+            "success": self.success,
+        }
+        if self.recommendation:
+            minimal_response["recommended_scope"] = self.recommendation.scope
+            minimal_response["confidence"] = self.recommendation.confidence
+        return minimal_response
 
-class SessionManageResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight scope suggestion response"""
+        lightweight_response: Dict[str, Any] = {
+            "success": self.success,
+            "message": self.message,
+        }
+        if self.recommendation:
+            lightweight_response["recommendation"] = {
+                "scope": self.recommendation.scope,
+                "confidence": self.recommendation.confidence,
+            }
+        lightweight_response["alternatives_count"] = len(self.alternatives)
+        return lightweight_response
+
+
+class SessionManageResponse(MCPResponseBase):
     """Response for session manage operation"""
 
     success: bool = Field(description="Operation success status")
@@ -204,8 +434,28 @@ class SessionManageResponse(BaseModel):
     sessions: List[SessionInfo] = Field(default_factory=list, description="List of sessions (for list)")
     cleaned_sessions: List[str] = Field(default_factory=list, description="Cleaned session IDs (for cleanup)")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal session response"""
+        minimal_response: Dict[str, Any] = {
+            "success": self.success,
+        }
+        if self.session:
+            minimal_response["session_id"] = self.session.session_id
+        minimal_response["sessions_count"] = len(self.sessions)
+        minimal_response["cleaned_count"] = len(self.cleaned_sessions)
+        return minimal_response
 
-class MemoryExportResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight session response"""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "sessions_count": len(self.sessions),
+            "cleaned_count": len(self.cleaned_sessions),
+        }
+
+
+class MemoryExportResponse(MCPResponseBase):
     """Response for memory export operation"""
 
     success: bool = Field(description="Operation success status")
@@ -216,8 +466,28 @@ class MemoryExportResponse(BaseModel):
     exported_count: int = Field(default=0, description="Number of memories exported")
     export_format: str = Field(default="json", description="Export format used")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal export response"""
+        return {
+            "success": self.success,
+            "exported_count": self.exported_count,
+            "export_format": self.export_format,
+        }
 
-class MemoryImportResponse(BaseModel):
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight export response"""
+        lightweight_response: Dict[str, Any] = {
+            "success": self.success,
+            "message": self.message,
+            "exported_count": self.exported_count,
+            "export_format": self.export_format,
+        }
+        if self.file_path:
+            lightweight_response["file_path"] = self.file_path
+        return lightweight_response
+
+
+class MemoryImportResponse(MCPResponseBase):
     """Response for memory import operation"""
 
     success: bool = Field(description="Operation success status")
@@ -228,9 +498,28 @@ class MemoryImportResponse(BaseModel):
     error_count: int = Field(default=0, description="Number of import errors")
     import_summary: Dict[str, Any] = Field(default_factory=dict, description="Import operation summary")
 
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal import response"""
+        return {
+            "success": self.success,
+            "imported_count": self.imported_count,
+            "skipped_count": self.skipped_count,
+            "error_count": self.error_count,
+        }
+
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight import response"""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "imported_count": self.imported_count,
+            "skipped_count": self.skipped_count,
+            "error_count": self.error_count,
+        }
+
 
 # Legacy compatibility response model (used by tools)
-class MemoryResponse(BaseModel):
+class MemoryResponse(MCPResponseBase):
     """Legacy memory response for tool compatibility"""
 
     success: bool = Field(default=True, description="Operation success status")
@@ -247,15 +536,96 @@ class MemoryResponse(BaseModel):
     is_duplicate: bool = Field(default=False, description="Whether this was a duplicate detection")
     duplicate_of: Optional[str] = Field(default=None, description="Original memory ID if duplicate")
 
+    def to_minimal_dict(
+        self, include_scope_if_modified: bool = False, original_scope: Optional[str] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Return minimal response dictionary with only essential fields.
+
+        Args:
+            include_scope_if_modified: Include scope only if it differs from original_scope
+            original_scope: Original scope to compare against
+            **kwargs: Additional arguments for compatibility
+
+        Returns:
+            Dict containing only essential fields: success, memory_id, created_at
+            Plus conditionally included fields based on auto-generation or modification
+        """
+        minimal_response = {
+            "success": self.success,
+            "memory_id": self.memory_id,
+            "created_at": self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at,
+        }
+
+        # Include scope only if it was modified/normalized from the request
+        if include_scope_if_modified and self.scope and self.scope != original_scope:
+            minimal_response["scope"] = self.scope
+
+        # Include fields only if they contain auto-generated data (not empty defaults)
+        # TODO: Include metadata, tags, category only if auto-generated by system
+        # Currently no auto-generation features implemented, so they are excluded
+
+        return minimal_response
+
+    def to_lightweight_dict(
+        self, include_scope_if_modified: bool = False, original_scope: Optional[str] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Return lightweight response dictionary excluding content echo.
+
+        Args:
+            include_scope_if_modified: Include scope only if it differs from original_scope
+            original_scope: Original scope to compare against
+            **kwargs: Additional arguments for compatibility
+
+        Returns:
+            Dict containing response without content echo, plus non-empty auto-generated fields
+        """
+        lightweight_response = {
+            "success": self.success,
+            "memory_id": self.memory_id,
+            "content": "",  # Don't echo input content
+            "created_at": self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at,
+        }
+
+        # Include scope only if it was modified/normalized from the request
+        if include_scope_if_modified and self.scope and self.scope != original_scope:
+            lightweight_response["scope"] = self.scope
+
+        # Only include non-empty auto-generated fields
+        if self.metadata:
+            lightweight_response["metadata"] = self.metadata
+        if self.tags:
+            lightweight_response["tags"] = self.tags
+        if self.category:
+            lightweight_response["category"] = self.category
+
+        return lightweight_response
+
 
 # Generic error response
-class ErrorResponse(BaseModel):
+class ErrorResponse(MCPResponseBase):
     """Error response"""
 
     success: bool = Field(default=False, description="Operation success status")
     message: str = Field(description="Error message")
     error: str = Field(description="Error type or code")
     data: Dict[str, Any] = Field(default_factory=dict, description="Error context data")
+
+    def to_minimal_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return minimal error response"""
+        return {
+            "success": self.success,
+            "error": self.error,
+        }
+
+    def to_lightweight_dict(self, **kwargs: Any) -> Dict[str, Any]:
+        """Return lightweight error response"""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "error": self.error,
+        }
 
 
 # Union type for all possible responses

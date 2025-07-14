@@ -334,10 +334,10 @@ Provides complete session lifecycle management including creation, listing, and 
         "idempotentHint": False,
     },
 )
-async def session_manage(request: SessionManageRequest, ctx: Context) -> Dict[str, Any]:
+async def session_manage(request: SessionManageRequest, ctx: Context) -> Any:
     """Manage sessions and cleanup"""
     response = await handle_session_manage(request, ctx)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 @mcp.tool(
@@ -369,10 +369,10 @@ Displays the hierarchical structure of all scopes with memory counts, helping yo
         "idempotentHint": True,
     },
 )
-async def scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str, Any]:
+async def scope_list(request: ScopeListRequest, ctx: Context) -> Any:
     """List scopes with pagination and hierarchy"""
     response = await handle_scope_list(request, ctx)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 @mcp.tool(
@@ -404,10 +404,10 @@ Analyzes your content using keyword detection and context patterns to recommend 
         "idempotentHint": True,
     },
 )
-async def scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Dict[str, Any]:
+async def scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Any:
     """Suggest scope based on content analysis"""
     response = await handle_scope_suggest(request, ctx)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 # Old memory_export deleted - replaced by memory_sync export operation
@@ -440,10 +440,10 @@ Moves specified memories from their current scopes to a new target scope, preser
 ➡️ What's next: Use scope_list to verify new organization, memory_search in new scope to confirm placement""",
     annotations={"title": "Memory Move", "readOnlyHint": False, "destructiveHint": False, "idempotentHint": False},
 )
-async def memory_move(request: MemoryMoveRequest, ctx: Context) -> Dict[str, Any]:
+async def memory_move(request: MemoryMoveRequest, ctx: Context) -> Any:
     """Move memories to a new scope"""
     response = await handle_memory_move(request, ctx)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 @mcp.tool(
@@ -476,10 +476,10 @@ Takes a specific memory as starting point and finds semantically related memorie
 )
 async def memory_discover_associations(
     memory_id: str, limit: int = 10, similarity_threshold: float = 0.1, ctx: Optional[Context] = None
-) -> Dict[str, Any]:
+) -> Any:
     """Discover semantic associations for a specific memory"""
     response = await handle_memory_discover_associations(memory_id, ctx, limit, similarity_threshold)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 @mcp.tool(

@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "description": "Smart lint configuration for handling expected false positives",
+  "expected_errors": {
+    "mypy": [
+      {
+        "file": "src/mcp_assoc_memory/api/tools/memory_tools.py",
+        "line": 1065,
+        "error_code": "unreachable",
+        "pattern": "Statement is unreachable",
+        "reason": "False positive: mypy incorrectly detects unreachable code in exception handler (GitHub issue #12785)",
+        "permanent": true
+      },
+      {
+        "file": "src/mcp_assoc_memory/api/tools/memory_tools.py",
+        "line": 1086,
+        "error_code": "unused-ignore",
+        "pattern": "Unused \"type: ignore\" comment",
+        "reason": "Related to unreachable false positive - type:ignore sometimes detected as unused",
+        "permanent": true
+      }
+    ],
+    "flake8": []
+  },
+  "settings": {
+    "strict_mode": false,
+    "allow_new_errors": false,
+    "max_unexpected_errors": 0
+  },
+  "file_patterns": {
+    "python": {
+      "include": ["src/**/*.py", "tests/**/*.py", "scripts/**/*.py"],
+      "exclude": ["**/__pycache__/**", "**/.*", "**/*.pyc"]
+    },
+    "config": {
+      "include": ["*.json", "*.yaml", "*.yml", "*.toml"],
+      "exclude": [".copilot-temp/**", "data/**", "htmlcov/**"]
+    }
+  },
+  "output": {
+    "report_file": ".copilot-temp/smart-lint-report.txt",
+    "progress_file": ".copilot-temp/smart-lint-progress.txt",
+    "include_timestamps": true,
+    "include_execution_time": true
+  }
+}
