@@ -180,7 +180,8 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
         memory = await memory_manager.store_memory(
             content=request.content,
             scope=request.scope,
-            allow_duplicates=request.allow_duplicates
+            allow_duplicates=request.allow_duplicates,
+            auto_associate=request.auto_associate
         )
 
         # Early None check - this is the critical fix

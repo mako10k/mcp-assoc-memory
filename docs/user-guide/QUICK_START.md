@@ -56,7 +56,8 @@ Use memory_store to save: "FastAPI is excellent for building APIs because of its
     "content": "FastAPI is excellent for building APIs...",
     "scope": "learning/web",
     "tags": ["fastapi", "api", "validation"],
-    "auto_associate": true
+    "auto_associate": true,
+    "duplicate_threshold": null
   }
 }
 ```
@@ -86,6 +87,26 @@ Set duplicate_threshold to 0.85 and allow_duplicates to true
 - **Content quality**: Maintain focused, unique insights
 - **Flexible control**: Choose when to enforce or bypass duplicate checking
 - **Similarity scoring**: Transparent relevance metrics (0.0-1.0)
+
+### Auto-Association Control
+The `memory_store` tool also supports automatic association discovery:
+
+**Enable auto-association (default):**
+```instructions
+Store this memory with auto-association: "React hooks simplify state management"
+```
+
+**Disable auto-association for faster storage:**
+```instructions
+Store this memory without auto-association: "Quick note about debugging"
+Set auto_associate to false
+```
+
+### Auto-Association Benefits:
+- **Automatic connections**: Discovers semantic relationships with existing memories
+- **Knowledge linking**: Builds interconnected knowledge graph
+- **Performance control**: Disable for bulk operations or temporary notes
+- **Creative discovery**: Reveals unexpected connections between concepts
 ```
 
 ### Search for Memories

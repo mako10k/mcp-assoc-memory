@@ -14,9 +14,9 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
 ### 🧠 Core Memory Operations
 
 #### 1. `memory_store` 
-**💾 Store New Memory with Auto-Association**
+**💾 Store New Memory**
 
-**Purpose**: Store new memories with automatic connection discovery to existing knowledge.
+**Purpose**: Store new memories with optional automatic connection discovery and duplicate detection.
 
 **Parameters**:
 ```json
@@ -35,6 +35,11 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
 }
 ```
 
+**Auto-Association Control**:
+- `auto_associate`: Boolean (default: true)
+  - `true`: Automatically discover semantic connections with existing memories
+  - `false`: Skip association discovery for faster storage (bulk operations)
+
 **Duplicate Detection**:
 - `duplicate_threshold`: Float (0.0-1.0) or null
   - `null` (default): No duplicate checking - allow any content
@@ -45,8 +50,9 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
   - `false`: Reject storage if duplicate found
 
 **Use Cases**:
-- **No checking**: `duplicate_threshold=null` (default behavior)
-- **Standard prevention**: `duplicate_threshold=0.85`
+- **Standard storage**: `auto_associate=true, duplicate_threshold=null` (default)
+- **Bulk operations**: `auto_associate=false` (faster)
+- **Duplicate prevention**: `duplicate_threshold=0.85`
 - **Force storage**: `duplicate_threshold=0.85, allow_duplicates=true`
 ```
 

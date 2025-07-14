@@ -277,7 +277,7 @@ Stores your content as a searchable memory, automatically discovers connections 
 
 ➡️ What's next: Use memory_discover_associations to explore new connections""",
     annotations={
-        "title": "Memory Storage with Auto-Association",
+        "title": "Memory Storage",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False,
