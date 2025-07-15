@@ -774,7 +774,7 @@ class MemoryManageRequest(CommonToolParameters):
         return self.memory_id
 
 
-class MemorySyncRequest(MCPRequestBase):
+class MemorySyncRequest(MCPRequestBase, CommonToolParameters):
     """Unified import/export operations request model"""
 
     operation: str = Field(
