@@ -382,7 +382,7 @@ class ScopeListRequest(MCPRequestBase, CommonToolParameters):
         return self.parent_scope if self.parent_scope else "root"
 
 
-class ScopeSuggestRequest(MCPRequestBase):
+class ScopeSuggestRequest(MCPRequestBase, CommonToolParameters):
     content: str = Field(
         description="""Content to analyze for scope recommendation:
 

@@ -21,6 +21,15 @@
 <!-- Users should add new backlog items here -->
 <!-- Copilot will process and remove items from this section -->
 
+過去のバックログを復旧させたい。
+ただ、このファイルの処理ログくらいしか残ってないと思うので、
+今後は連想記憶とバックログファイル（できれば別途作成）の両方に記録してほしい
+.github/copilot-instructions.md にそのことが書いてなかったらそれを追記してほしい
+なお、従来のバックログはこのファイルを確認して、一緒に思い出しながら、
+プロダクトバックログを再構成しましょう。
+まずは、優先順位高いものから。。
+
+
 <!-- All backlog items completed and processed to associative memory -->
 <!-- URL trailing slash enhancement stored in work/backlog/medium -->
 <!-- Mypy type compatibility issue stored in work/backlog/high -->

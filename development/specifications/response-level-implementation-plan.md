@@ -32,11 +32,11 @@
 - [x] `memory_manage` - Add response_level parameter ✅ Phase 2.3 Complete
 - [x] `memory_discover_associations` - Add response_level parameter ✅ Phase 2.4 Complete
 - [x] `memory_move` - Add response_level parameter ✅ Phase 2.5 Complete
+- [x] `memory_sync` - Add response_level parameter ✅ Phase 2.6 Complete
+- [x] `scope_list` - Add response_level parameter ✅ Phase 2.7 Complete
+- [x] `session_manage` - Add response_level parameter ✅ Phase 2.8 Complete
 - [ ] `memory_list_all` - Add response_level parameter
-- [ ] `memory_sync` - Add response_level parameter
-- [ ] `scope_list` - Add response_level parameter
 - [ ] `scope_suggest` - Add response_level parameter
-- [ ] `session_manage` - Add response_level parameter
 
 #### Response Logic Implementation
 - [ ] Implement level-specific response generation for each tool
