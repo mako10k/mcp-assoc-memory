@@ -22,6 +22,7 @@ from ..processing import process_tool_response
 from ..models import (
     DiversifiedSearchRequest,
     Memory,
+    MemoryDiscoverAssociationsRequest,
     MemoryExportRequest,
     MemoryImportRequest,
     MemoryImportResponse,
@@ -688,34 +689,52 @@ async def handle_memory_update(request: MemoryUpdateRequest, ctx: Context) -> Me
 
 
 async def handle_memory_discover_associations(
-    memory_id: str, ctx: Context, limit: int = 10, similarity_threshold: float = 0.1
+    request: MemoryDiscoverAssociationsRequest, ctx: Context
 ) -> Dict[str, Any]:
     """Discover semantic associations for a specific memory"""
     try:
         await ensure_initialized()
-        await ctx.info(f"Discovering associations for memory: {memory_id}")
+        await ctx.info(f"Discovering associations for memory: {request.memory_id}")
 
         # Get memory manager using unified function
         manager = await get_or_create_memory_manager()
         if not manager:
-            await ctx.error("Memory manager not available")
-            return {"error": "Memory manager not available", "associations": []}
+            error_msg = "Memory manager not available"
+            await ctx.error(error_msg)
+            
+            base_data = {
+                "success": False,
+                "message": error_msg,
+                "source_memory_id": request.memory_id,
+                "total_found": 0
+            }
+            
+            return ResponseBuilder.build_response(request.response_level, base_data)
 
         # Get the source memory
-        memory = await manager.get_memory(memory_id)
+        memory = await manager.get_memory(request.memory_id)
         if not memory:
-            await ctx.warning(f"Memory not found: {memory_id}")
-            return {"error": "Memory not found", "associations": []}
+            error_msg = f"Memory not found: {request.memory_id}"
+            await ctx.warning(error_msg)
+            
+            base_data = {
+                "success": False,
+                "message": error_msg,
+                "source_memory_id": request.memory_id,
+                "total_found": 0
+            }
+            
+            return ResponseBuilder.build_response(request.response_level, base_data)
 
         # Find similar memories with enhanced search strategy
         search_results = await manager.search_memories(
             query=memory.content,
-            limit=limit * 3,  # Search more to account for filtering
-            min_score=max(0.1, similarity_threshold - 0.2),  # Lower threshold for diversity
+            limit=request.limit * 3,  # Search more to account for filtering
+            min_score=max(0.1, request.similarity_threshold - 0.2),  # Lower threshold for diversity
         )
 
         # If we didn't find enough diverse results, try with the original content plus tags
-        if len(search_results) < limit:
+        if len(search_results) < request.limit:
             # Create enhanced query with tags and category
             enhanced_query = memory.content
             if memory.tags:
@@ -724,7 +743,7 @@ async def handle_memory_discover_associations(
                 enhanced_query += " " + memory.category
 
             additional_results = await manager.search_memories(
-                query=enhanced_query, limit=limit * 2, min_score=max(0.1, similarity_threshold - 0.3)
+                query=enhanced_query, limit=request.limit * 2, min_score=max(0.1, request.similarity_threshold - 0.3)
             )
 
             # Merge results (will be deduplicated later)
@@ -738,7 +757,7 @@ async def handle_memory_discover_associations(
             assoc_memory = result["memory"]
 
             # Skip the source memory itself
-            if assoc_memory.id == memory_id:
+            if assoc_memory.id == request.memory_id:
                 continue
 
             # Skip memories with identical content to promote diversity
@@ -764,22 +783,76 @@ async def handle_memory_discover_associations(
             )
 
             # Break if we have enough diverse associations
-            if len(associations) >= limit:
+            if len(associations) >= request.limit:
                 break
 
-        await ctx.info(f"Found {len(associations)} associations for memory {memory_id}")
+        await ctx.info(f"Found {len(associations)} associations for memory {request.memory_id}")
 
-        return {
-            "source_memory_id": memory_id,
-            "source_content": memory.content[:100] + "..." if len(memory.content) > 100 else memory.content,
-            "associations": associations,
-            "total_found": len(associations),
-            "similarity_threshold": similarity_threshold,
+        # Use ResponseBuilder for level-appropriate response
+        base_data = {
+            "success": True,
+            "message": f"Found {len(associations)} associations for memory: {request.memory_id}",
+            "source_memory_id": request.memory_id,
+            "total_found": len(associations)
         }
+        
+        standard_data = {
+            "source_content_preview": ResponseBuilder.truncate_content(memory.content, 100),
+            "associations": []
+        }
+        
+        # Add level-appropriate associations
+        if request.response_level != ResponseLevel.MINIMAL:
+            for assoc in associations:
+                if request.response_level == ResponseLevel.STANDARD:
+                    # Standard: ID, scope, content preview, similarity
+                    assoc_data = {
+                        "memory_id": assoc["memory_id"],
+                        "scope": assoc["scope"],
+                        "content_preview": ResponseBuilder.truncate_content(assoc["content"], 50),
+                        "similarity_score": assoc["similarity_score"]
+                    }
+                else:  # FULL
+                    # Full: Complete association objects
+                    assoc_data = assoc
+                standard_data["associations"].append(assoc_data)
+        
+        full_data = {
+            "source_memory": {
+                "memory_id": memory.id,
+                "content": memory.content,
+                "scope": memory.scope,
+                "tags": memory.tags,
+                "category": memory.category,
+                "created_at": memory.created_at.isoformat() if memory.created_at else None,
+                "metadata": memory.metadata
+            },
+            "search_metadata": {
+                "similarity_threshold": request.similarity_threshold,
+                "limit": request.limit,
+                "search_strategy": "enhanced_query_with_tags"
+            }
+        }
+        
+        return ResponseBuilder.build_response(
+            request.response_level,
+            base_data,
+            standard_data,
+            full_data
+        )
 
     except Exception as e:
-        await ctx.error(f"Failed to discover associations: {e}")
-        return {"error": str(e), "associations": []}
+        error_msg = f"Failed to discover associations: {str(e)}"
+        await ctx.error(error_msg)
+        
+        base_data = {
+            "success": False,
+            "message": error_msg,
+            "source_memory_id": request.memory_id,
+            "total_found": 0
+        }
+        
+        return ResponseBuilder.build_response(request.response_level, base_data)
 
 
 async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> MemoryImportResponse:

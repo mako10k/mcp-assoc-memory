@@ -832,3 +832,46 @@ class MemorySyncRequest(MCPRequestBase):
         if self.file_path:
             return f"{self.operation}:{self.file_path}"
         return f"{self.operation}:direct_data"
+
+
+class MemoryDiscoverAssociationsRequest(CommonToolParameters):
+    """Request model for discovering memory associations"""
+
+    memory_id: str = Field(description="Memory ID to discover associations for")
+    limit: int = Field(
+        default=10,
+        description="""Maximum number of associations to retrieve:
+
+        Values & Use Cases:
+        • 5-10: Focused associations (finding specific relationships) ← RECOMMENDED
+        • 10-20: Balanced exploration (general ideation, learning review)
+        • 20-50: Comprehensive discovery (brainstorming, research phase)
+
+        Strategy: Start small (10), increase if you need broader context
+        Example: limit=15 for creative thinking sessions
+
+        ⚠️ Performance: Higher values increase processing time""",
+        examples=[10, 15, 5],
+        ge=1,
+        le=100
+    )
+    similarity_threshold: float = Field(
+        default=0.1,
+        description="""Similarity threshold for association matching:
+
+        Values & Use Cases:
+        • 0.8-1.0: Near-identical content (duplicate detection, exact recall)
+        • 0.4-0.8: Clear relevance (general search, learning review)
+        • 0.2-0.4: Broader associations (idea expansion, new perspectives)
+        • 0.1-0.2: Creative connections (brainstorming, unexpected links) ← RECOMMENDED
+
+        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
+        Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
+        examples=[0.1, 0.2, 0.4],
+        ge=0.0,
+        le=1.0
+    )
+
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the memory_id"""
+        return f"memory_id:{self.memory_id}"
