@@ -12,6 +12,7 @@ from ..models.responses import (
     SessionInfo,
     SessionManageResponse,
 )
+from ..models.common import ResponseBuilder, ResponseLevel
 
 # Module-level dependencies (for backward compatibility)
 memory_manager = None
@@ -37,16 +38,28 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
         if not memory_manager:
             error_msg = "Memory manager not available"
             await ctx.error(error_msg)
-            return MemoryMoveResponse(
-                success=False,
-                message=error_msg,
-                data={},
-                moved_memories=[],
-                failed_memory_ids=request.memory_ids,
-            ).model_dump()
+            
+            base_data = {
+                "success": False,
+                "error": error_msg,
+                "moved_count": 0,
+                "failed_count": len(request.memory_ids)
+            }
+            
+            return ResponseBuilder.build_response(request.response_level, base_data)
+
+        # Handle empty memory_ids list early
+        if not request.memory_ids:
+            base_data = {
+                "success": True,
+                "moved_count": 0,
+                "failed_count": 0
+            }
+            return ResponseBuilder.build_response(request.response_level, base_data)
 
         moved_count = 0
         failed_memory_ids = []
+        moved_memories = []
 
         for memory_id in request.memory_ids:
             try:
@@ -65,6 +78,13 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
                     continue
 
                 moved_count += 1
+                moved_memories.append({
+                    "memory_id": memory_id,
+                    "scope": request.target_scope,
+                    "content_preview": updated_memory.content[:50] + "..." if len(updated_memory.content) > 50 else updated_memory.content,
+                    "created_at": getattr(updated_memory, 'created_at', None),
+                    "updated_at": getattr(updated_memory, 'updated_at', None)
+                })
                 await ctx.info(f"Successfully moved memory {memory_id} to {request.target_scope}")
 
             except Exception as move_error:
@@ -72,30 +92,54 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
                 await ctx.warning(error_msg)
                 failed_memory_ids.append(memory_id)
 
+        success = moved_count > 0 or len(request.memory_ids) == 0
         success_msg = f"Successfully moved {moved_count} memories to {request.target_scope}"
         if failed_memory_ids:
             success_msg += f" ({len(failed_memory_ids)} failed)"
 
         await ctx.info(success_msg)
 
-        return MemoryMoveResponse(
-            success=True,
-            message=success_msg,
-            data={"moved_count": moved_count, "target_scope": request.target_scope},
-            moved_memories=[],  # Simplified: don't return full memory objects to avoid serialization issues
-            failed_memory_ids=failed_memory_ids,
-        ).model_dump()
+        # Use ResponseBuilder for level-appropriate response
+        base_data = {
+            "success": success,
+            "moved_count": moved_count,
+            "failed_count": len(failed_memory_ids)
+        }
+        
+        standard_data = {
+            "target_scope": request.target_scope,
+            "moved_memories": moved_memories
+        }
+        
+        full_data = {
+            "move_summary": {
+                "total_requested": len(request.memory_ids),
+                "successfully_moved": moved_count,
+                "failed_moves": len(failed_memory_ids),
+                "success_rate": moved_count / len(request.memory_ids) if request.memory_ids else 0
+            },
+            "failed_memory_ids": failed_memory_ids
+        }
+        
+        return ResponseBuilder.build_response(
+            request.response_level,
+            base_data,
+            standard_data,
+            full_data
+        )
 
     except Exception as e:
         error_msg = f"Failed to move memories: {e}"
         await ctx.error(error_msg)
-        return MemoryMoveResponse(
-            success=False,
-            message=error_msg,
-            data={},
-            moved_memories=[],
-            failed_memory_ids=request.memory_ids,
-        ).model_dump()
+        
+        base_data = {
+            "success": False,
+            "error": error_msg,
+            "moved_count": 0,
+            "failed_count": len(request.memory_ids)
+        }
+        
+        return ResponseBuilder.build_response(request.response_level, base_data)
 
 
 async def handle_memory_discover_associations(

@@ -294,7 +294,7 @@ class MemoryUpdateRequest(MCPRequestBase):
         return self.memory_id
 
 
-class MemoryMoveRequest(MCPRequestBase):
+class MemoryMoveRequest(CommonToolParameters):
     memory_ids: List[str] = Field(
         description="""List of memory IDs to move to new scope:
 
