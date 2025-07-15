@@ -133,20 +133,19 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str
         return ResponseBuilder.build_response(request.response_level, base_data)
 
 
-async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> ScopeSuggestResponse:
-    """Handle scope suggestion requests"""
+async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Dict[str, Any]:
+    """Handle scope suggestion requests with ResponseBuilder integration"""
     try:
         # Use unified memory manager access
         current_memory_manager = await get_or_create_memory_manager()
 
         if current_memory_manager is None:
-            return ScopeSuggestResponse(
-                success=False,
-                message="Internal server error",
-                data={"error": "Memory manager not initialized"},
-                recommendation=None,
-                alternatives=[],
-            )
+            base_data = {
+                "success": False,
+                "message": "Internal server error",
+                "error": "Memory manager not initialized"
+            }
+            return ResponseBuilder.build_response(request.response_level, base_data)
 
         content = request.content.lower()
         current_scope = request.current_scope
@@ -241,24 +240,41 @@ async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Sc
         primary = suggestions[0]
         alternatives = suggestions[1:5]  # Limit to top 5 alternatives
 
-        return ScopeSuggestResponse(
-            success=True,
-            message=f"Generated {len(suggestions)} scope suggestions",
-            data={
-                "suggested_scope": primary.scope,
-                "confidence": primary.confidence,
-                "reasoning": primary.reasoning,
-                "alternatives": alternatives,
-                "current_scope": current_scope,
-            },
-        )
+        # Build response using ResponseBuilder
+        base_data = {
+            "success": True,
+            "message": f"Generated {len(suggestions)} scope suggestions",
+            "suggested_scope": primary.scope,
+            "confidence": primary.confidence
+        }
+
+        standard_data = {
+            "reasoning": primary.reasoning,
+            "alternatives": [{"scope": alt.scope, "confidence": alt.confidence} for alt in alternatives],
+            "current_scope": current_scope
+        }
+
+        full_data = {
+            "detailed_alternatives": [
+                {
+                    "scope": alt.scope,
+                    "confidence": alt.confidence,
+                    "reasoning": alt.reasoning
+                } for alt in alternatives
+            ],
+            "analysis_metadata": {
+                "content_length": len(request.content),
+                "context_aware": current_scope is not None
+            }
+        }
+
+        return ResponseBuilder.build_response(request.response_level, base_data, standard_data, full_data)
 
     except Exception as e:
         logger.error(f"Error in scope_suggest: {e}", exc_info=True)
-        return ScopeSuggestResponse(
-            success=False,
-            message=f"Failed to suggest scope: {str(e)}",
-            data={"error": "SCOPE_SUGGEST_ERROR"},
-            recommendation=None,
-            alternatives=[],
-        )
+        base_data = {
+            "success": False,
+            "message": f"Failed to suggest scope: {str(e)}",
+            "error": "SCOPE_SUGGEST_ERROR"
+        }
+        return ResponseBuilder.build_response(request.response_level, base_data)
