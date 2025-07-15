@@ -152,15 +152,16 @@ For detailed setup instructions, see `docs/installation.md`.
 
 ## Server Startup
 
-### Recommended: FastMCP Server
 
-Start the MCP server using **`python -m mcp_assoc_memory`**:
+### Recommended: FastMCP Server (STDIO default)
+
+**Official startup method:**
 
 ```bash
-python3 -m mcp_assoc_memory
+python -m mcp_assoc_memory
 ```
 
-The server starts in STDIO mode by default for MCP client integration.
+The server always starts in **STDIO mode by default** for MCP client integration. The legacy `mcp-server` command is deprecated and no longer provided.
 
 ### Environment Variables
 
@@ -198,10 +199,9 @@ pip install git+https://github.com/mako10k/mcp-assoc-memory.git
 pipx install git+https://github.com/mako10k/mcp-assoc-memory.git
 ```
 
-### Start the server
+
+### Start the server (after install)
 ```bash
-mcp-server
-# or
 python -m mcp_assoc_memory
 ```
 
@@ -212,11 +212,19 @@ python -m mcp_assoc_memory
 
 ## Developer Information
 
+
 ### Development Guidelines
 
 🤖 **AI Development Agent**: [development/workflow/AGENT.md](development/workflow/AGENT.md)  
 📋 **GitHub Copilot Rules**: [.github/copilot-instructions.md](.github/copilot-instructions.md)  
 🔄 **Development Workflow**: [development/workflow/DEVELOPER_GUIDELINES.md](development/workflow/DEVELOPER_GUIDELINES.md)
+
+---
+
+## ✅ Quality Status
+
+All code passes **mypy (type check)**, **flake8 (lint)**, and **pytest (unit/integration tests)** as of July 2025.  
+CI/CD pipeline enforces these checks for every commit.
 
 ### Technical Reference
 
