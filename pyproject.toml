@@ -7,7 +7,7 @@ name = "mcp-assoc-memory"
 version = "0.1.0"
 description = "Associative Memory MCP Server for LLMs - Knowledge management system with hierarchical scope organization"
 authors = [
-    {name = "mako10k", email = "your.email@example.com"}
+    {name = "Makoto Katsumata", email = "mako10k@mk10.org"}
 ]
 readme = "README.md"
 license = {text = "MIT"}
@@ -86,7 +86,8 @@ Documentation = "https://github.com/mako10k/mcp-assoc-memory/blob/main/README.md
 Issues = "https://github.com/mako10k/mcp-assoc-memory/issues"
 
 [project.scripts]
-mcp-assoc-memory = "mcp_assoc_memory.main:main"
+mcp-assoc-memory = "mcp_assoc_memory.__main__:main"
+mcp-server = "mcp_assoc_memory.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,3 +1,8 @@
+[![CI](https://github.com/mako10k/mcp-assoc-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/mako10k/mcp-assoc-memory/actions)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](./htmlcov/index.html)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/mcp-assoc-memory.svg)](https://pypi.org/project/mcp-assoc-memory/)
+
 # MCP Associative Memory Server
 
 🧠 **Production-Ready Intelligent Memory System** - Store, search, and discover knowledge connections using the Model Context Protocol (MCP) with **74/74 tests passing** and **complete CI/CD pipeline**.
@@ -174,6 +179,37 @@ The server starts in STDIO mode by default for MCP client integration.
 - Logs: `logs/mcp_server.log`
 - PID:  `logs/mcp_server.pid`
 
+## 🛠️ Installation (PyPI, pipx, GitHub)
+
+### Recommended: PyPI (after publish)
+```bash
+pip install mcp-assoc-memory
+```
+
+### pipx (isolated global install)
+```bash
+pipx install mcp-assoc-memory
+```
+
+### GitHub (latest/dev version)
+```bash
+pip install git+https://github.com/mako10k/mcp-assoc-memory.git
+# or
+pipx install git+https://github.com/mako10k/mcp-assoc-memory.git
+```
+
+### Start the server
+```bash
+mcp-server
+# or
+python -m mcp_assoc_memory
+```
+
+- MCPクライアントや自動検出ツール（Claude Desktop Extensions, FastMCP, Cursor等）からも自動認識されます。
+- Dockerイメージも近日公開予定。
+
+---
+
 ## Developer Information
 
 ### Development Guidelines
@@ -196,6 +232,46 @@ The server starts in STDIO mode by default for MCP client integration.
 2. Review [architecture documentation](development/architecture/) for system understanding
 3. Follow [GitHub Copilot instructions](.github/copilot-instructions.md) for AI-assisted development
 4. Update relevant documentation when making changes
+
+## 🚀 Quick Start
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/mako10k/mcp-assoc-memory.git
+cd mcp-assoc-memory
+```
+
+### 2. Set up your environment
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+venv\Scripts\activate  # Windows
+```
+
+### 3. Install dependencies
+```bash
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+### 4. Run tests and linting
+```bash
+python scripts/smart_lint.py
+pytest tests/ -v
+```
+
+### 5. Start the MCP server
+```bash
+./scripts/mcp_server_daemon.sh start
+```
+
+For Docker users:
+```bash
+docker-compose up --build
+```
+
+---
 
 ## License
 
