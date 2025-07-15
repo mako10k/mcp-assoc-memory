@@ -66,20 +66,20 @@ def mock_embedding_service():
 @pytest.fixture
 async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> AsyncGenerator[MemoryManager, None]:
     """Create a simple memory manager with mocked dependencies."""
-    
+
     # Create minimal mocks to avoid complex initialization
     mock_metadata_store = AsyncMock()
     mock_metadata_store.initialize = AsyncMock()
     mock_metadata_store.close = AsyncMock()
-    
+
     mock_vector_store = AsyncMock()
     mock_vector_store.initialize = AsyncMock()
     mock_vector_store.close = AsyncMock()
-    
+
     mock_graph_store = AsyncMock()
     mock_graph_store.initialize = AsyncMock()
     mock_graph_store.close = AsyncMock()
-    
+
     # Create memory manager with all mocked dependencies
     manager = MemoryManager(
         vector_store=mock_vector_store,
@@ -87,7 +87,7 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
         graph_store=mock_graph_store,
         embedding_service=mock_embedding_service
     )
-    
+
     # Mock the store_memory method to return a simple Memory object
     async def mock_store_memory(content: str, scope: str = "test", **kwargs) -> Memory:
         return Memory(
@@ -99,9 +99,9 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
             metadata=kwargs.get("metadata", {}),
             created_at="2025-07-12T09:00:00Z"
         )
-    
+
     manager.store_memory = mock_store_memory
-    
+
     # Mock get_memory method
     async def mock_get_memory(memory_id: str) -> Optional[Memory]:
         if memory_id == "test-id-123":
@@ -115,9 +115,9 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
                 created_at="2025-07-12T09:00:00Z"
             )
         return None
-    
+
     manager.get_memory = mock_get_memory
-    
+
     await manager.initialize()
     yield manager
     await manager.close()

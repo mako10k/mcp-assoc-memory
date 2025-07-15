@@ -38,14 +38,14 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
         if not memory_manager:
             error_msg = "Memory manager not available"
             await ctx.error(error_msg)
-            
+
             base_data = {
                 "success": False,
                 "error": error_msg,
                 "moved_count": 0,
                 "failed_count": len(request.memory_ids)
             }
-            
+
             return ResponseBuilder.build_response(request.response_level, base_data)
 
         # Handle empty memory_ids list early
@@ -105,12 +105,12 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
             "moved_count": moved_count,
             "failed_count": len(failed_memory_ids)
         }
-        
+
         standard_data = {
             "target_scope": request.target_scope,
             "moved_memories": moved_memories
         }
-        
+
         full_data = {
             "move_summary": {
                 "total_requested": len(request.memory_ids),
@@ -120,7 +120,7 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
             },
             "failed_memory_ids": failed_memory_ids
         }
-        
+
         return ResponseBuilder.build_response(
             request.response_level,
             base_data,
@@ -131,14 +131,14 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
     except Exception as e:
         error_msg = f"Failed to move memories: {e}"
         await ctx.error(error_msg)
-        
+
         base_data = {
             "success": False,
             "error": error_msg,
             "moved_count": 0,
             "failed_count": len(request.memory_ids)
         }
-        
+
         return ResponseBuilder.build_response(request.response_level, base_data)
 
 

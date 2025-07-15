@@ -275,33 +275,33 @@ _config_lock = threading.Lock()
 def get_config() -> Config:
     """
     Get global configuration instance (Singleton pattern)
-    
+
     Returns:
         Config: The global configuration instance
-        
+
     Note:
         This ensures all parts of the application use the same configuration
         instance, preventing configuration drift and inconsistencies.
     """
     global _global_config
-    
+
     # Double-checked locking pattern for thread safety
     if _global_config is None:
         with _config_lock:
             if _global_config is None:
                 _global_config = Config.load()
                 logger.info(f"Initialized global Config singleton with api config: {hasattr(_global_config.api, 'default_response_level')}")
-    
+
     return _global_config
 
 
 def set_config(config: Config) -> None:
     """
     Set global configuration instance
-    
+
     Args:
         config: Configuration instance to set as global
-        
+
     Note:
         This should be called during application initialization
         to ensure consistent configuration across all modules.
@@ -315,13 +315,13 @@ def set_config(config: Config) -> None:
 def initialize_config(config_path: Optional[str] = None) -> Config:
     """
     Initialize global configuration with specific config file
-    
+
     Args:
         config_path: Path to configuration file (optional)
-        
+
     Returns:
         Config: The initialized configuration instance
-        
+
     Note:
         This should be called once during application startup
         to load configuration from the specified file path.
@@ -333,5 +333,5 @@ def initialize_config(config_path: Optional[str] = None) -> Config:
         logger.info(f"API config loaded: {hasattr(_global_config.api, 'default_response_level')}")
         if hasattr(_global_config.api, 'default_response_level'):
             logger.info(f"Default response level: {_global_config.api.default_response_level}")
-    
+
     return _global_config

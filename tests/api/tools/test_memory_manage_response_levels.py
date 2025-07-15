@@ -55,7 +55,7 @@ class TestMemoryManageResponseLevels:
             memory_id="test-123",
             response_level=ResponseLevel.STANDARD
         )
-        
+
         # Should have response_level from CommonToolParameters
         assert hasattr(request, 'response_level')
         assert request.response_level == ResponseLevel.STANDARD
@@ -83,7 +83,7 @@ class TestMemoryManageResponseLevels:
                 assert response["operation"] == "get"
                 assert response["memory_id"] == "test-memory-123"
                 assert "message" in response
-                
+
                 # Minimal level should not include memory details
                 assert "memory" not in response
 
@@ -108,7 +108,7 @@ class TestMemoryManageResponseLevels:
                 assert response["operation"] == "get"
                 assert response["memory_id"] == "test-memory-123"
                 assert "memory" in response
-                
+
                 # Check memory preview structure
                 memory = response["memory"]
                 assert "memory_id" in memory
@@ -137,7 +137,7 @@ class TestMemoryManageResponseLevels:
                 assert response["operation"] == "get"
                 assert response["memory_id"] == "test-memory-123"
                 assert "memory" in response
-                
+
                 # Check complete memory structure
                 memory = response["memory"]
                 assert memory["memory_id"] == "test-memory-123"
@@ -182,7 +182,7 @@ class TestMemoryManageResponseLevels:
                 assert response["operation"] == "update"
                 assert response["memory_id"] == "test-memory-123"
                 assert "memory" in response
-                
+
                 # Check memory preview for standard level
                 memory = response["memory"]
                 assert "content_preview" in memory
@@ -212,7 +212,7 @@ class TestMemoryManageResponseLevels:
                 assert response["operation"] == "delete"
                 assert response["memory_id"] == "test-memory-123"
                 assert "message" in response
-                
+
                 # Delete responses are minimal by nature
                 assert "memory" not in response
 
@@ -237,7 +237,7 @@ class TestMemoryManageResponseLevels:
                 assert response["operation"] == "get"
                 assert response["memory_id"] == "nonexistent-memory"
                 assert "message" in response
-                
+
                 # Error responses should be minimal
                 assert "memory" not in response
 
@@ -323,7 +323,7 @@ class TestMemoryManageResponseLevels:
         assert minimal_tokens < 50, f"Minimal response too large: {minimal_tokens} tokens"
         assert standard_tokens < 200, f"Standard response too large: {standard_tokens} tokens"
         assert full_tokens > standard_tokens, "Full response should be larger than standard"
-        
+
         print(f"Token estimates - Minimal: {minimal_tokens}, Standard: {standard_tokens}, Full: {full_tokens}")
 
     @pytest.mark.asyncio

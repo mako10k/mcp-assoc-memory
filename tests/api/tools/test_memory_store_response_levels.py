@@ -57,7 +57,7 @@ class TestMemoryStoreResponseLevels:
             assert response["success"] is True
             assert response["memory_id"] == "test-memory-123"
             assert "message" in response
-            
+
             # Should NOT include standard/full level data
             assert "scope" not in response
             assert "associations_count" not in response
@@ -86,7 +86,7 @@ class TestMemoryStoreResponseLevels:
             assert response["scope"] == "test/scope"
             assert response["associations_count"] == 0
             assert "created_at" in response
-            
+
             # Should NOT include full level data
             assert "memory" not in response
             assert "duplicate_analysis" not in response
@@ -114,7 +114,7 @@ class TestMemoryStoreResponseLevels:
             assert response["scope"] == "test/scope"
             assert response["associations_count"] == 0
             assert "created_at" in response
-            
+
             # Should include full level data
             assert "memory" in response
             assert response["memory"]["id"] == "test-memory-123"
@@ -240,7 +240,7 @@ class TestMemoryStoreResponseLevels:
         # Verify size progression
         assert minimal_size < standard_size
         assert standard_size < full_size
-        
+
         # Verify size targets (approximate)
         assert minimal_size < 200  # Should be under 50 tokens (~200 chars)
         assert standard_size < 800  # Should be under 200 tokens (~800 chars)

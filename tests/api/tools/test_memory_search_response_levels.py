@@ -76,7 +76,7 @@ class TestMemorySearchResponseLevels:
             assert response["success"] is True
             assert response["total_count"] == 2
             assert "message" in response
-            
+
             # Should NOT include standard/full level data
             assert "query" not in response
             assert "results" not in response
@@ -106,14 +106,14 @@ class TestMemorySearchResponseLevels:
             assert response["scope"] == "learning/programming"
             assert "results" in response
             assert len(response["results"]) == 2
-            
+
             # Check result structure for standard level
             result = response["results"][0]
             assert "memory_id" in result
             assert "scope" in result
             assert "content_preview" in result
             assert "similarity_score" in result
-            
+
             # Should NOT include full level data
             assert "content" not in result  # Only preview in standard
             assert "search_metadata" not in response
@@ -142,7 +142,7 @@ class TestMemorySearchResponseLevels:
             assert response["scope"] == "learning/programming"
             assert "results" in response
             assert len(response["results"]) == 2
-            
+
             # Check result structure for full level
             result = response["results"][0]
             assert "memory_id" in result
@@ -154,7 +154,7 @@ class TestMemorySearchResponseLevels:
             assert "created_at" in result
             assert "metadata" in result
             assert "associations" in result
-            
+
             # Should include full level metadata
             assert "search_metadata" in response
             assert "scope_coverage" in response["search_metadata"]
@@ -177,7 +177,7 @@ class TestMemorySearchResponseLevels:
             assert response["success"] is False
             assert "message" in response
             assert response["total_count"] == 0
-            
+
             # Minimal level should not include error details
             assert "error_details" not in response
 
@@ -301,7 +301,7 @@ class TestMemorySearchResponseLevels:
         # Verify size progression
         assert minimal_size < standard_size
         assert standard_size < full_size
-        
+
         # Verify size targets (approximate)
         assert minimal_size < 200  # Should be under 50 tokens (~200 chars)
         assert standard_size < 2000  # Should be reasonable for 5 results

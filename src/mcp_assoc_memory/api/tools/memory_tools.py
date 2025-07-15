@@ -128,7 +128,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
                     limit=5,
                     min_score=0.1  # Low threshold to find potential duplicates
                 )
-                
+
                 await ctx.info(f"DEBUG: Found {len(search_results)} search results")
                 for i, result in enumerate(search_results):
                     # Handle both result formats for compatibility
@@ -141,7 +141,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
                         memory = result["memory"]
                         similarity = result["similarity"]
                     await ctx.info(f"DEBUG: Result {i}: ID={memory.id}, similarity={similarity}")
-                
+
                 # Check if any result exceeds the duplicate threshold
                 for result in search_results:
                     # Handle both result formats for compatibility
@@ -151,7 +151,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
                     else:
                         memory = result["memory"]
                         similarity = result["similarity"]
-                        
+
                     await ctx.info(f"DEBUG: Comparing {similarity} >= {request.duplicate_threshold}: {similarity >= request.duplicate_threshold}")
                     if similarity >= request.duplicate_threshold:
                         duplicate_candidate = {
@@ -161,16 +161,16 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
                             "scope": memory.scope,
                             "created_at": memory.created_at.isoformat()
                         }
-                        
+
                         error_msg = f"Duplicate content detected (similarity: {similarity:.3f} >= {request.duplicate_threshold})"
                         await ctx.warning(error_msg)
-                        
+
                         base_data = {
                             "success": False,
                             "message": error_msg,
                             "memory_id": None
                         }
-                        
+
                         full_data = {
                             "duplicate_analysis": {
                                 "duplicate_found": True,
@@ -179,14 +179,14 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
                                 "similarity_score": similarity
                             }
                         }
-                        
+
                         return ResponseBuilder.build_response(
                             request.response_level,
                             base_data,
                             None,
                             full_data
                         )
-                        
+
             except Exception as e:
                 await ctx.warning(f"Failed to check for duplicates: {e}")
                 # Continue with storage if duplicate check fails
@@ -226,13 +226,13 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
             "message": f"Memory stored successfully: {memory.id}",
             "memory_id": memory.id
         }
-        
+
         standard_data = {
             "scope": memory.scope,
             "associations_count": 0,  # TODO: Update when auto-association is implemented
             "created_at": memory.created_at.isoformat()
         }
-        
+
         full_data = {
             "memory": memory_model.model_dump() if memory_model else None,
             "duplicate_analysis": {
@@ -240,7 +240,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
                 "threshold_used": request.duplicate_threshold
             }
         }
-        
+
         return ResponseBuilder.build_response(
             request.response_level,
             base_data,
@@ -258,7 +258,7 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
             "message": error_msg,
             "memory_id": None
         }
-        
+
         return ResponseBuilder.build_response(
             request.response_level,
             base_data
@@ -369,13 +369,13 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
             "message": f"Found {len(formatted_results)} memories for query: {request.query}",
             "total_count": len(formatted_results)
         }
-        
+
         standard_data = {
             "query": request.query,
             "scope": request.scope,
             "results": []
         }
-        
+
         # Add level-appropriate results
         if request.response_level != ResponseLevel.MINIMAL:
             for result in formatted_results:
@@ -402,7 +402,7 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
                         "associations": result.associations if request.include_associations else []
                     }
                 standard_data["results"].append(result_data)
-        
+
         full_data = {
             "search_metadata": {
                 "scope_coverage": "hierarchical" if request.include_child_scopes else "exact",
@@ -411,7 +411,7 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
                 "include_associations": request.include_associations
             }
         }
-        
+
         return ResponseBuilder.build_response(
             request.response_level,
             base_data,
@@ -429,7 +429,7 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
             "message": error_message,
             "total_count": 0
         }
-        
+
         full_data = {
             "error_details": {
                 "error_type": type(e).__name__,
@@ -437,7 +437,7 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
                 "scope": getattr(request, "scope", "unknown")
             }
         }
-        
+
         return ResponseBuilder.build_response(
             request.response_level,
             base_data,
@@ -701,14 +701,14 @@ async def handle_memory_discover_associations(
         if not manager:
             error_msg = "Memory manager not available"
             await ctx.error(error_msg)
-            
+
             base_data = {
                 "success": False,
                 "message": error_msg,
                 "source_memory_id": request.memory_id,
                 "total_found": 0
             }
-            
+
             return ResponseBuilder.build_response(request.response_level, base_data)
 
         # Get the source memory
@@ -716,14 +716,14 @@ async def handle_memory_discover_associations(
         if not memory:
             error_msg = f"Memory not found: {request.memory_id}"
             await ctx.warning(error_msg)
-            
+
             base_data = {
                 "success": False,
                 "message": error_msg,
                 "source_memory_id": request.memory_id,
                 "total_found": 0
             }
-            
+
             return ResponseBuilder.build_response(request.response_level, base_data)
 
         # Find similar memories with enhanced search strategy
@@ -795,12 +795,12 @@ async def handle_memory_discover_associations(
             "source_memory_id": request.memory_id,
             "total_found": len(associations)
         }
-        
+
         standard_data = {
             "source_content_preview": ResponseBuilder.truncate_content(memory.content, 100),
             "associations": []
         }
-        
+
         # Add level-appropriate associations
         if request.response_level != ResponseLevel.MINIMAL:
             for assoc in associations:
@@ -816,7 +816,7 @@ async def handle_memory_discover_associations(
                     # Full: Complete association objects
                     assoc_data = assoc
                 standard_data["associations"].append(assoc_data)
-        
+
         full_data = {
             "source_memory": {
                 "memory_id": memory.id,
@@ -833,7 +833,7 @@ async def handle_memory_discover_associations(
                 "search_strategy": "enhanced_query_with_tags"
             }
         }
-        
+
         return ResponseBuilder.build_response(
             request.response_level,
             base_data,
@@ -844,14 +844,14 @@ async def handle_memory_discover_associations(
     except Exception as e:
         error_msg = f"Failed to discover associations: {str(e)}"
         await ctx.error(error_msg)
-        
+
         base_data = {
             "success": False,
             "message": error_msg,
             "source_memory_id": request.memory_id,
             "total_found": 0
         }
-        
+
         return ResponseBuilder.build_response(request.response_level, base_data)
 
 
@@ -1188,7 +1188,7 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
         if request.operation == "get":
             # Delegate to existing get handler and format with ResponseBuilder
             result = await handle_memory_get(request.memory_id, ctx, request.include_associations)
-            
+
             if "error" in result:
                 base_data = {
                     "success": False,
@@ -1197,7 +1197,7 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                     "memory_id": request.memory_id
                 }
                 return ResponseBuilder.build_response(request.response_level, base_data)
-            
+
             # Success case
             base_data = {
                 "success": True,
@@ -1205,7 +1205,7 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                 "operation": "get",
                 "memory_id": request.memory_id
             }
-            
+
             standard_data = {
                 "memory": {
                     "memory_id": result["memory_id"],
@@ -1213,11 +1213,11 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                     "content_preview": ResponseBuilder.truncate_content(result["content"], 100)
                 }
             }
-            
+
             full_data = {
                 "memory": result
             }
-            
+
             return ResponseBuilder.build_response(
                 request.response_level,
                 base_data,
@@ -1237,10 +1237,10 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                 preserve_associations=request.preserve_associations,
             )
             response = await handle_memory_update(update_request, ctx)
-            
+
             # Convert response to dict if needed
             response_dict = response.dict() if hasattr(response, "dict") else response
-            
+
             if not response_dict.get("success", False):
                 base_data = {
                     "success": False,
@@ -1249,7 +1249,7 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                     "memory_id": request.memory_id
                 }
                 return ResponseBuilder.build_response(request.response_level, base_data)
-            
+
             # Success case
             base_data = {
                 "success": True,
@@ -1257,7 +1257,7 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                 "operation": "update",
                 "memory_id": request.memory_id
             }
-            
+
             standard_data = {
                 "memory": {
                     "memory_id": response_dict["memory_id"],
@@ -1265,11 +1265,11 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                     "content_preview": ResponseBuilder.truncate_content(response_dict["content"], 100)
                 }
             }
-            
+
             full_data = {
                 "memory": response_dict
             }
-            
+
             return ResponseBuilder.build_response(
                 request.response_level,
                 base_data,
@@ -1280,40 +1280,40 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
         elif request.operation == "delete":
             # Delegate to existing delete handler
             result = await handle_memory_delete(request.memory_id, ctx)
-            
+
             base_data = {
                 "success": result.get("success", False),
                 "message": result.get("message", result.get("error", "Unknown error")),
                 "operation": "delete",
                 "memory_id": request.memory_id
             }
-            
+
             return ResponseBuilder.build_response(request.response_level, base_data)
 
         else:
             error_msg = f"Unknown operation: {request.operation}. Supported operations: 'get', 'update', 'delete'"
             await ctx.error(error_msg)
-            
+
             base_data = {
                 "success": False,
                 "message": error_msg,
                 "operation": request.operation,
                 "memory_id": request.memory_id
             }
-            
+
             return ResponseBuilder.build_response(request.response_level, base_data)
 
     except Exception as e:
         error_msg = f"Memory manage operation failed: {str(e)}"
         await ctx.error(error_msg)
-        
+
         base_data = {
             "success": False,
             "message": error_msg,
             "operation": request.operation,
             "memory_id": request.memory_id
         }
-        
+
         return ResponseBuilder.build_response(request.response_level, base_data)
 
 

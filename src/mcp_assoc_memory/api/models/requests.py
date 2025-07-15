@@ -43,8 +43,8 @@ class MCPRequestBase(BaseModel, ABC):
         """
         # Check if this request inherits from CommonToolParameters
         if hasattr(self, 'response_level') and self.response_level:
-            return self.response_level.value
-        
+            return str(self.response_level.value)
+
         # Default implementation for requests without response_level
         if hasattr(self, 'minimal_response') and self.minimal_response:
             return "minimal"
@@ -61,7 +61,7 @@ class MCPRequestBase(BaseModel, ABC):
         }
 
 
-class MemoryStoreRequest(CommonToolParameters, MCPRequestBase):
+class MemoryStoreRequest(MCPRequestBase, CommonToolParameters):
     content: str = Field(description="Memory content to store")
     scope: str = Field(
         default="user/default",
@@ -109,7 +109,7 @@ class MemoryStoreRequest(CommonToolParameters, MCPRequestBase):
         return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
 
 
-class MemorySearchRequest(CommonToolParameters, MCPRequestBase):
+class MemorySearchRequest(MCPRequestBase, CommonToolParameters):
     query: str = Field(description="Search query")
     scope: Optional[str] = Field(
         default=None,

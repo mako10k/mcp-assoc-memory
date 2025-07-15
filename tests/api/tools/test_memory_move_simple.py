@@ -17,12 +17,12 @@ async def test_memory_move_basic():
         target_scope="new/target/scope",
         response_level=ResponseLevel.MINIMAL
     )
-    
+
     # Mock context
     mock_context = AsyncMock()
     mock_context.info = AsyncMock()
     mock_context.error = AsyncMock()
-    
+
     # Mock memory object
     mock_memory = MagicMock()
     mock_memory.id = "test-memory-123"
@@ -31,16 +31,16 @@ async def test_memory_move_basic():
     mock_memory.tags = ["test"]
     mock_memory.category = "test"
     mock_memory.metadata = {}
-    
+
     # Mock memory manager
     with patch('src.mcp_assoc_memory.api.tools.other_tools.get_or_create_memory_manager') as mock_manager_factory:
         mock_manager = AsyncMock()
         mock_manager.update_memory.return_value = mock_memory
         mock_manager_factory.return_value = mock_manager
-        
+
         # Execute
         response = await handle_memory_move(request, mock_context)
-        
+
         # Basic assertions
         assert isinstance(response, dict)
         assert "success" in response

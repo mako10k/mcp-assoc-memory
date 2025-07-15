@@ -258,7 +258,7 @@ class MemorySearchResponse(MCPResponseBase):
                     if len(content) > 100:
                         result_dict["memory"]["content"] = content[:100] + "..."
                 results_truncated.append(result_dict)
-            
+
             return {
                 "success": self.success,
                 "query": self.query,
@@ -275,7 +275,7 @@ class MemorySearchResponse(MCPResponseBase):
                     if len(content) > 100:
                         result_dict["memory"]["content"] = content[:100] + "..."
                 results_truncated.append(result_dict)
-            
+
             return {
                 "success": self.success,
                 "query": self.query,

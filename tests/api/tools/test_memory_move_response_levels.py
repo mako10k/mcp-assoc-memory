@@ -39,12 +39,12 @@ class TestMemoryMoveResponseLevels:
             target_scope="test/scope",
             response_level=ResponseLevel.STANDARD
         )
-        
+
         # Test inheritance
         assert isinstance(request, CommonToolParameters)
         assert hasattr(request, 'response_level')
         assert request.response_level == ResponseLevel.STANDARD
-        
+
         # Test default response level
         request_default = MemoryMoveRequest(
             memory_ids=["test-123"],
@@ -72,7 +72,7 @@ class TestMemoryMoveResponseLevels:
             assert response["success"] is True
             assert response["moved_count"] == 1
             assert response["failed_count"] == 0
-            
+
             # Minimal response should not include detailed data
             assert "moved_memories" not in response
             assert "move_summary" not in response
@@ -101,7 +101,7 @@ class TestMemoryMoveResponseLevels:
             assert "target_scope" in response
             assert "moved_memories" in response
             assert len(response["moved_memories"]) == 1
-            
+
             # Check content preview truncation
             moved_memory = response["moved_memories"][0]
             assert len(moved_memory["content_preview"]) <= 53  # 50 chars + "..."
@@ -131,7 +131,7 @@ class TestMemoryMoveResponseLevels:
             assert "moved_memories" in response
             assert "move_summary" in response
             # failed_memory_ids may be omitted when empty due to ResponseBuilder._clean_response
-            
+
             # Check complete move summary
             move_summary = response["move_summary"]
             assert "total_requested" in move_summary
@@ -163,7 +163,7 @@ class TestMemoryMoveResponseLevels:
             assert response["moved_count"] == 3
             assert response["failed_count"] == 0
             assert len(response["moved_memories"]) == 3
-            
+
             # Verify update_memory was called for each memory
             assert mock_manager.update_memory.call_count == 3
 
@@ -231,12 +231,12 @@ class TestMemoryMoveResponseLevels:
         minimal_fields = ["success", "moved_count", "failed_count", "message"]
         minimal_estimated_size = len(str(minimal_fields)) + 100  # Conservative estimate
         assert minimal_estimated_size < 200  # Should be under 200 chars
-        
+
         # Standard response includes moved_memories with previews
         standard_additional = ["target_scope", "moved_memories"]
         standard_estimated_size = minimal_estimated_size + len(str(standard_additional)) + 500
         assert standard_estimated_size < 1000  # Should be reasonable
-        
+
         # Full response includes complete data
         full_additional = ["move_summary", "failed_memory_ids"]
         full_estimated_size = standard_estimated_size + len(str(full_additional)) + 200

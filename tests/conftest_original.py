@@ -90,15 +90,15 @@ async def mock_embedding_service():
 async def test_chroma_client(temp_dir: Path) -> AsyncGenerator[ClientAPI, None]:
     """Create an isolated ChromaDB client for testing."""
     import chromadb
-    
+
     persist_directory = temp_dir / "test_chroma_db"
     persist_directory.mkdir(exist_ok=True)
-    
+
     # Use new ChromaDB API without deprecated settings
     client = chromadb.PersistentClient(path=str(persist_directory))
-    
+
     yield client
-    
+
     # Cleanup - avoid reset() which is disabled by default
     try:
         collections = client.list_collections()
@@ -113,10 +113,10 @@ async def test_metadata_store(temp_dir: Path) -> AsyncGenerator[SQLiteMetadataSt
     """Create an isolated metadata store for testing."""
     db_path = temp_dir / "test_metadata.db"
     store = SQLiteMetadataStore(str(db_path))
-    
+
     await store.initialize()
     yield store
-    
+
     await store.close()
 
 
@@ -125,14 +125,14 @@ async def test_vector_store(temp_dir: Path) -> AsyncGenerator[ChromaVectorStore,
     """Create an isolated vector store for testing."""
     persist_directory = temp_dir / "test_chroma_db"
     persist_directory.mkdir(exist_ok=True)
-    
+
     store = ChromaVectorStore(
         persist_directory=str(persist_directory)
     )
-    
+
     await store.initialize()
     yield store
-    
+
     # Cleanup
     try:
         await store.close()
@@ -152,17 +152,17 @@ async def test_memory_manager(
     mock_graph_store = AsyncMock()
     mock_graph_store.initialize = AsyncMock()
     mock_graph_store.close = AsyncMock()
-    
+
     manager = MemoryManager(
         vector_store=test_vector_store,
         metadata_store=test_metadata_store,
         graph_store=mock_graph_store,
         embedding_service=mock_embedding_service
     )
-    
+
     await manager.initialize()
     yield manager
-    
+
     await manager.close()
 
 
@@ -208,13 +208,13 @@ async def populated_memory_manager(
             tags=data.get("tags"),
             metadata=data.get("metadata")
         )
-    
+
     yield test_memory_manager
 
 
 class MemoryFactory:
     """Factory class for creating test memory objects."""
-    
+
     @staticmethod
     def create_memory(
         content: str = "Test memory content",
@@ -233,7 +233,7 @@ class MemoryFactory:
             tags=tags or [],
             metadata=metadata or {}
         )
-    
+
     @staticmethod
     def create_memories(count: int = 3) -> List[Memory]:
         """Create multiple test memory objects."""
@@ -269,7 +269,7 @@ def cleanup_environment():
     """Automatically clean up environment variables after each test."""
     original_env = os.environ.copy()
     yield
-    
+
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
