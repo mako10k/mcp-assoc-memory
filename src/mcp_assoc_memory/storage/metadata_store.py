@@ -817,12 +817,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
                         (scope, scope),
                     ) as cursor:
                         result = await cursor.fetchone()
-                        return result[0] if result else 0
+                        return int(result[0]) if result else 0
             else:
                 async with aiosqlite.connect(self.database_path) as db:
                     async with db.execute("SELECT COUNT(*) FROM associations") as cursor:
                         result = await cursor.fetchone()
-                        return result[0] if result else 0
+                        return int(result[0]) if result else 0
         except Exception as e:
             logger.error("Failed to get association count", error=str(e))
             return 0
@@ -865,7 +865,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                     "SELECT COUNT(*) FROM memories WHERE JSON_EXTRACT(metadata, '$.scope') = ?", (scope,)
                 ) as cursor:
                     row = await cursor.fetchone()
-                    return row[0] if row and row[0] is not None else 0
+                    return int(row[0]) if row and row[0] is not None else 0
         except Exception as e:
             logger.error(f"Failed to get memory count for scope '{scope}': {e}")
             return 0

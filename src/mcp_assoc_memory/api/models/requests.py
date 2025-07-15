@@ -875,3 +875,39 @@ class MemoryDiscoverAssociationsRequest(CommonToolParameters):
     def get_primary_identifier(self) -> str:
         """Primary identifier is the memory_id"""
         return f"memory_id:{self.memory_id}"
+
+
+class MemoryListAllRequest(MCPRequestBase, CommonToolParameters):
+    page: int = Field(
+        default=1,
+        ge=1,
+        description="""Page number for pagination:
+
+        Navigation Strategy:
+        • Start with page=1 for initial overview
+        • Use pagination.has_next to continue browsing
+        • Jump to specific pages for targeted access
+        • Monitor total_pages to understand collection size
+
+        Example: page=1 for first overview, page=3 for deeper exploration""",
+        examples=[1, 2, 3],
+    )
+    per_page: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="""Items per page (1-100):
+
+        Values & Use Cases:
+        • 5-10: Quick overview (manageable chunks) ← RECOMMENDED
+        • 20-50: Efficient browsing (bulk review)
+        • 50-100: System analysis (comprehensive data check)
+
+        Strategy: Start with 10, increase for bulk operations
+        Example: per_page=25 for efficient content review""",
+        examples=[10, 25, 50],
+    )
+
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the page and per_page"""
+        return f"page:{self.page}, per_page:{self.per_page}"

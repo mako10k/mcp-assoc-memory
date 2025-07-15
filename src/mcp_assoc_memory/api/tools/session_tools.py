@@ -39,7 +39,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
 
             # Add a session marker memory
             session_marker_content = f"Session created: {session_id}"
-            
+
             # Store the session marker memory
             memory = await memory_manager.store_memory(
                 content=session_marker_content,
@@ -129,7 +129,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
         elif request.action == "cleanup":
             # Clean up old sessions
             cutoff_date = datetime.now() - timedelta(days=request.max_age_days or 7)
-            
+
             # Search for all session memories
             all_session_memories = await memory_manager.search_memories(
                 query="",
@@ -141,7 +141,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
             # Filter old memories and delete them
             cleaned_count = 0
             cleaned_sessions = set()
-            
+
             for memory in all_session_memories:
                 created_at = memory.get("created_at")
                 if created_at and created_at < cutoff_date:

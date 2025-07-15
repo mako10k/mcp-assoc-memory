@@ -65,7 +65,7 @@ class TestSessionManageResponseLevels:
             mock_memory_manager = MagicMock()
             mock_memory = MagicMock()
             mock_memory.id = "memory-id-123"
-            
+
             mock_memory_manager.store_memory = AsyncMock(return_value=mock_memory)
             mock_init.return_value = mock_memory_manager
 
@@ -91,7 +91,7 @@ class TestSessionManageResponseLevels:
             mock_memory_manager = MagicMock()
             mock_memory = MagicMock()
             mock_memory.id = "memory-id-123"
-            
+
             mock_memory_manager.store_memory = AsyncMock(return_value=mock_memory)
             mock_init.return_value = mock_memory_manager
 

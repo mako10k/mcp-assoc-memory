@@ -26,6 +26,7 @@ from ..models import (
     MemoryExportRequest,
     MemoryImportRequest,
     MemoryImportResponse,
+    MemoryListAllRequest,
     MemoryManageRequest,
     MemoryResponse,
     MemorySearchRequest,
@@ -1042,13 +1043,13 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Context) -> Me
         raise
 
 
-async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optional[Context] = None) -> Dict[str, Any]:
-    """List all memories with pagination (for debugging)"""
+async def handle_memory_list_all(request: MemoryListAllRequest, ctx: Optional[Context] = None) -> Dict[str, Any]:
+    """List all memories with pagination and response level support"""
     try:
-        await ensure_initialized()  # Just ensure it's initialized
+        await ensure_initialized()
 
         if ctx:
-            await ctx.info(f"Retrieving memories (page {page}, {per_page} per page)...")
+            await ctx.info(f"Retrieving memories (page {request.page}, {request.per_page} per page)...")
 
         # Get all memories from memory manager
         memory_mgr = await get_or_create_memory_manager()
@@ -1072,9 +1073,9 @@ async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optiona
         total_items = len(all_memories)
 
         # Calculate pagination
-        total_pages = (total_items + per_page - 1) // per_page
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
+        total_pages = (total_items + request.per_page - 1) // request.per_page
+        start_idx = (request.page - 1) * request.per_page
+        end_idx = start_idx + request.per_page
 
         # Get page items
         page_memories = all_memories[start_idx:end_idx]
@@ -1107,23 +1108,68 @@ async def handle_memory_list_all(page: int = 1, per_page: int = 10, ctx: Optiona
                 continue
 
         pagination = PaginationInfo(
-            page=page,
-            per_page=per_page,
+            page=request.page,
+            per_page=request.per_page,
             total_items=total_items,
             total_pages=total_pages,
-            has_next=page < total_pages,
-            has_previous=page > 1,
+            has_next=request.page < total_pages,
+            has_previous=request.page > 1,
         )
 
         if ctx:
-            await ctx.info(f"Retrieved {len(results)} memories (page {page}/{total_pages})")
+            await ctx.info(f"Retrieved {len(results)} memories (page {request.page}/{total_pages})")
 
-        return {"memories": results, "pagination": pagination}
+        # Use ResponseBuilder for level-appropriate responses
+        response_level = request.response_level
+
+        base_data = {
+            "success": True,
+            "message": f"Retrieved {len(results)} memories (page {request.page}/{total_pages})",
+            "total_count": total_items
+        }
+
+        if response_level == ResponseLevel.MINIMAL:
+            # Minimal: Only essential pagination and count
+            standard_data = {
+                "page": request.page,
+                "per_page": request.per_page,
+                "total_pages": total_pages
+            }
+            return ResponseBuilder.build_response(response_level, base_data, standard_data)
+        elif response_level == ResponseLevel.FULL:
+            # Full: Include all memory details and metadata
+            standard_data = {
+                "memories": results,
+                "pagination": pagination
+            }
+            full_data = {
+                "search_metadata": {
+                    "request_type": "memory_list_all",
+                    "timestamp": datetime.now().isoformat(),
+                    "page_size": request.per_page,
+                    "current_page": request.page
+                }
+            }
+            return ResponseBuilder.build_response(response_level, base_data, standard_data, full_data)
+        else:
+            # Standard: Balanced response with memories and pagination
+            standard_data = {
+                "memories": results,
+                "pagination": pagination
+            }
+            return ResponseBuilder.build_response(response_level, base_data, standard_data)
 
     except Exception as e:
         if ctx:
             await ctx.error(f"Failed to list memories: {e}")
-        raise
+
+        response_level = getattr(request, 'response_level', ResponseLevel.STANDARD)
+        base_data = {
+            "success": False,
+            "message": f"Failed to list memories: {str(e)}",
+            "total_count": 0
+        }
+        return ResponseBuilder.build_response(response_level, base_data)
 
 
 async def handle_unified_search(request: UnifiedSearchRequest, ctx: Context) -> Dict[str, Any]:
