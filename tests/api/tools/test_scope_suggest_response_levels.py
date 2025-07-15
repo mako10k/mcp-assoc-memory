@@ -83,7 +83,7 @@ async def test_scope_suggest_full_response():
             assert "alternatives" in result
             assert "detailed_alternatives" in result
             assert "analysis_metadata" in result
-            
+
             # Check analysis metadata structure
             metadata = result["analysis_metadata"]
             assert "content_length" in metadata

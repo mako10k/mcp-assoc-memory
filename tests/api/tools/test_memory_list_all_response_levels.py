@@ -23,7 +23,7 @@ async def test_memory_list_all_minimal_response():
         # Mock the singleton memory manager to prevent actual initialization
         with patch('mcp_assoc_memory.core.singleton_memory_manager.get_or_create_memory_manager') as mock_singleton:
             mock_memory_manager = MagicMock()
-            
+
             # Mock the actual methods called in handle_memory_list_all
             mock_memory_manager.get_all_memories = AsyncMock(return_value=[])
             mock_singleton.return_value = mock_memory_manager
@@ -52,7 +52,7 @@ async def test_memory_list_all_standard_response():
 
         with patch('mcp_assoc_memory.api.tools.memory_tools.ensure_initialized') as mock_init:
             mock_memory_manager = MagicMock()
-            
+
             # Mock memory data
             mock_memory = MagicMock()
             mock_memory.id = "memory-123"
@@ -63,7 +63,7 @@ async def test_memory_list_all_standard_response():
             mock_memory.created_at = datetime.now()
             mock_memory.updated_at = datetime.now()
             mock_memory.metadata = {}
-            
+
             mock_memory_manager.get_all_memories = AsyncMock(return_value=[mock_memory])
             mock_init.return_value = mock_memory_manager
 
@@ -89,7 +89,7 @@ async def test_memory_list_all_full_response():
 
         with patch('mcp_assoc_memory.api.tools.memory_tools.ensure_initialized') as mock_init:
             mock_memory_manager = MagicMock()
-            
+
             # Mock memory data
             mock_memory = MagicMock()
             mock_memory.id = "memory-123"
@@ -100,7 +100,7 @@ async def test_memory_list_all_full_response():
             mock_memory.created_at = datetime.now()
             mock_memory.updated_at = datetime.now()
             mock_memory.metadata = {}
-            
+
             mock_memory_manager.get_all_memories = AsyncMock(return_value=[mock_memory])
             mock_init.return_value = mock_memory_manager
 
@@ -152,7 +152,7 @@ async def test_memory_list_all_pagination():
 
         with patch('mcp_assoc_memory.api.tools.memory_tools.ensure_initialized') as mock_init:
             mock_memory_manager = MagicMock()
-            
+
             # Mock total of 12 memories, but only return the 5 for page 2
             mock_memories = []
             for i in range(5):  # Second page would have 5 memories (memories 5-9)
@@ -166,7 +166,7 @@ async def test_memory_list_all_pagination():
                 mock_memory.updated_at = datetime.now()
                 mock_memory.metadata = {}
                 mock_memories.append(mock_memory)
-            
+
             # We'll mock that get_all_memories returns all 12 but the logic will slice
             all_memories = []
             for i in range(12):
@@ -180,7 +180,7 @@ async def test_memory_list_all_pagination():
                 mock_memory.updated_at = datetime.now()
                 mock_memory.metadata = {}
                 all_memories.append(mock_memory)
-            
+
             mock_memory_manager.get_all_memories = AsyncMock(return_value=all_memories)
             mock_init.return_value = mock_memory_manager
 
@@ -189,7 +189,7 @@ async def test_memory_list_all_pagination():
             assert result["success"] is True
             assert result["total_count"] == 12
             assert len(result["memories"]) == 5  # Page 2 should have 5 memories
-            
+
             # Check pagination info
             pagination = result["pagination"]
             assert pagination["current_page"] == 2
