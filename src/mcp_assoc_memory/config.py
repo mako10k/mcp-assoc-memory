@@ -6,6 +6,7 @@ Manages environment variables and default values
 import json
 import logging
 import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -68,6 +69,24 @@ class SecurityConfig:
 
 
 @dataclass
+class APIConfig:
+    """API configuration for response processing"""
+
+    # Response metadata configuration
+    enable_response_metadata: bool = False
+    enable_audit_trail: bool = False
+    force_minimal_metadata: bool = False
+    minimal_response_max_size: int = 1024  # bytes
+
+    # Response processing configuration
+    remove_null_values: bool = True
+
+    # Caching configuration
+    enable_response_caching: bool = False
+    cache_ttl_seconds: int = 300
+
+
+@dataclass
 class TransportConfig:
     """Transport configuration"""
 
@@ -90,9 +109,16 @@ class Config:
     storage: StorageConfig = field(default_factory=StorageConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     transport: TransportConfig = field(default_factory=TransportConfig)
+    api: APIConfig = field(default_factory=APIConfig)
 
     log_level: str = "INFO"
     debug_mode: bool = False
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get configuration value with dict-like interface"""
+        if hasattr(self, key):
+            return getattr(self, key)
+        return default
 
     @classmethod
     def load(cls, config_path: Optional[str] = None, cli_args: Optional[dict] = None) -> "Config":
@@ -235,24 +261,77 @@ class Config:
             "storage": self.storage.__dict__,
             "security": self.security.__dict__,
             "transport": self.transport.__dict__,
+            "api": self.api.__dict__,
             "log_level": self.log_level,
             "debug_mode": self.debug_mode,
         }
 
 
-# Global configuration instance
-_global_config = None
+# Global configuration instance - Singleton pattern
+_global_config: Optional[Config] = None
+_config_lock = threading.Lock()
 
 
-def get_config() -> Dict[str, Any]:
-    """Get global configuration"""
+def get_config() -> Config:
+    """
+    Get global configuration instance (Singleton pattern)
+
+    Returns:
+        Config: The global configuration instance
+
+    Note:
+        This ensures all parts of the application use the same configuration
+        instance, preventing configuration drift and inconsistencies.
+    """
     global _global_config
+
+    # Double-checked locking pattern for thread safety
     if _global_config is None:
-        _global_config = Config.load()
-    return _global_config.to_dict()
+        with _config_lock:
+            if _global_config is None:
+                _global_config = Config.load()
+                logger.info(f"Initialized global Config singleton with api config: {hasattr(_global_config.api, 'default_response_level')}")
+
+    return _global_config
 
 
 def set_config(config: Config) -> None:
-    """Set global configuration"""
+    """
+    Set global configuration instance
+
+    Args:
+        config: Configuration instance to set as global
+
+    Note:
+        This should be called during application initialization
+        to ensure consistent configuration across all modules.
+    """
     global _global_config
-    _global_config = config
+    with _config_lock:
+        _global_config = config
+        logger.info(f"Set global Config singleton with api config: {hasattr(config.api, 'default_response_level')}")
+
+
+def initialize_config(config_path: Optional[str] = None) -> Config:
+    """
+    Initialize global configuration with specific config file
+
+    Args:
+        config_path: Path to configuration file (optional)
+
+    Returns:
+        Config: The initialized configuration instance
+
+    Note:
+        This should be called once during application startup
+        to load configuration from the specified file path.
+    """
+    global _global_config
+    with _config_lock:
+        _global_config = Config.load(config_path)
+        logger.info(f"Initialized global Config from {config_path or 'default locations'}")
+        logger.info(f"API config loaded: {hasattr(_global_config.api, 'default_response_level')}")
+        if hasattr(_global_config.api, 'default_response_level'):
+            logger.info(f"Default response level: {_global_config.api.default_response_level}")
+
+    return _global_config

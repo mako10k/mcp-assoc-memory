@@ -67,20 +67,20 @@ def mock_embedding_service():
 @pytest.fixture
 async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> AsyncGenerator[MemoryManager, None]:
     """Create a simple memory manager with mocked dependencies."""
-    
+
     # Create minimal mocks to avoid complex initialization
     mock_metadata_store = AsyncMock()
     mock_metadata_store.initialize = AsyncMock()
     mock_metadata_store.close = AsyncMock()
-    
+
     mock_vector_store = AsyncMock()
     mock_vector_store.initialize = AsyncMock()
     mock_vector_store.close = AsyncMock()
-    
+
     mock_graph_store = AsyncMock()
     mock_graph_store.initialize = AsyncMock()
     mock_graph_store.close = AsyncMock()
-    
+
     # Create memory manager with all mocked dependencies
     manager = MemoryManager(
         vector_store=mock_vector_store,
@@ -88,12 +88,12 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
         graph_store=mock_graph_store,
         embedding_service=mock_embedding_service
     )
-    
+
     # Mock the store_memory method with duplicate detection support
     memory_counter = {"count": 0}  # Use dict to allow modification in nested function
     stored_memories = {}  # Store memories by content+scope for duplicate detection
     stored_memories_by_id = {}  # Store memories by ID for retrieval
-    
+
     async def mock_store_memory(
         scope: str = "user/default",
         content: str = "",
@@ -114,7 +114,7 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
             if duplicate_key in stored_memories:
                 # Return existing memory for duplicate content
                 return stored_memories[duplicate_key]
-        
+
         # Create new memory
         memory_counter["count"] += 1
         from datetime import datetime
@@ -127,24 +127,24 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
             metadata=metadata or {},
             created_at=datetime.utcnow()
         )
-        
+
         # Store for duplicate detection
         duplicate_key = f"{content}||{scope}"
         stored_memories[duplicate_key] = memory
-        
+
         # Store by ID for retrieval
         stored_memories_by_id[memory.id] = memory
-        
+
         return memory
-    
+
     manager.store_memory = mock_store_memory
-    
+
     # Mock get_memory method
     async def mock_get_memory(memory_id: str) -> Optional[Memory]:
         # Check stored memories first
         if memory_id in stored_memories_by_id:
             return stored_memories_by_id[memory_id]
-        
+
         # Fallback for fixed test ID
         from datetime import datetime
         if memory_id == "test-id-123":
@@ -158,9 +158,9 @@ async def simple_memory_manager(temp_dir: Path, mock_embedding_service) -> Async
                 created_at=datetime.utcnow()
             )
         return None
-    
+
     manager.get_memory = mock_get_memory
-    
+
     await manager.initialize()
     yield manager
     await manager.close()
@@ -205,20 +205,20 @@ def sample_memory_data() -> List[Dict]:
 async def populated_memory_manager(simple_memory_manager, sample_memory_data) -> AsyncGenerator[MemoryManager, None]:
     """Create a memory manager pre-populated with sample data."""
     manager = simple_memory_manager
-    
+
     # Store sample memories
     stored_memories = []
     for data in sample_memory_data:
         memory = await manager.store_memory(**data)
         stored_memories.append(memory)
-    
+
     # Mock the search_memories method to return the stored memories
     async def mock_search_memories(query: str = "", scope: Optional[str] = None, limit: int = 10, **kwargs):
         # Simple mock search that returns all stored memories
         return stored_memories[:limit]
-    
+
     manager.search_memories = mock_search_memories
-    
+
     yield manager
 
 

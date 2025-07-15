@@ -8,7 +8,6 @@ import tempfile
 from pathlib import Path
 
 
-
 def test_minimal_chromadb():
     """Minimal ChromaDB test without any complex dependencies."""
     try:

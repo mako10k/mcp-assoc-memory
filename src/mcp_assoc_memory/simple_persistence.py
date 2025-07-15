@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class SimplePersistence:
     """Simple JSON file-based persistence for memory storage"""
 
-    def __init__(self, storage_file: str = "/workspaces/mcp-assoc-memory/data/memories.json"):
+    def __init__(self, storage_file: str = "./data/memories.json"):
         self.storage_file = Path(storage_file)
         self.storage_file.parent.mkdir(exist_ok=True)
 

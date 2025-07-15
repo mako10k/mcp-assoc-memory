@@ -2,12 +2,66 @@
 Request models for MCP Associative Memory Server API
 """
 
+from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from .common import CommonToolParameters, ResponseLevel
 
-class MemoryStoreRequest(BaseModel):
+
+class MCPRequestBase(BaseModel, ABC):
+    """
+    Abstract base class for all MCP request types
+
+    Provides common functionality for:
+    - Request validation
+    - Metadata extraction
+    - Response level determination
+    - Debugging and audit trails
+    """
+
+    def get_request_type(self) -> str:
+        """Get request type for logging and processing"""
+        return self.__class__.__name__
+
+    def get_operation_id(self) -> str:
+        """Get unique operation identifier for tracking"""
+        return f"{self.get_request_type()}_{id(self)}"
+
+    @abstractmethod
+    def get_primary_identifier(self) -> str:
+        """Get primary identifier for this request (e.g., memory_id, query)"""
+        pass
+
+    def get_response_level(self) -> str:
+        """
+        Determine response detail level based on request characteristics
+
+        Returns:
+            str: "minimal", "standard", or "full"
+        """
+        # Check if this request inherits from CommonToolParameters
+        if hasattr(self, 'response_level') and self.response_level:
+            return str(self.response_level.value)
+
+        # Default implementation for requests without response_level
+        if hasattr(self, 'minimal_response') and self.minimal_response:
+            return "minimal"
+        return "standard"
+
+    def get_processing_metadata(self) -> Dict[str, Any]:
+        """Get metadata for request processing and debugging"""
+        return {
+            "request_type": self.get_request_type(),
+            "operation_id": self.get_operation_id(),
+            "primary_identifier": self.get_primary_identifier(),
+            "response_level": self.get_response_level(),
+            "model_dump_size": len(str(self.model_dump())),
+        }
+
+
+class MemoryStoreRequest(MCPRequestBase, CommonToolParameters):
     content: str = Field(description="Memory content to store")
     scope: str = Field(
         default="user/default",
@@ -32,35 +86,30 @@ class MemoryStoreRequest(BaseModel):
     category: Optional[str] = Field(default=None, description="Memory category")
     auto_associate: bool = Field(default=True, description="Enable automatic association discovery")
     allow_duplicates: bool = Field(default=False, description="Allow storing duplicate content")
-    similarity_threshold: float = Field(
-        default=0.95,
+    duplicate_threshold: Optional[float] = Field(
+        default=None,
         ge=0.0,
         le=1.0,
-        description="""Duplicate detection threshold:
+        description="""Duplicate detection threshold for pre-registration check:
 
         Values & Use Cases:
-        • 0.95-1.0: Prevent only near-identical content ← RECOMMENDED
-        • 0.85-0.95: Block similar variations (stricter)
-        • 0.70-0.85: Aggressive duplicate prevention
+        • None: No duplicate checking - allow any content including duplicates ← DEFAULT
+        • 0.95-1.0: Strict - only prevent near-identical content
+        • 0.85-0.95: Standard - prevent similar variations ← RECOMMENDED
+        • 0.70-0.85: Aggressive - prevent related content duplication
 
-        Strategy: Keep high (0.95) unless you need strict deduplication
-        Example: similarity_threshold=0.95 for most cases""",
-        examples=[0.95, 0.90, 0.85],
-    )
-    minimal_response: bool = Field(
-        default=False,
-        description="""Return minimal response data to reduce payload size:
-
-        Use Cases:
-        • True: Return only essential fields (memory_id, success, message) ← RECOMMENDED for bulk operations
-        • False: Return complete memory data with associations (default)
-
-        Strategy: Use minimal=True for storage operations, False for retrieval
-        Target: Minimal responses < 1KB vs full responses with associations""",
+        Strategy: Leave None for no duplicate checking, use 0.85-0.95 for duplicate prevention
+        If similarity score ≥ threshold, registration will fail with duplicate error
+        Example: duplicate_threshold=0.85 for standard duplicate prevention""",
+        examples=[None, 0.85, 0.90, 0.95],
     )
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the content preview"""
+        return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
 
-class MemorySearchRequest(BaseModel):
+
+class MemorySearchRequest(MCPRequestBase, CommonToolParameters):
     query: str = Field(description="Search query")
     scope: Optional[str] = Field(
         default=None,
@@ -105,15 +154,18 @@ class MemorySearchRequest(BaseModel):
         • 0.2-0.4: Broader associations (idea expansion, new perspectives)
         • 0.1-0.2: Creative connections (brainstorming, unexpected links) ← RECOMMENDED
 
-        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while \
-        LLM judges relevance via similarity scores
+        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
         Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
         examples=[0.1, 0.2, 0.4],
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the search query"""
+        return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
 
-class DiversifiedSearchRequest(BaseModel):
+
+class DiversifiedSearchRequest(MCPRequestBase):
     """Diversified similarity search request for broader knowledge exploration"""
 
     query: str = Field(description="Search query")
@@ -209,8 +261,12 @@ class DiversifiedSearchRequest(BaseModel):
     )
     include_associations: bool = Field(default=True, description="Include related memories in results")
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the search query"""
+        return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
 
-class MemoryUpdateRequest(BaseModel):
+
+class MemoryUpdateRequest(MCPRequestBase):
     memory_id: str = Field(description="ID of the memory to update")
     content: Optional[str] = Field(default=None, description="New content for the memory (optional)")
     scope: Optional[str] = Field(
@@ -233,8 +289,12 @@ class MemoryUpdateRequest(BaseModel):
         default=True, description="Whether to preserve existing associations when updating content"
     )
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the memory ID"""
+        return self.memory_id
 
-class MemoryMoveRequest(BaseModel):
+
+class MemoryMoveRequest(CommonToolParameters):
     memory_ids: List[str] = Field(
         description="""List of memory IDs to move to new scope:
 
@@ -277,8 +337,12 @@ class MemoryMoveRequest(BaseModel):
         Example: target_scope="work/projects/mcp-improvements" for project reorganization"""
     )
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the list of memory IDs"""
+        return f"memory_ids:{','.join(self.memory_ids)}"
 
-class ScopeListRequest(BaseModel):
+
+class ScopeListRequest(MCPRequestBase, CommonToolParameters):
     parent_scope: Optional[str] = Field(
         default=None,
         description="""Parent scope to filter hierarchy view:
@@ -313,8 +377,12 @@ class ScopeListRequest(BaseModel):
         Example: include_memory_counts=False for rapid scope exploration""",
     )
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the parent scope"""
+        return self.parent_scope if self.parent_scope else "root"
 
-class ScopeSuggestRequest(BaseModel):
+
+class ScopeSuggestRequest(MCPRequestBase, CommonToolParameters):
     content: str = Field(
         description="""Content to analyze for scope recommendation:
 
@@ -350,8 +418,12 @@ class ScopeSuggestRequest(BaseModel):
         examples=[None, "work/projects", "learning", "personal"],
     )
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the content preview"""
+        return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
 
-class SessionManageRequest(BaseModel):
+
+class SessionManageRequest(MCPRequestBase, CommonToolParameters):
     action: str = Field(
         description="""Session management action to perform:
 
@@ -403,8 +475,12 @@ class SessionManageRequest(BaseModel):
         examples=[1, 7, 14, 30],
     )
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the action and session ID"""
+        return f"action:{self.action}, session_id:{self.session_id}"
 
-class MemoryExportRequest(BaseModel):
+
+class MemoryExportRequest(MCPRequestBase):
     scope: Optional[str] = Field(
         default=None,
         description="""Scope to export (optional):
@@ -442,8 +518,12 @@ class MemoryExportRequest(BaseModel):
     )
     compression: bool = Field(default=False, description="Compress export data (gzip)")
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the scope and file path"""
+        return f"scope:{self.scope}, file_path:{self.file_path}"
 
-class MemoryImportRequest(BaseModel):
+
+class MemoryImportRequest(MCPRequestBase):
     file_path: Optional[str] = Field(
         default=None,
         description="""Server-side file path for import (Pattern A):
@@ -505,8 +585,16 @@ class MemoryImportRequest(BaseModel):
     )
     validate_data: bool = Field(default=True, description="Validate imported data structure and content")
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the file path or import data preview"""
+        if self.file_path:
+            return f"file_path:{self.file_path}"
+        if self.import_data:
+            return f"import_data:{self.import_data[:50]}..." if len(self.import_data) > 50 else f"import_data:{self.import_data}"
+        return "no_identifier"
 
-class UnifiedSearchRequest(BaseModel):
+
+class UnifiedSearchRequest(MCPRequestBase):
     """Unified search request supporting both standard and diversified search modes"""
 
     query: str = Field(description="Search query")
@@ -632,8 +720,12 @@ class UnifiedSearchRequest(BaseModel):
         examples=[5, 7, 3],
     )
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the query preview"""
+        return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
 
-class MemoryManageRequest(BaseModel):
+
+class MemoryManageRequest(CommonToolParameters):
     """Unified CRUD operations request model"""
 
     operation: str = Field(
@@ -677,8 +769,12 @@ class MemoryManageRequest(BaseModel):
         description="Whether to preserve existing associations when updating content (update operation only)",
     )
 
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the memory ID"""
+        return self.memory_id
 
-class MemorySyncRequest(BaseModel):
+
+class MemorySyncRequest(MCPRequestBase, CommonToolParameters):
     """Unified import/export operations request model"""
 
     operation: str = Field(
@@ -730,39 +826,88 @@ class MemorySyncRequest(BaseModel):
         default=True, description="Include association relationships in export (export operation only)"
     )
     compression: bool = Field(default=False, description="Compress export data with gzip (export operation only)")
-    export_format: str = Field(default="json", description="Export format: json or yaml (export operation only)")
 
-    # Import-specific parameters
-    import_data: Optional[str] = Field(
-        default=None,
-        description="""Direct import data (import operation only):
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the operation and optional file path"""
+        if self.file_path:
+            return f"{self.operation}:{self.file_path}"
+        return f"{self.operation}:direct_data"
 
-        Data Format:
-        • JSON string containing exported memory data
-        • Used when file_path is None
-        • Enables cross-node memory transfer
-        • Supports compressed data (base64 encoded gzip)
 
-        Usage Pattern:
-        1. Export from source environment with file_path=None
-        2. Copy export response data
-        3. Import to target environment with import_data=<copied_data>""",
+class MemoryDiscoverAssociationsRequest(CommonToolParameters):
+    """Request model for discovering memory associations"""
+
+    memory_id: str = Field(description="Memory ID to discover associations for")
+    limit: int = Field(
+        default=10,
+        description="""Maximum number of associations to retrieve:
+
+        Values & Use Cases:
+        • 5-10: Focused associations (finding specific relationships) ← RECOMMENDED
+        • 10-20: Balanced exploration (general ideation, learning review)
+        • 20-50: Comprehensive discovery (brainstorming, research phase)
+
+        Strategy: Start small (10), increase if you need broader context
+        Example: limit=15 for creative thinking sessions
+
+        ⚠️ Performance: Higher values increase processing time""",
+        examples=[10, 15, 5],
+        ge=1,
+        le=100
     )
-    merge_strategy: str = Field(
-        default="skip_duplicates",
-        description="""How to handle duplicate memories (import operation only):
+    similarity_threshold: float = Field(
+        default=0.1,
+        description="""Similarity threshold for association matching:
 
-        Merge Strategies:
-        • "skip_duplicates": Keep existing, skip imports (safe default)
-        • "overwrite": Replace existing with imported data
-        • "create_versions": Create new versions of duplicates
-        • "merge_metadata": Combine metadata while keeping content
+        Values & Use Cases:
+        • 0.8-1.0: Near-identical content (duplicate detection, exact recall)
+        • 0.4-0.8: Clear relevance (general search, learning review)
+        • 0.2-0.4: Broader associations (idea expansion, new perspectives)
+        • 0.1-0.2: Creative connections (brainstorming, unexpected links) ← RECOMMENDED
 
-        Use Cases:
-        • skip_duplicates: Safe import without conflicts
-        • overwrite: Force update from authoritative source
-        • create_versions: Preserve both local and imported versions""",
+        Strategy: ChromaDB uses Top-K search, so low threshold (0.1) filters noise while LLM judges relevance via similarity scores
+        Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
+        examples=[0.1, 0.2, 0.4],
+        ge=0.0,
+        le=1.0
     )
-    validate_data: bool = Field(
-        default=True, description="Validate imported data structure and content (import operation only)"
+
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the memory_id"""
+        return f"memory_id:{self.memory_id}"
+
+
+class MemoryListAllRequest(MCPRequestBase, CommonToolParameters):
+    page: int = Field(
+        default=1,
+        ge=1,
+        description="""Page number for pagination:
+
+        Navigation Strategy:
+        • Start with page=1 for initial overview
+        • Use pagination.has_next to continue browsing
+        • Jump to specific pages for targeted access
+        • Monitor total_pages to understand collection size
+
+        Example: page=1 for first overview, page=3 for deeper exploration""",
+        examples=[1, 2, 3],
     )
+    per_page: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="""Items per page (1-100):
+
+        Values & Use Cases:
+        • 5-10: Quick overview (manageable chunks) ← RECOMMENDED
+        • 20-50: Efficient browsing (bulk review)
+        • 50-100: System analysis (comprehensive data check)
+
+        Strategy: Start with 10, increase for bulk operations
+        Example: per_page=25 for efficient content review""",
+        examples=[10, 25, 50],
+    )
+
+    def get_primary_identifier(self) -> str:
+        """Primary identifier is the page and per_page"""
+        return f"page:{self.page}, per_page:{self.per_page}"

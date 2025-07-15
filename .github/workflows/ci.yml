@@ -43,13 +43,9 @@ jobs:
         pip install -r requirements-dev.txt
         pip install -e .  # Install package in editable mode
         
-    - name: Run linting
+    - name: Run Smart Lint (flake8 + mypy with false positive handling)
       run: |
-        flake8 src/ --max-line-length=120 --extend-ignore=E203,W503
-        
-    - name: Run type checking
-      run: |
-        mypy src/mcp_assoc_memory/ --ignore-missing-imports --show-error-codes || echo "Type checking completed with issues"
+        python scripts/smart_lint.py
         
     - name: Run unit tests
       run: |

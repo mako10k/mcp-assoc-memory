@@ -68,12 +68,69 @@
             "problemMatcher": []
         },
         {
-            "label": "Lint: Run flake8",
+            "label": "Logs: Rotate Log Files",
             "type": "shell",
-            "command": "sh",
+            "command": "${workspaceFolder}/scripts/rotate_logs.sh",
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Lint: Smart Lint (All)",
+            "type": "shell",
+            "command": "python",
             "args": [
-                "-c",
-                "flake8 src/ --format=\"%(path)s:%(row)d:%(col)d: %(code)s %(text)s\" --max-line-length=120 --extend-ignore=E203,W503 > .copilot-temp/flake8-report.txt 2>&1 && echo \"Flake8 analysis completed. Report saved to .copilot-temp/flake8-report.txt\""
+                "scripts/smart_lint.py"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": [
+                {
+                    "owner": "flake8",
+                    "fileLocation": "relative",
+                    "pattern": {
+                        "regexp": "^\\s+(.*):(\\d+):(\\d+) - (.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "message": 4
+                    }
+                },
+                {
+                    "owner": "mypy",
+                    "fileLocation": "relative",
+                    "pattern": {
+                        "regexp": "^\\s+(.*):(\\d+) - \\[(\\w+)\\] (.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "code": 3,
+                        "message": 4
+                    }
+                }
+            ]
+        },
+        {
+            "label": "Lint: Smart Lint (flake8 only)",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "scripts/smart_lint.py",
+                "--tool",
+                "flake8"
             ],
             "group": "test",
             "presentation": {
@@ -85,25 +142,25 @@
                 "clear": false
             },
             "problemMatcher": {
-                "owner": "python",
+                "owner": "flake8",
                 "fileLocation": "relative",
                 "pattern": {
-                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(\\w\\d+)\\s+(.*)$",
+                    "regexp": "^\\s+(.*):(\\d+):(\\d+) - (.*)$",
                     "file": 1,
                     "line": 2,
                     "column": 3,
-                    "code": 4,
-                    "message": 5
+                    "message": 4
                 }
             }
         },
         {
-            "label": "Lint: Run mypy",
+            "label": "Lint: Smart Lint (mypy only)",
             "type": "shell",
-            "command": "sh",
+            "command": "python",
             "args": [
-                "-c",
-                "mypy src/mcp_assoc_memory/ --ignore-missing-imports --show-error-codes --pretty > .copilot-temp/mypy-report.txt 2>&1 && echo \"Mypy analysis completed. Report saved to .copilot-temp/mypy-report.txt\""
+                "scripts/smart_lint.py",
+                "--tool",
+                "mypy"
             ],
             "group": "test",
             "presentation": {
@@ -118,12 +175,11 @@
                 "owner": "mypy",
                 "fileLocation": "relative",
                 "pattern": {
-                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(error|warning|note):\\s+(.*)$",
+                    "regexp": "^\\s+(.*):(\\d+) - \\[(\\w+)\\] (.*)$",
                     "file": 1,
                     "line": 2,
-                    "column": 3,
-                    "severity": 4,
-                    "message": 5
+                    "code": 3,
+                    "message": 4
                 }
             }
         },
@@ -169,8 +225,7 @@
             "label": "Code Quality: Run All",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "Lint: Run flake8",
-                "Lint: Run mypy",
+                "Lint: Smart Lint (All)",
                 "Format: Run black",
                 "Format: Run isort"
             ],
@@ -435,8 +490,7 @@
             "label": "Test: All Quality Checks",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "Lint: Run flake8",
-                "Lint: Run mypy",
+                "Lint: Smart Lint (All)",
                 "Test: Complete Test Suite"
             ],
             "group": "test",

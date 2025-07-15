@@ -53,6 +53,25 @@ Built with **FastMCP 2.0** for modern LLM integration, optimized for **GitHub Co
 - **VS Code Tasks**: One-click server management and maintenance
 - **Real-time Association**: Automatic relationship discovery during storage
 - **Performance Optimized**: Sub-second search across thousands of memories
+- **Response Level Control**: Minimal, standard, or full detail responses for optimal token usage
+
+### ⚡ **Smart Response Levels**
+Control response detail and token usage with three intelligent levels:
+
+- **`minimal`**: Essential information only (~50 tokens) - Perfect for status checks and basic operations
+- **`standard`**: Balanced detail for workflow continuity (default) - Optimal for most use cases  
+- **`full`**: Comprehensive data including metadata, associations, and analysis - Ideal for debugging and detailed exploration
+
+**Example Usage:**
+```python
+# Quick status check
+memory_store(content="meeting notes", response_level="minimal")
+# Returns: {"success": true, "message": "Memory stored", "memory_id": "..."}
+
+# Full debugging info
+memory_search(query="project ideas", response_level="full") 
+# Returns: Complete results with similarity scores, metadata, associations
+```
 
 ## 🎯 Complete MCP Tool Suite
 

@@ -39,6 +39,42 @@ FastMCP server running on http://localhost:8000
 MCP endpoint available at: http://localhost:8000/mcp/
 ```
 
+## 🎚️ Response Level Optimization
+
+**All tools support response level control for token efficiency:**
+
+### When to Use Each Level
+
+#### Minimal (`response_level: "minimal"`)
+- **Bulk operations**: Storing many memories quickly
+- **Token-conscious workflows**: When response tokens matter
+- **Status checking**: Quick success/failure confirmation
+
+```instructions
+Store multiple project notes with minimal responses for efficiency:
+memory_store content="Project milestone completed" response_level="minimal"
+```
+
+#### Standard (`response_level: "standard"`) - Default
+- **Regular workflow**: Balanced information for most tasks
+- **Interactive work**: Sufficient context for next steps  
+- **Content preview**: See what was stored/found
+
+```instructions
+Search for programming notes with standard detail:
+memory_search query="Python best practices" response_level="standard"
+```
+
+#### Full (`response_level: "full"`)
+- **Deep analysis**: Complete context and associations
+- **Research mode**: Maximum information for exploration
+- **Debugging**: Full details for troubleshooting
+
+```instructions
+Get complete analysis of memory connections:
+memory_discover_associations memory_id="abc123" response_level="full"
+```
+
 ## 💭 Your First Memory
 
 ### Store Your First Memory
@@ -56,9 +92,57 @@ Use memory_store to save: "FastAPI is excellent for building APIs because of its
     "content": "FastAPI is excellent for building APIs...",
     "scope": "learning/web",
     "tags": ["fastapi", "api", "validation"],
-    "auto_associate": true
+    "auto_associate": true,
+    "duplicate_threshold": null
   }
 }
+```
+
+### Duplicate Detection Control
+The `memory_store` tool offers flexible duplicate handling:
+
+**No duplicate checking (default):**
+```instructions
+Store this memory: "Python is great for data science"
+```
+
+**Prevent similar content:**
+```instructions
+Store this memory with duplicate detection: "Python is excellent for data science" 
+Set duplicate_threshold to 0.85
+```
+
+**Force storage even if duplicate detected:**
+```instructions
+Store this memory even if similar exists: "Python is awesome for data science"
+Set duplicate_threshold to 0.85 and allow_duplicates to true
+```
+
+### Duplicate Detection Benefits:
+- **Storage efficiency**: Avoid accumulating similar content
+- **Content quality**: Maintain focused, unique insights
+- **Flexible control**: Choose when to enforce or bypass duplicate checking
+- **Similarity scoring**: Transparent relevance metrics (0.0-1.0)
+
+### Auto-Association Control
+The `memory_store` tool also supports automatic association discovery:
+
+**Enable auto-association (default):**
+```instructions
+Store this memory with auto-association: "React hooks simplify state management"
+```
+
+**Disable auto-association for faster storage:**
+```instructions
+Store this memory without auto-association: "Quick note about debugging"
+Set auto_associate to false
+```
+
+### Auto-Association Benefits:
+- **Automatic connections**: Discovers semantic relationships with existing memories
+- **Knowledge linking**: Builds interconnected knowledge graph
+- **Performance control**: Disable for bulk operations or temporary notes
+- **Creative discovery**: Reveals unexpected connections between concepts
 ```
 
 ### Search for Memories

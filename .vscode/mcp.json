@@ -9,7 +9,15 @@
         "ShellServer": {
             "command": "npm",
             "args": ["start"],
-            "cwd": "${workspaceFolder}/../mcp-shell-server"
+            "cwd": "${workspaceFolder}/../mcp-shell-server",
+            "env": {
+                "MCP_SHELL_DEFAULT_WORKDIR": "${workspaceFolder}",
+                "MCP_SHELL_ALLOWED_WORKDIRS": "${workspaceFolder},${userHome},/tmp",
+                "PATH": "${workspaceFolder}/venv/bin:${userHome}/.nvm/versions/node/v22.16.0/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+                "VIRTUAL_ENV": "${workspaceFolder}/venv",
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "NODE_ENV": "development"
+            }
         }
 
     }

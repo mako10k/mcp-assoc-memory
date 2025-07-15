@@ -4,8 +4,10 @@ Models module initialization
 
 from .requests import (
     DiversifiedSearchRequest,
+    MemoryDiscoverAssociationsRequest,
     MemoryExportRequest,
     MemoryImportRequest,
+    MemoryListAllRequest,
     MemoryManageRequest,
     MemoryMoveRequest,
     MemorySearchRequest,
@@ -51,6 +53,8 @@ __all__ = [  # Request models
     "DiversifiedSearchRequest",
     "UnifiedSearchRequest",
     "MemoryManageRequest",
+    "MemoryDiscoverAssociationsRequest",
+    "MemoryListAllRequest",
     "MemorySyncRequest",
     "MemoryUpdateRequest",
     "MemoryMoveRequest",

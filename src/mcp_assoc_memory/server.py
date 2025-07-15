@@ -4,66 +4,144 @@ FastMCP-compliant memory management server implementation with associative memor
 
 import asyncio
 import logging
+import sys
+import traceback
+from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
 
-from fastmcp import Context, FastMCP
-from pydantic import Field
 
-from .api.dependencies import set_global_dependencies
-from .api.models import (
-    MemoryManageRequest,
-    MemoryMoveRequest,
-    MemoryResponse,
-    MemoryStoreRequest,
-    MemorySyncRequest,
-    ScopeListRequest,
-    ScopeSuggestRequest,
-    SessionManageRequest,
-    UnifiedSearchRequest,
-)
-from .api.tools import (
-    handle_analyze_memories_prompt,
-    handle_memory_discover_associations,
-    handle_memory_list_all,
-    handle_memory_get,
-    handle_memory_update,
-    handle_memory_delete,
-    handle_memory_move,
-    handle_memory_stats,
-    handle_scope_memories,
-    handle_memory_store,
-    handle_memory_export,
-    handle_memory_import,
-    handle_scope_list,
-    handle_scope_suggest,
-    handle_session_manage,
-    handle_summarize_memory_prompt,
-    handle_memory_search,
-    handle_unified_search,
-    handle_memory_manage,
-    handle_memory_sync,
-    handle_diversified_search,
-    set_dependencies,
-    set_prompt_dependencies,
-    set_resource_dependencies,
-    set_scope_dependencies,
-)
-from .api.tools.other_tools import set_dependencies as set_other_dependencies
-from .config import get_config
-from .core.embedding_service import (
-    MockEmbeddingService,
-    SentenceTransformerEmbeddingService,
-)
+# CRITICAL: Initialize logging first, before any imports that might fail
+def initialize_early_logging() -> None:
+    """Initialize logging before anything else to capture startup errors"""
+    try:
+        # Ensure logs directory exists
+        log_dir = Path("logs")
+        log_dir.mkdir(exist_ok=True)
 
-# Import the full associative memory architecture
-from .core.similarity import SimilarityCalculator
-from .core.singleton_memory_manager import (
-    initialize_memory_manager,
-)
-from .simple_persistence import get_persistent_storage
-from .storage.graph_store import NetworkXGraphStore
-from .storage.metadata_store import SQLiteMetadataStore
-from .storage.vector_store import ChromaVectorStore
+        # Configure logging immediately - only file handler to avoid duplicates
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s [%(levelname)s][%(name)s] %(message)s',
+            handlers=[
+                logging.FileHandler('logs/mcp_server.log', mode='a')
+            ]
+        )
+
+        logger = logging.getLogger(__name__)
+        logger.info("=" * 80)
+        logger.info("MCP Associative Memory Server - Starting up")
+        logger.info(f"Python version: {sys.version}")
+        logger.info(f"Working directory: {Path.cwd()}")
+        logger.info(f"Python path: {sys.path[:3]}")  # First 3 entries
+
+        return logger
+    except Exception as e:
+        # Fallback: write to stderr directly
+        print(f"CRITICAL: Failed to initialize logging: {e}", file=sys.stderr)
+        print(f"CRITICAL: Traceback: {traceback.format_exc()}", file=sys.stderr)
+        sys.exit(1)
+
+
+# Initialize logging immediately
+logger = initialize_early_logging()
+
+try:
+    logger.info("Importing FastMCP and Pydantic...")
+    from fastmcp import Context, FastMCP
+    from pydantic import Field
+    logger.info("Core imports successful")
+
+    logger.info("Importing project dependencies...")
+    from .api.dependencies import set_global_dependencies
+    logger.info("Dependencies import successful")
+
+    logger.info("Importing API models...")
+    from .api.models import (
+        MemoryManageRequest,
+        MemoryMoveRequest,
+        MemoryResponse,
+        MemoryStoreRequest,
+        MemoryStoreResponse,
+        MemorySyncRequest,
+        ScopeListRequest,
+        ScopeSuggestRequest,
+        SessionManageRequest,
+        UnifiedSearchRequest,
+    )
+    logger.info("API models import successful")
+
+    logger.info("Importing API tools...")
+    from .api.tools import (
+        handle_analyze_memories_prompt,
+        handle_memory_discover_associations,
+        handle_memory_list_all,
+        handle_memory_get,
+        handle_memory_update,
+        handle_memory_delete,
+        handle_memory_move,
+        handle_memory_stats,
+        handle_scope_memories,
+        handle_memory_store,
+        handle_memory_export,
+        handle_memory_import,
+        handle_scope_list,
+        handle_scope_suggest,
+        handle_session_manage,
+        handle_summarize_memory_prompt,
+        handle_memory_search,
+        handle_unified_search,
+        handle_memory_manage,
+        handle_memory_sync,
+        handle_diversified_search,
+        set_dependencies,
+        set_prompt_dependencies,
+        set_resource_dependencies,
+        set_scope_dependencies,
+    )
+    logger.info("API tools import successful")
+
+    logger.info("Importing additional tools...")
+    from .api.tools.other_tools import set_dependencies as set_other_dependencies
+    logger.info("Additional tools import successful")
+
+    logger.info("Importing configuration...")
+    from .config import get_config, initialize_config
+    logger.info("Configuration import successful")
+
+    logger.info("Importing embedding services...")
+    from .core.embedding_service import (
+        MockEmbeddingService,
+        SentenceTransformerEmbeddingService,
+    )
+    logger.info("Embedding services import successful")
+
+    logger.info("Importing core similarity and memory manager...")
+    # Import the full associative memory architecture
+    from .core.similarity import SimilarityCalculator
+    from .core.singleton_memory_manager import (
+        initialize_memory_manager,
+    )
+    logger.info("Memory manager import successful")
+
+    logger.info("Importing storage components...")
+    from .simple_persistence import get_persistent_storage
+    from .storage.graph_store import NetworkXGraphStore
+    from .storage.metadata_store import SQLiteMetadataStore
+    from .storage.vector_store import ChromaVectorStore
+    logger.info("Storage components import successful")
+
+    logger.info("All imports completed successfully")
+
+except ImportError as e:
+    logger.error(f"IMPORT ERROR: {e}")
+    logger.error(f"Failed import traceback: {traceback.format_exc()}")
+    print(f"CRITICAL: Import failed: {e}", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    logger.error(f"UNEXPECTED ERROR during imports: {e}")
+    logger.error(f"Full traceback: {traceback.format_exc()}")
+    print(f"CRITICAL: Unexpected error: {e}", file=sys.stderr)
+    sys.exit(1)
 
 logger = logging.getLogger(__name__)
 
@@ -71,21 +149,41 @@ logger = logging.getLogger(__name__)
 mcp: FastMCP = FastMCP(name="AssocMemoryServer")
 
 # Initialize the associative memory system
-config = get_config()
-
-# Initialize storage components
-vector_store = ChromaVectorStore()
-metadata_store = SQLiteMetadataStore()
-graph_store = NetworkXGraphStore()
-
-# Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
 try:
-    embedding_service = SentenceTransformerEmbeddingService()
-    logger.info("Using SentenceTransformerEmbeddingService for production")
+    logger.info("Initializing configuration...")
+    # Initialize configuration singleton with explicit config file path
+    config_path = "config.json"  # Explicitly specify the config file
+    config = initialize_config(config_path)
+    logger.info(f"Server initialized with config from: {config_path}")
+    logger.info(f"API configuration loaded: {hasattr(config.api, 'default_response_level')}")
+    if hasattr(config.api, 'default_response_level'):
+        logger.info(f"Default response level: {config.api.default_response_level}")
+    logger.info("Configuration initialized successfully")
+
+    logger.info("Initializing storage components...")
+    # Initialize storage components
+    vector_store = ChromaVectorStore()
+    metadata_store = SQLiteMetadataStore()
+    graph_store = NetworkXGraphStore()
+    logger.info("Storage components initialized successfully")
+
+    logger.info("Initializing embedding service...")
+    # Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
+    try:
+        embedding_service = SentenceTransformerEmbeddingService()
+        logger.info("Using SentenceTransformerEmbeddingService for production")
+    except Exception as e:
+        logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
+        embedding_service = MockEmbeddingService()  # type: ignore
+        logger.info("Using MockEmbeddingService as fallback")
+
+    logger.info("All components initialized successfully")
+
 except Exception as e:
-    logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
-    embedding_service = MockEmbeddingService()  # type: ignore
-    logger.info("Falling back to MockEmbeddingService")
+    logger.error(f"INITIALIZATION ERROR: {e}")
+    logger.error(f"Full traceback: {traceback.format_exc()}")
+    print(f"CRITICAL: Initialization failed: {e}", file=sys.stderr)
+    sys.exit(1)
 
 similarity_calculator = SimilarityCalculator()
 
@@ -171,21 +269,21 @@ Stores your content as a searchable memory, automatically discovers connections 
 
 💡 Quick Start:
 - Auto-categorize: Let scope_suggest recommend the best scope
-- Prevent duplicates: allow_duplicates=False (default) saves space
+- Duplicate handling: duplicate_threshold=0.85 (prevent similar content), =null (no checking)
+- Force storage: allow_duplicates=true (store even if duplicate detected)
 - Enable connections: auto_associate=True (default) builds knowledge links
-- Quality control: similarity_threshold=0.95 prevents near-duplicates
 
 ⚠️ Important: Duplicate detection may block intentionally similar content
 
 ➡️ What's next: Use memory_discover_associations to explore new connections""",
     annotations={
-        "title": "Memory Storage with Auto-Association",
+        "title": "Memory Storage",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False,
     },
 )
-async def memory_store(request: MemoryStoreRequest, ctx: Context) -> MemoryResponse:
+async def memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict[str, Any]:
     """Store a memory with full associative capabilities"""
     return await handle_memory_store(request, ctx)
 
@@ -334,10 +432,10 @@ Provides complete session lifecycle management including creation, listing, and 
         "idempotentHint": False,
     },
 )
-async def session_manage(request: SessionManageRequest, ctx: Context) -> Dict[str, Any]:
+async def session_manage(request: SessionManageRequest, ctx: Context) -> Any:
     """Manage sessions and cleanup"""
     response = await handle_session_manage(request, ctx)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 @mcp.tool(
@@ -369,10 +467,10 @@ Displays the hierarchical structure of all scopes with memory counts, helping yo
         "idempotentHint": True,
     },
 )
-async def scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str, Any]:
+async def scope_list(request: ScopeListRequest, ctx: Context) -> Any:
     """List scopes with pagination and hierarchy"""
     response = await handle_scope_list(request, ctx)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 @mcp.tool(
@@ -404,10 +502,10 @@ Analyzes your content using keyword detection and context patterns to recommend 
         "idempotentHint": True,
     },
 )
-async def scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Dict[str, Any]:
+async def scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Any:
     """Suggest scope based on content analysis"""
     response = await handle_scope_suggest(request, ctx)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 # Old memory_export deleted - replaced by memory_sync export operation
@@ -440,10 +538,10 @@ Moves specified memories from their current scopes to a new target scope, preser
 ➡️ What's next: Use scope_list to verify new organization, memory_search in new scope to confirm placement""",
     annotations={"title": "Memory Move", "readOnlyHint": False, "destructiveHint": False, "idempotentHint": False},
 )
-async def memory_move(request: MemoryMoveRequest, ctx: Context) -> Dict[str, Any]:
+async def memory_move(request: MemoryMoveRequest, ctx: Context) -> Any:
     """Move memories to a new scope"""
     response = await handle_memory_move(request, ctx)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 @mcp.tool(
@@ -476,10 +574,10 @@ Takes a specific memory as starting point and finds semantically related memorie
 )
 async def memory_discover_associations(
     memory_id: str, limit: int = 10, similarity_threshold: float = 0.1, ctx: Optional[Context] = None
-) -> Dict[str, Any]:
+) -> Any:
     """Discover semantic associations for a specific memory"""
     response = await handle_memory_discover_associations(memory_id, ctx, limit, similarity_threshold)
-    return response.dict() if hasattr(response, "dict") else response  # type: ignore
+    return response
 
 
 @mcp.tool(
@@ -510,16 +608,15 @@ Provides unified interface for both standard semantic search and diversified sea
         "idempotentHint": True,
     },
 )
-async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> List[MemoryResponse]:
+async def memory_search(request: UnifiedSearchRequest, ctx: Context) -> Dict[str, Any]:
     """Unified search supporting both standard and diversified modes"""
     # Delegate to handler
     result = await handle_unified_search(request, ctx)
-    # Convert handler result to expected format
-    if isinstance(result, dict) and "results" in result:
-        # Return the MemoryResponse objects directly
-        return result["results"]  # type: ignore
-    # Return empty list if result format is unexpected
-    return []
+    # Return the complete handler result
+    if isinstance(result, dict):
+        return result
+    # Return empty results structure if result format is unexpected
+    return {"results": [], "success": False, "message": "Unexpected result format"}
 
 
 @mcp.tool(
@@ -596,28 +693,35 @@ def main() -> None:
     async def startup() -> None:
         """Initialize the memory system on startup"""
         try:
+            # Initialize response processor
+            from .api.processing import create_response_processor, set_global_processor
+            processor = create_response_processor(config)
+            set_global_processor(processor)
+            logger.info("Response processor initialized successfully")
+
+            # Initialize memory system
             await ensure_initialized()
             logger.info("Associative memory system initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize associative memory system: {e}")
+            logger.error(f"Failed to initialize systems: {e}")
             # Continue with simple storage as fallback
 
     # Initialize before running
     asyncio.run(startup())
 
-    # Use transport configuration from config file
-    transport_config = config.get("transport", {})
+    # Use transport configuration from config object
+    transport_config = config.transport
 
-    if transport_config.get("http_enabled", False):
+    if transport_config.http_enabled:
         # HTTP transport
-        port = transport_config.get("http_port", 8000)
-        host = transport_config.get("http_host", "0.0.0.0")
+        port = transport_config.http_port
+        host = getattr(transport_config, 'http_host', "0.0.0.0")
         logger.info(f"Starting server on HTTP transport: {host}:{port}")
         mcp.run(transport="http", host=host, port=port)
-    elif transport_config.get("sse_enabled", False):
+    elif transport_config.sse_enabled:
         # SSE transport
-        port = transport_config.get("sse_port", 8000)
-        host = transport_config.get("sse_host", "0.0.0.0")
+        port = getattr(transport_config, 'sse_port', 8000)
+        host = getattr(transport_config, 'sse_host', "0.0.0.0")
         logger.info(f"Starting server on SSE transport: {host}:{port}")
         mcp.run(transport="sse", host=host, port=port)
     else:

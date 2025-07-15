@@ -48,6 +48,36 @@
 
 ## 🎯 Modern API Features
 
+### ⚡ **Smart Response Levels**
+**All 10 tools support intelligent response detail control:**
+
+- **`response_level: "minimal"`** - Essential info only (~50 tokens)
+  - Perfect for: Status checks, bulk operations, token optimization
+  - Returns: Basic success/error status and minimal data
+
+- **`response_level: "standard"`** - Balanced detail (default)
+  - Perfect for: Normal workflow, interactive use, moderate token usage
+  - Returns: Sufficient context for follow-up operations
+
+- **`response_level: "full"`** - Comprehensive information
+  - Perfect for: Debugging, analysis, complete data exploration
+  - Returns: All metadata, associations, detailed analysis
+
+**Example:**
+```json
+// Minimal response  
+{"success": true, "message": "Memory stored", "memory_id": "abc123"}
+
+// Standard response (default)
+{"success": true, "message": "Memory stored", "memory_id": "abc123", 
+ "scope": "work/project", "associations_count": 2, "created_at": "..."}
+
+// Full response
+{"success": true, "message": "Memory stored", "memory_id": "abc123",
+ "scope": "work/project", "associations_count": 2, "created_at": "...",
+ "memory": {...full object...}, "duplicate_analysis": {...}}
+```
+
 ### 🆕 **2025 Enhancements**
 - **Unified Interfaces**: Single tools for multiple operations
 - **Mode-based Operations**: Standard and diversified search in one tool

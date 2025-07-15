@@ -23,7 +23,7 @@ def explain_client_initialization():
     print("   transport = {")
     print("       'type': 'stdio',")
     print("       'command': ['python', '-m', 'src.mcp_assoc_memory.server'],")
-    print("       'cwd': '/workspaces/mcp-assoc-memory'")
+    print("       'cwd': '.'")
     print("   }")
     print("   client = Client(transport)")
 
@@ -125,7 +125,7 @@ def show_server_startup_options():
     print("=" * 50)
 
     print("\n1. HTTP Mode (for Client testing):")
-    print("   cd /workspaces/mcp-assoc-memory")
+    print("   cd .")
     print("   python -m src.mcp_assoc_memory")
     print("   # Server runs on http://localhost:8000/mcp")
 

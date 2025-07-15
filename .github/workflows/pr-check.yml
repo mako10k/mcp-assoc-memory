@@ -37,16 +37,18 @@ jobs:
       run: |
         poetry run isort --check-only src/
         
-    - name: Run flake8 linting
+    - name: Run Smart Lint (comprehensive linting and type checking)
       run: |
-        poetry run flake8 src/ --max-line-length=120 --extend-ignore=E203,W503 --output-file=flake8-report.txt
+        poetry run python scripts/smart_lint.py
         
     - name: Upload lint reports
       uses: actions/upload-artifact@v3
       if: failure()
       with:
-        name: lint-reports
-        path: flake8-report.txt
+        name: smart-lint-reports
+        path: |
+          .copilot-temp/smart-lint-progress.txt
+          .copilot-temp/smart-lint-report.txt
 
   type-check:
     runs-on: ubuntu-latest

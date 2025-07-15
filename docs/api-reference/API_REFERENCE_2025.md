@@ -9,14 +9,43 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
 - **Complete CI/CD pipeline** with security and quality gates
 - **Production-ready** with comprehensive test coverage
 
+## 🎚️ Response Level Control
+
+**All MCP tools support response level optimization for token efficiency:**
+
+### Response Levels
+- **`minimal`**: Essential data only (<50 tokens avg)
+  - Success status, core IDs, basic counts
+  - Optimized for batch operations and token-conscious workflows
+  
+- **`standard`**: Balanced information (default)
+  - Sufficient context for workflow continuity
+  - Content previews, basic metadata, operation results
+  
+- **`full`**: Complete detailed information
+  - Comprehensive data including associations, full metadata
+  - Detailed analysis, complete content, extensive context
+
+### Usage Examples
+```json
+// Minimal response for bulk operations
+{"response_level": "minimal"}
+
+// Standard response (default)  
+{"response_level": "standard"}
+
+// Full details for analysis
+{"response_level": "full"}
+```
+
 ## 🛠️ Available Tools
 
 ### 🧠 Core Memory Operations
 
 #### 1. `memory_store` 
-**💾 Store New Memory with Auto-Association**
+**💾 Store New Memory**
 
-**Purpose**: Store new memories with automatic connection discovery to existing knowledge.
+**Purpose**: Store new memories with optional automatic connection discovery and duplicate detection.
 
 **Parameters**:
 ```json
@@ -29,24 +58,81 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
     "metadata": {"project": "mcp-server"},
     "allow_duplicates": false,
     "auto_associate": true,
-    "similarity_threshold": 0.95,
-    "minimal_response": false
+    "duplicate_threshold": 0.85,
+    "response_level": "standard"
   }
 }
+```
+
+**Response Level Control**:
+- `response_level`: String (default: "standard")
+  - `"minimal"`: Essential data only (<50 tokens) - ID, success status
+  - `"standard"`: Balanced information for workflow continuity  
+  - `"full"`: Complete details including associations and metadata
+
+**Auto-Association Control**:
+- `auto_associate`: Boolean (default: true)
+  - `true`: Automatically discover semantic connections with existing memories
+  - `false`: Skip association discovery for faster storage (bulk operations)
+
+**Duplicate Detection**:
+- `duplicate_threshold`: Float (0.0-1.0) or null
+  - `null` (default): No duplicate checking - allow any content
+  - `0.85-0.95`: Standard duplicate prevention (recommended)
+  - `0.95-1.0`: Strict - prevent only near-identical content
+- `allow_duplicates`: Boolean (default: false)
+  - `true`: Store even if duplicate detected (when threshold specified)
+  - `false`: Reject storage if duplicate found
+
+**Use Cases**:
+- **Standard storage**: `auto_associate=true, duplicate_threshold=null` (default)
+- **Bulk operations**: `auto_associate=false` (faster)
+- **Duplicate prevention**: `duplicate_threshold=0.85`
+- **Force storage**: `duplicate_threshold=0.85, allow_duplicates=true`
 ```
 
 **Response**:
 ```json
 {
-  "memory_id": "uuid-string",
-  "content": "Your memory content here",
-  "scope": "work/projects/example",
-  "metadata": {"project": "mcp-server"},
-  "tags": ["python", "fastapi"],
-  "category": "programming",
-  "created_at": "2025-07-12T10:30:00Z",
-  "is_duplicate": false,
-  "duplicate_of": null
+  "success": true,
+  "message": "Memory stored successfully: uuid-string",
+  "data": {
+    "memory_id": "uuid-string",
+    "created_at": "2025-07-12T10:30:00Z",
+    "scope": "work/projects/example",
+    "duplicate_check_performed": true
+  },
+  "memory": {
+    "id": "uuid-string",
+    "content": "Your memory content here",
+    "scope": "work/projects/example",
+    "metadata": {"project": "mcp-server"},
+    "tags": ["python", "fastapi"],
+    "category": "programming",
+    "created_at": "2025-07-12T10:30:00Z",
+    "updated_at": "2025-07-12T10:30:00Z"
+  },
+  "associations_created": [],
+  "duplicate_found": false
+}
+```
+
+**Duplicate Detection Response**:
+```json
+{
+  "success": false,
+  "message": "Duplicate content detected (similarity: 0.947 >= 0.85)",
+  "data": {"duplicate_threshold": 0.85},
+  "memory": null,
+  "associations_created": [],
+  "duplicate_found": true,
+  "duplicate_candidate": {
+    "memory_id": "existing-uuid",
+    "similarity_score": 0.947,
+    "content_preview": "Similar existing content...",
+    "scope": "work/projects/example",
+    "created_at": "2025-07-11T15:20:00Z"
+  }
 }
 ```
 
