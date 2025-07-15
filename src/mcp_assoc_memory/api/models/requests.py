@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from .common import CommonToolParameters, ResponseLevel
+
 
 class MCPRequestBase(BaseModel, ABC):
     """
@@ -39,7 +41,11 @@ class MCPRequestBase(BaseModel, ABC):
         Returns:
             str: "minimal", "standard", or "full"
         """
-        # Default implementation - can be overridden by specific request types
+        # Check if this request inherits from CommonToolParameters
+        if hasattr(self, 'response_level') and self.response_level:
+            return self.response_level.value
+        
+        # Default implementation for requests without response_level
         if hasattr(self, 'minimal_response') and self.minimal_response:
             return "minimal"
         return "standard"
@@ -55,7 +61,7 @@ class MCPRequestBase(BaseModel, ABC):
         }
 
 
-class MemoryStoreRequest(MCPRequestBase):
+class MemoryStoreRequest(CommonToolParameters, MCPRequestBase):
     content: str = Field(description="Memory content to store")
     scope: str = Field(
         default="user/default",
@@ -96,17 +102,6 @@ class MemoryStoreRequest(MCPRequestBase):
         If similarity score ≥ threshold, registration will fail with duplicate error
         Example: duplicate_threshold=0.85 for standard duplicate prevention""",
         examples=[None, 0.85, 0.90, 0.95],
-    )
-    minimal_response: bool = Field(
-        default=False,
-        description="""Return minimal response data to reduce payload size:
-
-        Use Cases:
-        • True: Return only essential fields (memory_id, success, message) ← RECOMMENDED for bulk operations
-        • False: Return complete memory data with associations (default)
-
-        Strategy: Use minimal=True for storage operations, False for retrieval
-        Target: Minimal responses < 1KB vs full responses with associations""",
     )
 
     def get_primary_identifier(self) -> str:

@@ -37,6 +37,7 @@ from ..models import (
     UnifiedSearchRequest,
 )
 from ..models.responses import SearchResultWithAssociations, Association
+from ..models.common import CommonToolParameters, ResponseBuilder, ResponseLevel
 from .export_tools import handle_memory_export
 
 # Global references (will be set by server.py)
@@ -97,13 +98,14 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
     if not request.content or not request.content.strip():
         error_msg = "Content cannot be empty"
         await ctx.error(error_msg)
-        return MemoryStoreResponse(
-            success=False,
-            message=error_msg,
-            data={},
-            memory=None,
-            associations_created=[]
-        ).to_response_dict(level="minimal")
+        return ResponseBuilder.build_response(
+            request.response_level,
+            {
+                "success": False,
+                "message": error_msg,
+                "memory_id": None
+            }
+        )
 
     try:
         # Get memory manager with early None check
@@ -162,15 +164,27 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
                         error_msg = f"Duplicate content detected (similarity: {similarity:.3f} >= {request.duplicate_threshold})"
                         await ctx.warning(error_msg)
                         
-                        return MemoryStoreResponse(
-                            success=False,
-                            message=error_msg,
-                            data={"duplicate_threshold": request.duplicate_threshold},
-                            memory=None,
-                            associations_created=[],
-                            duplicate_found=True,
-                            duplicate_candidate=duplicate_candidate
-                        ).model_dump()
+                        base_data = {
+                            "success": False,
+                            "message": error_msg,
+                            "memory_id": None
+                        }
+                        
+                        full_data = {
+                            "duplicate_analysis": {
+                                "duplicate_found": True,
+                                "duplicate_candidate": duplicate_candidate,
+                                "threshold_used": request.duplicate_threshold,
+                                "similarity_score": similarity
+                            }
+                        }
+                        
+                        return ResponseBuilder.build_response(
+                            request.response_level,
+                            base_data,
+                            None,
+                            full_data
+                        )
                         
             except Exception as e:
                 await ctx.warning(f"Failed to check for duplicates: {e}")
@@ -205,37 +219,49 @@ async def handle_memory_store(request: MemoryStoreRequest, ctx: Context) -> Dict
             metadata=memory.metadata or {}
         )
 
-        response = MemoryStoreResponse(
-            success=True,
-            message=f"Memory stored successfully: {memory.id}",
-            data={
-                "memory_id": memory.id,
-                "created_at": memory.created_at.isoformat(),
-                "scope": memory.scope,
-                "duplicate_check_performed": request.duplicate_threshold is not None
-            },
-            memory=memory_model,
-            associations_created=[],  # Will be populated if auto-associations are created
-            duplicate_found=False
+        # Use response level to build appropriate response
+        base_data = {
+            "success": True,
+            "message": f"Memory stored successfully: {memory.id}",
+            "memory_id": memory.id
+        }
+        
+        standard_data = {
+            "scope": memory.scope,
+            "associations_count": 0,  # TODO: Update when auto-association is implemented
+            "created_at": memory.created_at.isoformat()
+        }
+        
+        full_data = {
+            "memory": memory_model.model_dump() if memory_model else None,
+            "duplicate_analysis": {
+                "duplicate_check_performed": request.duplicate_threshold is not None,
+                "threshold_used": request.duplicate_threshold
+            }
+        }
+        
+        return ResponseBuilder.build_response(
+            request.response_level,
+            base_data,
+            standard_data,
+            full_data
         )
-
-        # Use unified response processing instead of direct to_minimal_dict()
-        return process_tool_response(request, response)
 
     except Exception as e:
         error_msg = f"Failed to store memory: {str(e)}"
         await ctx.error(error_msg)
 
-        error_response = MemoryStoreResponse(
-            success=False,
-            message=f"{error_msg}: {str(e)}",
-            data={},
-            memory=None,
-            associations_created=[]
+        # Use response level for error responses too
+        base_data = {
+            "success": False,
+            "message": error_msg,
+            "memory_id": None
+        }
+        
+        return ResponseBuilder.build_response(
+            request.response_level,
+            base_data
         )
-
-        # Use unified response processing for error responses too
-        return process_tool_response(request, error_response)
 
 
 async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Dict[str, Any]:
