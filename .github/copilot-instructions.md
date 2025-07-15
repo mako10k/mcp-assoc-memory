@@ -223,6 +223,8 @@ For security guard conflicts, long-running executions, or terminal sessions, use
 2. **Process items**: Store valid items in associative memory using scope `work/backlog/{priority}`
 3. **Clean up**: Remove processed items from the backlog file
 4. **Update sprint**: Integrate high-priority items into current sprint planning
+5. **Dual recording**: Store ALL processed items in both associative memory AND separate backlog files when requested
+6. **Recovery support**: Maintain processing logs for backlog reconstruction and recovery
 
 ### Benefits
 - **Non-blocking**: Users can add items without interrupting current work
