@@ -362,45 +362,87 @@ async def handle_memory_search(request: MemorySearchRequest, ctx: Context) -> Di
 
         await ctx.info(f"Found {len(formatted_results)} memories")
 
-        # Use unified response processing
-        response = MemorySearchResponse(
-            success=True,
-            message=f"Found {len(formatted_results)} memories for query: {request.query}",
-            data={
-                "scope": request.scope,
-                "include_child_scopes": request.include_child_scopes,
+        # Use ResponseBuilder for level-appropriate response
+        base_data = {
+            "success": True,
+            "message": f"Found {len(formatted_results)} memories for query: {request.query}",
+            "total_count": len(formatted_results)
+        }
+        
+        standard_data = {
+            "query": request.query,
+            "scope": request.scope,
+            "results": []
+        }
+        
+        # Add level-appropriate results
+        if request.response_level != ResponseLevel.MINIMAL:
+            for result in formatted_results:
+                memory = result.memory
+                if request.response_level == ResponseLevel.STANDARD:
+                    # Standard: ID, scope, content preview
+                    result_data = {
+                        "memory_id": memory.id,
+                        "scope": memory.scope,
+                        "content_preview": ResponseBuilder.truncate_content(memory.content, 50),
+                        "similarity_score": result.similarity_score
+                    }
+                else:  # FULL
+                    # Full: Complete memory objects with associations
+                    result_data = {
+                        "memory_id": memory.id,
+                        "content": memory.content,
+                        "scope": memory.scope,
+                        "similarity_score": result.similarity_score,
+                        "tags": memory.tags,
+                        "category": memory.category,
+                        "created_at": memory.created_at.isoformat() if memory.created_at else None,
+                        "metadata": memory.metadata,
+                        "associations": result.associations if request.include_associations else []
+                    }
+                standard_data["results"].append(result_data)
+        
+        full_data = {
+            "search_metadata": {
+                "scope_coverage": "hierarchical" if request.include_child_scopes else "exact",
                 "similarity_threshold": request.similarity_threshold,
-                "search_metadata": {
-                    "scope_coverage": "hierarchical" if request.include_child_scopes else "exact",
-                    "fallback_used": len(formatted_results) > 0 and request.scope is not None,
-                },
-            },
-            results=formatted_results,
-            query=request.query,
-            total_found=len(formatted_results)
+                "include_child_scopes": request.include_child_scopes,
+                "include_associations": request.include_associations
+            }
+        }
+        
+        return ResponseBuilder.build_response(
+            request.response_level,
+            base_data,
+            standard_data,
+            full_data
         )
-
-        return process_tool_response(request, response)
 
     except Exception as e:
         error_message = f"Failed to search memories: {str(e)}"
         await ctx.error(error_message)
 
-        # Use unified response processing for error responses
-        error_response = MemorySearchResponse(
-            success=False,
-            message=error_message,
-            data={
+        # Use ResponseBuilder for error responses
+        base_data = {
+            "success": False,
+            "message": error_message,
+            "total_count": 0
+        }
+        
+        full_data = {
+            "error_details": {
                 "error_type": type(e).__name__,
                 "query": getattr(request, "query", "unknown"),
-                "scope": getattr(request, "scope", "unknown"),
-            },
-            results=[],
-            query=getattr(request, "query", "unknown"),
-            total_found=0
+                "scope": getattr(request, "scope", "unknown")
+            }
+        }
+        
+        return ResponseBuilder.build_response(
+            request.response_level,
+            base_data,
+            None,
+            full_data
         )
-
-        return process_tool_response(request, error_response)
 
 
 async def handle_diversified_search(request: DiversifiedSearchRequest, ctx: Context) -> Dict[str, Any]:

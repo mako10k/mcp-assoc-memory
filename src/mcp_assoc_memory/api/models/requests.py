@@ -109,7 +109,7 @@ class MemoryStoreRequest(CommonToolParameters, MCPRequestBase):
         return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
 
 
-class MemorySearchRequest(MCPRequestBase):
+class MemorySearchRequest(CommonToolParameters, MCPRequestBase):
     query: str = Field(description="Search query")
     scope: Optional[str] = Field(
         default=None,
