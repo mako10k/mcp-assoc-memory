@@ -82,7 +82,19 @@
 
 ## 🟡 Medium Priority
 
-*Medium priority items to be added as they are identified and processed*
+### Development Workflow Timeout Issues
+**Type**: technical-debt | **Sprint**: future
+**Status**: Investigation Required (2025-07-15)
+**Description**: Frequent timeout problems during development affecting mypy, smart_lint.py, and other tools
+**Technical Details**:
+- Commands that should complete in 10-30 seconds often exceed timeout limits
+- May be related to ChromaDB initialization overhead, system resources, or network dependencies
+- Affects development workflow and CI/CD pipeline efficiency
+**Recommendations**:
+- Increase default timeout values for complex operations
+- Investigate root cause of slow mypy execution
+- Consider caching mechanisms for repeated operations
+- Optimize ChromaDB initialization to reduce startup time
 
 ---
 
