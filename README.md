@@ -175,7 +175,7 @@ The server operates in **STDIO mode** for direct MCP client integration. This is
 
 ## 🛠️ Installation (PyPI, pipx, GitHub)
 
-### Recommended: PyPI (after publish)
+### Recommended: PyPI
 ```bash
 pip install mcp-assoc-memory
 ```
