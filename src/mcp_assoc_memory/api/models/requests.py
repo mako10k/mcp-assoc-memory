@@ -342,7 +342,7 @@ class MemoryMoveRequest(CommonToolParameters):
         return f"memory_ids:{','.join(self.memory_ids)}"
 
 
-class ScopeListRequest(MCPRequestBase):
+class ScopeListRequest(MCPRequestBase, CommonToolParameters):
     parent_scope: Optional[str] = Field(
         default=None,
         description="""Parent scope to filter hierarchy view:

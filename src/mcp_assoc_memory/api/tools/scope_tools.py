@@ -3,7 +3,7 @@ Scope management tool handlers for MCP Associative Memory Server
 """
 
 import logging
-from typing import Any
+from typing import Any, Dict
 
 from fastmcp import Context
 
@@ -16,6 +16,7 @@ from ..models import (
     ScopeSuggestRequest,
     ScopeSuggestResponse,
 )
+from ..models.common import ResponseLevel, ResponseBuilder
 from ..utils import get_child_scopes, validate_scope_path
 
 logger = logging.getLogger(__name__)
@@ -30,19 +31,18 @@ def set_dependencies(mm: Any) -> None:
     memory_manager = mm
 
 
-async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeListResponse:
-    """Handle scope list requests"""
+async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str, Any]:
+    """Handle scope list requests with ResponseBuilder integration"""
     try:
         # Use comprehensive memory manager access
         current_memory_manager = await get_or_create_memory_manager()
         if current_memory_manager is None:
-            return ScopeListResponse(
-                success=False,
-                message="Internal server error",
-                data={"error": "Memory manager not initialized"},
-                scopes=[],
-                total_scopes=0,
-            )
+            base_data = {
+                "success": False,
+                "message": "Internal server error",
+                "error": "Memory manager not initialized"
+            }
+            return ResponseBuilder.build_response(request.response_level, base_data)
 
         # Get all scopes from memory manager
         all_scopes = await current_memory_manager.get_all_scopes()
@@ -52,13 +52,12 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
         parent_scope = request.parent_scope
         if parent_scope:
             if not validate_scope_path(parent_scope):
-                return ScopeListResponse(
-                    success=False,
-                    message=f"Invalid parent scope format: {parent_scope}",
-                    data={"error": "INVALID_SCOPE"},
-                    scopes=[],
-                    total_scopes=0,
-                )
+                base_data = {
+                    "success": False,
+                    "message": f"Invalid parent scope format: {parent_scope}",
+                    "error": "INVALID_SCOPE"
+                }
+                return ResponseBuilder.build_response(request.response_level, base_data)
             filtered_scopes = get_child_scopes(parent_scope, all_scopes)
         else:
             filtered_scopes = all_scopes
@@ -77,34 +76,61 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> ScopeLis
             # Get child scopes for this scope
             child_scopes = [s for s in all_scopes if s.startswith(scope + "/") and s != scope]
 
-            scope_infos.append(
-                ScopeInfo(
-                    scope=scope,
-                    memory_count=memory_count,
-                    child_scopes=child_scopes,
-                )
-            )
+            scope_info = {
+                "scope": scope,
+                "memory_count": memory_count,
+                "child_scopes": child_scopes,
+            }
+            scope_infos.append(scope_info)
 
         # Sort by scope name for consistent ordering
-        scope_infos.sort(key=lambda x: x.scope)
+        scope_infos.sort(key=lambda x: x["scope"])
 
-        return ScopeListResponse(
-            success=True,
-            message=f"Retrieved {len(scope_infos)} scopes",
-            data={"scopes": scope_infos, "parent_scope": parent_scope, "total_count": len(scope_infos)},
-            scopes=scope_infos,
-            total_scopes=len(scope_infos),
+        # Use ResponseBuilder for level-appropriate response
+        base_data = {
+            "success": True,
+            "message": f"Retrieved {len(scope_infos)} scopes",
+            "total_scopes": len(scope_infos)
+        }
+
+        standard_data: Dict[str, Any] = {
+            "parent_scope": parent_scope,
+            "scope_preview": [
+                {
+                    "scope": info["scope"],
+                    "memory_count": info["memory_count"],
+                    "child_count": len(info["child_scopes"])
+                }
+                for info in scope_infos[:10]  # Limit to first 10 scopes for preview
+            ]
+        }
+
+        full_data: Dict[str, Any] = {
+            "scopes": scope_infos,
+            "parent_scope": parent_scope,
+            "total_count": len(scope_infos),
+            "hierarchy_stats": {
+                "total_scopes": len(all_scopes),
+                "filtered_scopes": len(filtered_scopes),
+                "include_memory_counts": request.include_memory_counts
+            }
+        }
+
+        return ResponseBuilder.build_response(
+            request.response_level,
+            base_data,
+            standard_data,
+            full_data
         )
 
     except Exception as e:
         logger.error(f"Error in scope_list: {e}", exc_info=True)
-        return ScopeListResponse(
-            success=False,
-            message=f"Failed to list scopes: {str(e)}",
-            data={"error": "SCOPE_LIST_ERROR"},
-            scopes=[],
-            total_scopes=0,
-        )
+        base_data = {
+            "success": False,
+            "message": f"Failed to list scopes: {str(e)}",
+            "error": "SCOPE_LIST_ERROR"
+        }
+        return ResponseBuilder.build_response(request.response_level, base_data)
 
 
 async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> ScopeSuggestResponse:
