@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-assoc-memory"
-version = "0.1.1"
+version = "0.1.2"
 description = "Associative Memory MCP Server for LLMs - Knowledge management system with hierarchical scope organization"
 authors = [
     {name = "Makoto Katsumata", email = "mako10k@mk10.org"}

@@ -152,33 +152,26 @@ For detailed setup instructions, see `docs/installation.md`.
 
 ## Server Startup
 
+### Direct STDIO Mode (Recommended)
 
-### Recommended: FastMCP Server (STDIO default)
-
-**Official startup method:**
+**Standard MCP startup method:**
 
 ```bash
-python -m mcp_assoc_memory
+python -m mcp_assoc_memory.server --config config.json
 ```
 
-The server always starts in **STDIO mode by default** for MCP client integration. The legacy `mcp-server` command is deprecated and no longer provided.
+The server operates in **STDIO mode** for direct MCP client integration. This is the recommended approach for VS Code Copilot and other MCP clients.
+
+### Configuration
+
+- Copy `config.json.template` to `config.json`
+- Set your OpenAI API key for embeddings
+- Configure transport options (STDIO enabled by default)
 
 ### Environment Variables
 
 - `OPENAI_API_KEY`: Required for OpenAI embeddings
 - `MCP_LOG_LEVEL`: Set logging level (DEBUG, INFO, WARNING, ERROR)
-
-### Server Control Scripts
-
-- Start:   `./scripts/mcp_server_daemon.sh start`
-- Stop:    `./scripts/mcp_server_daemon.sh stop`  
-- Restart: `./scripts/mcp_server_daemon.sh restart`
-- Status:  `./scripts/mcp_server_daemon.sh status`
-
-### Logs & PID Files
-
-- Logs: `logs/mcp_server.log`
-- PID:  `logs/mcp_server.pid`
 
 ## 🛠️ Installation (PyPI, pipx, GitHub)
 
@@ -202,9 +195,10 @@ pipx install git+https://github.com/mako10k/mcp-assoc-memory.git
 
 ### Start the server (after install)
 ```bash
-python -m mcp_assoc_memory
+python -m mcp_assoc_memory.server --config config.json
 ```
 
+- Configure via `.vscode/mcp.json` for VS Code Copilot integration
 - MCPクライアントや自動検出ツール（Claude Desktop Extensions, FastMCP, Cursor等）からも自動認識されます。
 - Dockerイメージも近日公開予定。
 
@@ -271,7 +265,7 @@ pytest tests/ -v
 
 ### 5. Start the MCP server
 ```bash
-./scripts/mcp_server_daemon.sh start
+python -m mcp_assoc_memory.server --config config.json
 ```
 
 For Docker users:

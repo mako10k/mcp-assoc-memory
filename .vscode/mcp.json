@@ -4,7 +4,12 @@
             "url": "http://localhost:3000/mcp"
         },
         "AssocMemory": {
-            "url": "http://localhost:3006/mcp/"
+            "command": "python3",
+            "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json"],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
         },
         "ShellServer": {
             "command": "npm",

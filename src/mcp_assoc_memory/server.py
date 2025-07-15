@@ -11,7 +11,7 @@ from typing import Annotated, Any, Dict, List, Optional
 
 
 # CRITICAL: Initialize logging first, before any imports that might fail
-def initialize_early_logging() -> None:
+def initialize_early_logging() -> logging.Logger:
     """Initialize logging before anything else to capture startup errors"""
     try:
         # Ensure logs directory exists
@@ -43,6 +43,7 @@ def initialize_early_logging() -> None:
 
 
 # Initialize logging immediately
+
 logger = initialize_early_logging()
 
 try:
@@ -68,6 +69,7 @@ try:
         SessionManageRequest,
         UnifiedSearchRequest,
     )
+    from .api.models.requests import MemoryListAllRequest
     logger.info("API models import successful")
 
     logger.info("Importing API tools...")
@@ -143,7 +145,6 @@ except Exception as e:
     print(f"CRITICAL: Unexpected error: {e}", file=sys.stderr)
     sys.exit(1)
 
-logger = logging.getLogger(__name__)
 
 # FastMCP server instance
 mcp: FastMCP = FastMCP(name="AssocMemoryServer")
@@ -366,7 +367,12 @@ async def memory_list_all(
     ] = 10,
 ) -> Dict[str, Any]:
     """List all memories with pagination (for debugging)"""
-    return await handle_memory_list_all(page, per_page, ctx)
+    try:
+        request = MemoryListAllRequest(page=page, per_page=per_page)
+        return await handle_memory_list_all(request, ctx)
+    except Exception as e:
+        await ctx.error(f"Error in memory_list_all: {e}")
+        return {"error": str(e), "success": False}
 
 
 # Resource definitions - Another important FastMCP concept
@@ -712,22 +718,20 @@ def main() -> None:
     # Use transport configuration from config object
     transport_config = config.transport
 
-    if transport_config.http_enabled:
-        # HTTP transport
-        port = transport_config.http_port
+    # Prefer STDIO as default, then HTTP, then SSE
+    if getattr(transport_config, 'stdio_enabled', True):
+        logger.info("Starting server on STDIO transport")
+        mcp.run(transport="stdio")
+    elif getattr(transport_config, 'http_enabled', False):
+        port = getattr(transport_config, 'http_port', 8000)
         host = getattr(transport_config, 'http_host', "0.0.0.0")
         logger.info(f"Starting server on HTTP transport: {host}:{port}")
         mcp.run(transport="http", host=host, port=port)
-    elif transport_config.sse_enabled:
-        # SSE transport
-        port = getattr(transport_config, 'sse_port', 8000)
+    elif getattr(transport_config, 'sse_enabled', False):
+        port = getattr(transport_config, 'sse_port', 8001)
         host = getattr(transport_config, 'sse_host', "0.0.0.0")
         logger.info(f"Starting server on SSE transport: {host}:{port}")
         mcp.run(transport="sse", host=host, port=port)
-    else:
-        # Default to STDIO transport
-        logger.info("Starting server on STDIO transport")
-        mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":

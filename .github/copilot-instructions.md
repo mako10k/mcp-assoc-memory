@@ -1,3 +1,9 @@
+## ✅ Context Preservation and Forgetting Mitigation
+
+- Periodically record conversation history and key context using `#mcp_assocmemory_memory_store` to associative memory.
+- Minimize use of Copilot's summarization features to avoid context loss.
+- Important conversation history must also be recorded to a file (see file design in project docs).
+- After summarization or context loss, always refer to associative memory and restore context only after explicit user instruction.
 
 
 # GitHub Copilot Instructions (MCP Associative Memory Project)
@@ -41,13 +47,18 @@
 
 ## ✅ Critical Operations
 
-### Server Management
-**Never use `run_in_terminal` for server management** - always use:
-```bash
-# Recommended method
-./scripts/mcp_server_daemon.sh [start|stop|restart|status]
 
-# Or VS Code tasks via Command Palette: "Tasks: Run Task"
+### Server Management & Terminal Operations
+**Never use `run_in_terminal` for server or terminal management.**
+Always use `#mcp_shellserver_shell_execute` or `#mcp_shellserver_terminal_create` for all server and terminal operations.
+
+Recommended:
+```bash
+# Server management
+./scripts/mcp_server_daemon.sh [start|stop|restart|status]
+# Or use VS Code "Tasks: Run Task"
+# For terminal operations and command execution
+# Always use #mcp_shellserver_shell_execute or #mcp_shellserver_terminal_create
 ```
 
 ### Terminal Bug Workaround

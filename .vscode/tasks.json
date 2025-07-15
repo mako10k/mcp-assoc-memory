@@ -4,58 +4,16 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "MCP Server: Start",
+            "label": "MCP: Test Connection",
             "type": "shell",
-            "command": "${workspaceFolder}/scripts/mcp_server_daemon.sh",
-            "args": ["start"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
+            "command": "python3",
+            "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json", "--test"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}/src"
+                }
             },
-            "problemMatcher": []
-        },
-        {
-            "label": "MCP Server: Stop",
-            "type": "shell",
-            "command": "${workspaceFolder}/scripts/mcp_server_daemon.sh",
-            "args": ["stop"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "MCP Server: Restart",
-            "type": "shell",
-            "command": "${workspaceFolder}/scripts/mcp_server_daemon.sh",
-            "args": ["restart"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "MCP Server: Status",
-            "type": "shell",
-            "command": "${workspaceFolder}/scripts/mcp_server_daemon.sh",
-            "args": ["status"],
             "group": "test",
             "presentation": {
                 "echo": true,
@@ -229,70 +187,6 @@
                 "Format: Run black",
                 "Format: Run isort"
             ],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "MCP Test Server: Start",
-            "type": "shell",
-            "command": "${workspaceFolder}/scripts/mcp_test_server_daemon.sh",
-            "args": ["start"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "MCP Test Server: Stop",
-            "type": "shell",
-            "command": "${workspaceFolder}/scripts/mcp_test_server_daemon.sh",
-            "args": ["stop"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "MCP Test Server: Restart",
-            "type": "shell",
-            "command": "${workspaceFolder}/scripts/mcp_test_server_daemon.sh",
-            "args": ["restart"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "MCP Test Server: Status",
-            "type": "shell",
-            "command": "${workspaceFolder}/scripts/mcp_test_server_daemon.sh",
-            "args": ["status"],
             "group": "test",
             "presentation": {
                 "echo": true,
