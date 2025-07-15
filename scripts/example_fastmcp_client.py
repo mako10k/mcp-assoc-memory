@@ -107,7 +107,7 @@ async def test_stdio_client_connection():
     transport = {
         "type": "stdio",
         "command": ["python", "-m", "src.mcp_assoc_memory.server"],
-        "cwd": "/workspaces/mcp-assoc-memory",
+        "cwd": ".",
     }
 
     try:

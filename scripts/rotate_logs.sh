@@ -2,7 +2,7 @@
 # Log rotation script for MCP Associative Memory Server
 # Keeps 3 generations of log files
 
-LOG_DIR="/workspaces/mcp-assoc-memory/logs"
+LOG_DIR="./logs"
 MAX_SIZE_MB=10  # Rotate when log exceeds 10MB
 MAX_GENERATIONS=3
 

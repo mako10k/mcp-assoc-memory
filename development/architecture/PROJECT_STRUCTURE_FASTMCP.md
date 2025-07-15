@@ -3,7 +3,7 @@
 ## Directory Structure
 
 ```
-/workspaces/mcp-assoc-memory/
+mcp-assoc-memory/
 ├── 📚 Documentation
 │   ├── README.md                              # Project overview (English)
 │   ├── SPECIFICATION_FASTMCP.md               # API specifications for FastMCP

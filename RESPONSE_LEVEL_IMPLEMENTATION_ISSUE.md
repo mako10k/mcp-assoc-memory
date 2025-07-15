@@ -116,7 +116,7 @@ mcp_assocmemory_memory_store '{"content": "test full response", "minimal_respons
 mcp_assocmemory_memory_search '{"query": "test", "limit": 3, "mode": "standard"}'
 
 # Check server logs for debug messages
-tail -n 50 /workspaces/mcp-assoc-memory/logs/mcp_server.log | grep -E "(DEBUG|level=)"
+tail -n 50 logs/mcp_server.log | grep -E "(DEBUG|level=)"
 ```
 
 ## 📊 Impact Assessment

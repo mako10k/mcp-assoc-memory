@@ -12,7 +12,11 @@
             "cwd": "${workspaceFolder}/../mcp-shell-server",
             "env": {
                 "MCP_SHELL_DEFAULT_WORKDIR": "${workspaceFolder}",
-                "MCP_SHELL_ALLOWED_WORKDIRS": "/workspaces,/home,/tmp"
+                "MCP_SHELL_ALLOWED_WORKDIRS": "${workspaceFolder},${userHome},/tmp",
+                "PATH": "${userHome}/.nvm/versions/node/v22.16.0/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${workspaceFolder}/venv/bin",
+                "VIRTUAL_ENV": "${workspaceFolder}/venv",
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "NODE_ENV": "development"
             }
         }
 
