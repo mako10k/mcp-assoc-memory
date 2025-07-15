@@ -423,7 +423,7 @@ class ScopeSuggestRequest(MCPRequestBase):
         return f"content:{self.content[:50]}..." if len(self.content) > 50 else f"content:{self.content}"
 
 
-class SessionManageRequest(MCPRequestBase):
+class SessionManageRequest(MCPRequestBase, CommonToolParameters):
     action: str = Field(
         description="""Session management action to perform:
 

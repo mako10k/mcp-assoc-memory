@@ -7,6 +7,7 @@ from typing import Any, Dict
 from ...storage.simple_persistence import memory_storage, persistence
 from ..models.requests import SessionManageRequest
 from ..models.responses import SessionInfo, SessionManageResponse
+from ..models.common import ResponseBuilder
 
 
 async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict[str, Any]:
@@ -34,14 +35,16 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict
 
             await ctx.info(f"Created session: {session_id}")
 
-            return SessionManageResponse(
+            response = SessionManageResponse(
                 success=True,
                 message=f"Session {session_id} created successfully",
                 data={"session_id": session_id, "scope": session_scope},
                 session=SessionInfo(
                     session_id=session_id, memory_count=1, created_at=datetime.now(), last_activity=datetime.now()
                 ),
-            ).model_dump()
+            )
+
+            return response.to_response_dict(level=request.response_level.value)
 
         elif request.action == "list":
             # List all active sessions
@@ -74,12 +77,14 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict
 
             await ctx.info(f"Found {len(active_sessions)} active sessions")
 
-            return SessionManageResponse(
+            response = SessionManageResponse(
                 success=True,
                 message=f"Found {len(active_sessions)} active sessions",
                 data={"session_count": len(active_sessions)},
                 sessions=active_sessions,
-            ).model_dump()
+            )
+
+            return response.to_response_dict(level=request.response_level.value)
 
         elif request.action == "cleanup":
             # Clean up old sessions
@@ -101,16 +106,32 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Dict
 
             await ctx.info(f"Cleaned up {cleaned_count} old session memories")
 
-            return SessionManageResponse(
+            response = SessionManageResponse(
                 success=True,
                 message=f"Cleaned up {cleaned_count} old session memories",
                 data={"cleaned_count": cleaned_count},
                 cleaned_sessions=[],  # TODO: Return actual cleaned session IDs
-            ).model_dump()
+            )
+
+            return response.to_response_dict(level=request.response_level.value)
 
         else:
-            return {"success": False, "error": f"Unknown action: {request.action}", "data": {}}
+            return ResponseBuilder.build_response(
+                request.response_level,
+                {
+                    "success": False,
+                    "message": f"Unknown action: {request.action}",
+                    "error": f"Unknown action: {request.action}"
+                }
+            )
 
     except Exception as e:
         await ctx.error(f"Failed to manage session: {e}")
-        return {"success": False, "error": f"Failed to manage session: {e}", "data": {}}
+        return ResponseBuilder.build_response(
+            request.response_level,
+            {
+                "success": False,
+                "message": f"Failed to manage session: {e}",
+                "error": str(e)
+            }
+        )
