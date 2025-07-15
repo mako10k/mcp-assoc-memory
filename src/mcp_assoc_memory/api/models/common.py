@@ -25,6 +25,10 @@ class CommonToolParameters(BaseModel):
             "• full: Complete data + metadata + associations (maximum detail)"
         )
     )
+    
+    def get_response_level(self) -> ResponseLevel:
+        """Get the response level from the request."""
+        return self.response_level
 
 
 class ResponseBuilder:

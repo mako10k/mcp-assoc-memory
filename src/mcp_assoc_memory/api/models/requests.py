@@ -725,7 +725,7 @@ class UnifiedSearchRequest(MCPRequestBase):
         return f"query:{self.query[:50]}..." if len(self.query) > 50 else f"query:{self.query}"
 
 
-class MemoryManageRequest(MCPRequestBase):
+class MemoryManageRequest(CommonToolParameters):
     """Unified CRUD operations request model"""
 
     operation: str = Field(

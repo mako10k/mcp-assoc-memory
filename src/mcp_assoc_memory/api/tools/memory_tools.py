@@ -1113,8 +1113,44 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
         await ctx.info(f"Memory manage: operation={request.operation}, memory_id={request.memory_id}")
 
         if request.operation == "get":
-            # Delegate to existing get handler
-            return await handle_memory_get(request.memory_id, ctx, request.include_associations)
+            # Delegate to existing get handler and format with ResponseBuilder
+            result = await handle_memory_get(request.memory_id, ctx, request.include_associations)
+            
+            if "error" in result:
+                base_data = {
+                    "success": False,
+                    "message": result["error"],
+                    "operation": "get",
+                    "memory_id": request.memory_id
+                }
+                return ResponseBuilder.build_response(request.response_level, base_data)
+            
+            # Success case
+            base_data = {
+                "success": True,
+                "message": f"Memory retrieved successfully: {request.memory_id}",
+                "operation": "get",
+                "memory_id": request.memory_id
+            }
+            
+            standard_data = {
+                "memory": {
+                    "memory_id": result["memory_id"],
+                    "scope": result["scope"],
+                    "content_preview": ResponseBuilder.truncate_content(result["content"], 100)
+                }
+            }
+            
+            full_data = {
+                "memory": result
+            }
+            
+            return ResponseBuilder.build_response(
+                request.response_level,
+                base_data,
+                standard_data,
+                full_data
+            )
 
         elif request.operation == "update":
             # Create update request from manage request
@@ -1128,29 +1164,84 @@ async def handle_memory_manage(request: MemoryManageRequest, ctx: Context) -> Di
                 preserve_associations=request.preserve_associations,
             )
             response = await handle_memory_update(update_request, ctx)
-            return response.dict() if hasattr(response, "dict") else response  # type: ignore
+            
+            # Convert response to dict if needed
+            response_dict = response.dict() if hasattr(response, "dict") else response
+            
+            if not response_dict.get("success", False):
+                base_data = {
+                    "success": False,
+                    "message": response_dict.get("message", "Update failed"),
+                    "operation": "update",
+                    "memory_id": request.memory_id
+                }
+                return ResponseBuilder.build_response(request.response_level, base_data)
+            
+            # Success case
+            base_data = {
+                "success": True,
+                "message": f"Memory updated successfully: {request.memory_id}",
+                "operation": "update",
+                "memory_id": request.memory_id
+            }
+            
+            standard_data = {
+                "memory": {
+                    "memory_id": response_dict["memory_id"],
+                    "scope": response_dict["scope"],
+                    "content_preview": ResponseBuilder.truncate_content(response_dict["content"], 100)
+                }
+            }
+            
+            full_data = {
+                "memory": response_dict
+            }
+            
+            return ResponseBuilder.build_response(
+                request.response_level,
+                base_data,
+                standard_data,
+                full_data
+            )
 
         elif request.operation == "delete":
             # Delegate to existing delete handler
-            return await handle_memory_delete(request.memory_id, ctx)
+            result = await handle_memory_delete(request.memory_id, ctx)
+            
+            base_data = {
+                "success": result.get("success", False),
+                "message": result.get("message", result.get("error", "Unknown error")),
+                "operation": "delete",
+                "memory_id": request.memory_id
+            }
+            
+            return ResponseBuilder.build_response(request.response_level, base_data)
 
         else:
-            await ctx.error(f"Unknown operation: {request.operation}")
-            return {
-                "error": f"Unknown operation: {request.operation}. Supported operations: 'get', 'update', 'delete'",
-                "operation": request.operation,
-                "memory_id": request.memory_id,
+            error_msg = f"Unknown operation: {request.operation}. Supported operations: 'get', 'update', 'delete'"
+            await ctx.error(error_msg)
+            
+            base_data = {
                 "success": False,
+                "message": error_msg,
+                "operation": request.operation,
+                "memory_id": request.memory_id
             }
+            
+            return ResponseBuilder.build_response(request.response_level, base_data)
 
     except Exception as e:
-        await ctx.error(f"Memory manage operation failed: {e}")
-        return {
-            "error": f"Memory manage operation failed: {str(e)}",
-            "operation": request.operation,
-            "memory_id": request.memory_id,
+        error_msg = f"Memory manage operation failed: {str(e)}"
+        await ctx.error(error_msg)
+        
+        base_data = {
             "success": False,
+            "message": error_msg,
+            "operation": request.operation,
+            "memory_id": request.memory_id
         }
+        
+        return ResponseBuilder.build_response(request.response_level, base_data)
 
 
 async def handle_memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[str, Any]:
