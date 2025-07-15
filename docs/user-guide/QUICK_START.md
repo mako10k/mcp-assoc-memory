@@ -39,6 +39,42 @@ FastMCP server running on http://localhost:8000
 MCP endpoint available at: http://localhost:8000/mcp/
 ```
 
+## 🎚️ Response Level Optimization
+
+**All tools support response level control for token efficiency:**
+
+### When to Use Each Level
+
+#### Minimal (`response_level: "minimal"`)
+- **Bulk operations**: Storing many memories quickly
+- **Token-conscious workflows**: When response tokens matter
+- **Status checking**: Quick success/failure confirmation
+
+```instructions
+Store multiple project notes with minimal responses for efficiency:
+memory_store content="Project milestone completed" response_level="minimal"
+```
+
+#### Standard (`response_level: "standard"`) - Default
+- **Regular workflow**: Balanced information for most tasks
+- **Interactive work**: Sufficient context for next steps  
+- **Content preview**: See what was stored/found
+
+```instructions
+Search for programming notes with standard detail:
+memory_search query="Python best practices" response_level="standard"
+```
+
+#### Full (`response_level: "full"`)
+- **Deep analysis**: Complete context and associations
+- **Research mode**: Maximum information for exploration
+- **Debugging**: Full details for troubleshooting
+
+```instructions
+Get complete analysis of memory connections:
+memory_discover_associations memory_id="abc123" response_level="full"
+```
+
 ## 💭 Your First Memory
 
 ### Store Your First Memory

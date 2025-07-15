@@ -9,6 +9,35 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
 - **Complete CI/CD pipeline** with security and quality gates
 - **Production-ready** with comprehensive test coverage
 
+## 🎚️ Response Level Control
+
+**All MCP tools support response level optimization for token efficiency:**
+
+### Response Levels
+- **`minimal`**: Essential data only (<50 tokens avg)
+  - Success status, core IDs, basic counts
+  - Optimized for batch operations and token-conscious workflows
+  
+- **`standard`**: Balanced information (default)
+  - Sufficient context for workflow continuity
+  - Content previews, basic metadata, operation results
+  
+- **`full`**: Complete detailed information
+  - Comprehensive data including associations, full metadata
+  - Detailed analysis, complete content, extensive context
+
+### Usage Examples
+```json
+// Minimal response for bulk operations
+{"response_level": "minimal"}
+
+// Standard response (default)  
+{"response_level": "standard"}
+
+// Full details for analysis
+{"response_level": "full"}
+```
+
 ## 🛠️ Available Tools
 
 ### 🧠 Core Memory Operations
@@ -30,10 +59,16 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
     "allow_duplicates": false,
     "auto_associate": true,
     "duplicate_threshold": 0.85,
-    "minimal_response": false
+    "response_level": "standard"
   }
 }
 ```
+
+**Response Level Control**:
+- `response_level`: String (default: "standard")
+  - `"minimal"`: Essential data only (<50 tokens) - ID, success status
+  - `"standard"`: Balanced information for workflow continuity  
+  - `"full"`: Complete details including associations and metadata
 
 **Auto-Association Control**:
 - `auto_associate`: Boolean (default: true)
@@ -99,7 +134,6 @@ The MCP Associative Memory Server provides a comprehensive suite of **10 MCP too
     "created_at": "2025-07-11T15:20:00Z"
   }
 }
-```
 ```
 
 ---
