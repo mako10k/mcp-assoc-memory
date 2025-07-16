@@ -40,16 +40,13 @@ class ResponseProcessor:
         self._enable_audit_trail = False
         self._enable_response_metadata = True
 
-        if api_config and hasattr(api_config, 'enable_audit_trail'):
+        if api_config and hasattr(api_config, "enable_audit_trail"):
             self._enable_audit_trail = bool(api_config.enable_audit_trail)
-        if api_config and hasattr(api_config, 'enable_response_metadata'):
+        if api_config and hasattr(api_config, "enable_response_metadata"):
             self._enable_response_metadata = bool(api_config.enable_response_metadata)
 
     def process_tool_response(
-        self,
-        request: MCPRequestBase,
-        response: MCPResponseBase,
-        operation_context: Optional[Dict[str, Any]] = None
+        self, request: MCPRequestBase, response: MCPResponseBase, operation_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Process tool response with unified configuration and request context
@@ -83,9 +80,7 @@ class ResponseProcessor:
         return final_response
 
     def _determine_response_level(
-        self,
-        request: MCPRequestBase,
-        operation_context: Optional[Dict[str, Any]] = None
+        self, request: MCPRequestBase, operation_context: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Determine response detail level from multiple sources
@@ -110,13 +105,13 @@ class ResponseProcessor:
         # 3. Configuration default for this request type
         request_type = request.get_request_type()
         api_config = self.config.get("api")
-        if api_config and hasattr(api_config, 'response_levels'):
+        if api_config and hasattr(api_config, "response_levels"):
             config_level = api_config.response_levels.get(request_type)
             if config_level:
                 return str(config_level)
 
         # 4. Global configuration default
-        if api_config and hasattr(api_config, 'default_response_level'):
+        if api_config and hasattr(api_config, "default_response_level"):
             global_level = api_config.default_response_level
             if global_level:
                 return str(global_level)
@@ -129,7 +124,7 @@ class ResponseProcessor:
         response: Dict[str, Any],
         request: MCPRequestBase,
         response_level: str,
-        operation_context: Optional[Dict[str, Any]] = None
+        operation_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Add response metadata if enabled"""
         metadata: Dict[str, Any] = {
@@ -142,8 +137,7 @@ class ResponseProcessor:
         # Add operation context metadata if available
         if operation_context:
             metadata["operation_context"] = {
-                k: v for k, v in operation_context.items()
-                if k not in ["response_level"]  # Avoid duplication
+                k: v for k, v in operation_context.items() if k not in ["response_level"]  # Avoid duplication
             }
 
         # Add metadata to response based on level
@@ -152,22 +146,16 @@ class ResponseProcessor:
         elif response_level == "minimal":
             api_config = self.config.get("api")
             force_minimal = False
-            if api_config and hasattr(api_config, 'force_minimal_metadata'):
+            if api_config and hasattr(api_config, "force_minimal_metadata"):
                 force_minimal = bool(api_config.force_minimal_metadata)
 
             if force_minimal:
-                response["_meta"] = {
-                    "request_type": metadata["request_type"],
-                    "operation_id": metadata["operation_id"]
-                }
+                response["_meta"] = {"request_type": metadata["request_type"], "operation_id": metadata["operation_id"]}
 
         return response
 
     def _add_audit_trail(
-        self,
-        response: Dict[str, Any],
-        request: MCPRequestBase,
-        operation_context: Optional[Dict[str, Any]] = None
+        self, response: Dict[str, Any], request: MCPRequestBase, operation_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Add audit trail information"""
         audit_info = {
@@ -188,18 +176,14 @@ class ResponseProcessor:
 
         return response
 
-    def _apply_final_transformations(
-        self,
-        response: Dict[str, Any],
-        response_level: str
-    ) -> Dict[str, Any]:
+    def _apply_final_transformations(self, response: Dict[str, Any], response_level: str) -> Dict[str, Any]:
         """Apply final response transformations based on configuration"""
         # Get API config
         api_config = self.config.get("api")
 
         # Remove null values if configured
         remove_nulls = False
-        if api_config and hasattr(api_config, 'remove_null_values'):
+        if api_config and hasattr(api_config, "remove_null_values"):
             remove_nulls = bool(api_config.remove_null_values)
 
         if remove_nulls:
@@ -208,13 +192,11 @@ class ResponseProcessor:
         # Apply size limits for minimal responses
         if response_level == "minimal":
             max_size = 1024  # Default
-            if api_config and hasattr(api_config, 'minimal_response_max_size'):
+            if api_config and hasattr(api_config, "minimal_response_max_size"):
                 max_size = int(api_config.minimal_response_max_size)
 
             if len(str(response)) > max_size:
-                logger.warning(
-                    f"Minimal response size ({len(str(response))}) exceeds limit ({max_size})"
-                )
+                logger.warning(f"Minimal response size ({len(str(response))}) exceeds limit ({max_size})")
 
         return response
 
@@ -226,12 +208,7 @@ class ResponseProcessor:
             return [self._remove_null_values(item) for item in obj if item is not None]
         return obj
 
-    def _log_response_processing(
-        self,
-        request: MCPRequestBase,
-        response_level: str,
-        response_size: int
-    ) -> None:
+    def _log_response_processing(self, request: MCPRequestBase, response_level: str, response_size: int) -> None:
         """Log response processing information"""
         logger.debug(
             f"Processed {request.get_request_type()} response: "
@@ -263,9 +240,7 @@ def get_response_processor() -> ResponseProcessor:
 
 
 def process_tool_response(
-    request: MCPRequestBase,
-    response: MCPResponseBase,
-    operation_context: Optional[Dict[str, Any]] = None
+    request: MCPRequestBase, response: MCPResponseBase, operation_context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Convenience function for processing tool responses

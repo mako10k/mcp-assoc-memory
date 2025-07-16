@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 class ResponseLevel(Enum):
     """Response detail level for all MCP tools."""
+
     MINIMAL = "minimal"
     STANDARD = "standard"
     FULL = "full"
@@ -16,6 +17,7 @@ class ResponseLevel(Enum):
 
 class CommonToolParameters(BaseModel):
     """Common parameters inherited by all MCP tools."""
+
     response_level: ResponseLevel = Field(
         default=ResponseLevel.STANDARD,
         description=(
@@ -23,7 +25,7 @@ class CommonToolParameters(BaseModel):
             "• minimal: Success status + essential IDs only (minimal tokens)\n"
             "• standard: Balanced info for workflow continuity + content previews\n"
             "• full: Complete data + metadata + associations (maximum detail)"
-        )
+        ),
     )
 
 
@@ -35,7 +37,7 @@ class ResponseBuilder:
         level: ResponseLevel,
         base_data: Dict[str, Any],
         standard_data: Optional[Dict[str, Any]] = None,
-        full_data: Optional[Dict[str, Any]] = None
+        full_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Build response according to specified level.
@@ -142,12 +144,14 @@ class TokenEstimator:
 
 class MCPResponseBase(BaseModel):
     """Base class for all MCP tool responses."""
+
     success: bool = Field(description="Operation success status")
     message: str = Field(description="Brief operation result message")
     data: Dict[str, Any] = Field(default_factory=dict, description="Additional response data")
 
     class Config:
         """Pydantic configuration."""
+
         extra = "forbid"  # Prevent accidental field additions
         validate_assignment = True
 
@@ -157,7 +161,7 @@ class ResponseLevelMixin:
 
     def get_response_level(self) -> ResponseLevel:
         """Get the response level from the request."""
-        return getattr(self, 'response_level', ResponseLevel.STANDARD)
+        return getattr(self, "response_level", ResponseLevel.STANDARD)
 
     def should_include_preview(self) -> bool:
         """Check if content previews should be included."""

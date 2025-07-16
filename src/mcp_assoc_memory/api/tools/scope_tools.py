@@ -40,7 +40,7 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str
             base_data = {
                 "success": False,
                 "message": "Internal server error",
-                "error": "Memory manager not initialized"
+                "error": "Memory manager not initialized",
             }
             return ResponseBuilder.build_response(request.response_level, base_data)
 
@@ -55,7 +55,7 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str
                 base_data = {
                     "success": False,
                     "message": f"Invalid parent scope format: {parent_scope}",
-                    "error": "INVALID_SCOPE"
+                    "error": "INVALID_SCOPE",
                 }
                 return ResponseBuilder.build_response(request.response_level, base_data)
             filtered_scopes = get_child_scopes(parent_scope, all_scopes)
@@ -90,19 +90,15 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str
         base_data = {
             "success": True,
             "message": f"Retrieved {len(scope_infos)} scopes",
-            "total_scopes": len(scope_infos)
+            "total_scopes": len(scope_infos),
         }
 
         standard_data: Dict[str, Any] = {
             "parent_scope": parent_scope,
             "scope_preview": [
-                {
-                    "scope": info["scope"],
-                    "memory_count": info["memory_count"],
-                    "child_count": len(info["child_scopes"])
-                }
+                {"scope": info["scope"], "memory_count": info["memory_count"], "child_count": len(info["child_scopes"])}
                 for info in scope_infos[:10]  # Limit to first 10 scopes for preview
-            ]
+            ],
         }
 
         full_data: Dict[str, Any] = {
@@ -112,24 +108,15 @@ async def handle_scope_list(request: ScopeListRequest, ctx: Context) -> Dict[str
             "hierarchy_stats": {
                 "total_scopes": len(all_scopes),
                 "filtered_scopes": len(filtered_scopes),
-                "include_memory_counts": request.include_memory_counts
-            }
+                "include_memory_counts": request.include_memory_counts,
+            },
         }
 
-        return ResponseBuilder.build_response(
-            request.response_level,
-            base_data,
-            standard_data,
-            full_data
-        )
+        return ResponseBuilder.build_response(request.response_level, base_data, standard_data, full_data)
 
     except Exception as e:
         logger.error(f"Error in scope_list: {e}", exc_info=True)
-        base_data = {
-            "success": False,
-            "message": f"Failed to list scopes: {str(e)}",
-            "error": "SCOPE_LIST_ERROR"
-        }
+        base_data = {"success": False, "message": f"Failed to list scopes: {str(e)}", "error": "SCOPE_LIST_ERROR"}
         return ResponseBuilder.build_response(request.response_level, base_data)
 
 
@@ -143,7 +130,7 @@ async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Di
             base_data = {
                 "success": False,
                 "message": "Internal server error",
-                "error": "Memory manager not initialized"
+                "error": "Memory manager not initialized",
             }
             return ResponseBuilder.build_response(request.response_level, base_data)
 
@@ -245,36 +232,25 @@ async def handle_scope_suggest(request: ScopeSuggestRequest, ctx: Context) -> Di
             "success": True,
             "message": f"Generated {len(suggestions)} scope suggestions",
             "suggested_scope": primary.scope,
-            "confidence": primary.confidence
+            "confidence": primary.confidence,
         }
 
         standard_data = {
             "reasoning": primary.reasoning,
             "alternatives": [{"scope": alt.scope, "confidence": alt.confidence} for alt in alternatives],
-            "current_scope": current_scope
+            "current_scope": current_scope,
         }
 
         full_data = {
             "detailed_alternatives": [
-                {
-                    "scope": alt.scope,
-                    "confidence": alt.confidence,
-                    "reasoning": alt.reasoning
-                } for alt in alternatives
+                {"scope": alt.scope, "confidence": alt.confidence, "reasoning": alt.reasoning} for alt in alternatives
             ],
-            "analysis_metadata": {
-                "content_length": len(request.content),
-                "context_aware": current_scope is not None
-            }
+            "analysis_metadata": {"content_length": len(request.content), "context_aware": current_scope is not None},
         }
 
         return ResponseBuilder.build_response(request.response_level, base_data, standard_data, full_data)
 
     except Exception as e:
         logger.error(f"Error in scope_suggest: {e}", exc_info=True)
-        base_data = {
-            "success": False,
-            "message": f"Failed to suggest scope: {str(e)}",
-            "error": "SCOPE_SUGGEST_ERROR"
-        }
+        base_data = {"success": False, "message": f"Failed to suggest scope: {str(e)}", "error": "SCOPE_SUGGEST_ERROR"}
         return ResponseBuilder.build_response(request.response_level, base_data)

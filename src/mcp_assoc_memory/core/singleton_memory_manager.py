@@ -256,10 +256,11 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
             # Contract Programming: Log embedding service fallback with context
             try:
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.warning(
                     f"SentenceTransformer embedding service failed, falling back to Mock: {e}",
-                    extra={"fallback_reason": str(e), "service_type": "embedding"}
+                    extra={"fallback_reason": str(e), "service_type": "embedding"},
                 )
             except ImportError:
                 print(f"Warning: SentenceTransformer failed, using Mock embedding service: {e}")

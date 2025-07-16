@@ -28,11 +28,7 @@ class MCPResponseBase(BaseModel, ABC):
 
     @classmethod
     def success_response(
-        cls,
-        message: str,
-        data: Optional[Any] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
+        cls, message: str, data: Optional[Any] = None, metadata: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> Dict[str, Any]:
         """
         Create standardized success response
@@ -64,11 +60,7 @@ class MCPResponseBase(BaseModel, ABC):
 
     @classmethod
     def error_response(
-        cls,
-        message: str,
-        error: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
+        cls, message: str, error: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> Dict[str, Any]:
         """
         Create standardized error response
@@ -191,7 +183,9 @@ class MemoryStoreResponse(MCPResponseBase):
     memory: Optional[Memory] = Field(default=None, description="Stored memory (if successful)")
     associations_created: List[Association] = Field(default_factory=list, description="Auto-created associations")
     duplicate_found: Optional[bool] = Field(default=None, description="Whether duplicate was found during pre-check")
-    duplicate_candidate: Optional[Dict[str, Any]] = Field(default=None, description="Similar memory found if duplicate threshold exceeded")
+    duplicate_candidate: Optional[Dict[str, Any]] = Field(
+        default=None, description="Similar memory found if duplicate threshold exceeded"
+    )
 
     def to_response_dict(self, level: str = "minimal", **kwargs: Any) -> Dict[str, Any]:
         """Generate response dictionary with specified detail level"""
@@ -739,7 +733,13 @@ class MemoryResponse(MCPResponseBase):
     is_duplicate: bool = Field(default=False, description="Whether this was a duplicate detection")
     duplicate_of: Optional[str] = Field(default=None, description="Original memory ID if duplicate")
 
-    def to_response_dict(self, level: str = "minimal", include_scope_if_modified: bool = False, original_scope: Optional[str] = None, **kwargs: Any) -> Dict[str, Any]:
+    def to_response_dict(
+        self,
+        level: str = "minimal",
+        include_scope_if_modified: bool = False,
+        original_scope: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
         """Generate response dictionary with specified detail level"""
         if level == "minimal":
             minimal_response = {
@@ -787,7 +787,12 @@ class MemoryResponse(MCPResponseBase):
                 "duplicate_of": self.duplicate_of,
             }
         else:
-            return self.to_response_dict(level="minimal", include_scope_if_modified=include_scope_if_modified, original_scope=original_scope, **kwargs)
+            return self.to_response_dict(
+                level="minimal",
+                include_scope_if_modified=include_scope_if_modified,
+                original_scope=original_scope,
+                **kwargs,
+            )
 
 
 # Generic error response

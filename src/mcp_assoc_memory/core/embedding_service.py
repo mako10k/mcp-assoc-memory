@@ -98,15 +98,15 @@ class OpenAIEmbeddingService(EmbeddingService):
         self.api_key = api_key
         self.model = model
         self._client: Optional[Any] = None
-        
+
         # 基本的な検証：APIキーの形式チェック
         if not api_key or not isinstance(api_key, str):
             raise ValueError("API key must be a non-empty string")
-        
+
         # OpenAI APIキーの基本形式チェック
-        if not api_key.startswith(('sk-', 'sk-proj-')):
+        if not api_key.startswith(("sk-", "sk-proj-")):
             raise ValueError(f"Invalid OpenAI API key format: {api_key[:10]}... (must start with 'sk-' or 'sk-proj-')")
-        
+
         logger.info(f"OpenAIEmbeddingService initialized with model: {model}")
 
     async def _check_api_key(self) -> None:
@@ -121,17 +121,18 @@ class OpenAIEmbeddingService(EmbeddingService):
         if self._client is None:
             try:
                 import openai
-                
+
                 # テストモード検知：外部API呼び出しのみをモック化
                 import os
                 import sys
+
                 is_test_mode = (
                     "pytest" in sys.modules
                     or os.getenv("TESTING", "").lower() in ("1", "true", "yes")
                     or os.getenv("ENVIRONMENT", "").lower() == "test"
                     or "--test" in sys.argv
                 )
-                
+
                 if is_test_mode:
                     # MockクライアントでAPI呼び出し部分のみをモック化
                     logger.info("Test mode detected, using mock OpenAI client")
@@ -238,7 +239,7 @@ class SentenceTransformerEmbeddingService(EmbeddingService):
 
 class MockOpenAIClient:
     """テスト用OpenAIクライアントモック"""
-    
+
     class MockEmbeddings:
         async def create(self, model: str, input: str) -> Any:
             """モック埋め込み生成"""
@@ -246,7 +247,7 @@ class MockOpenAIClient:
             text_hash = hashlib.sha256(input.encode("utf-8")).hexdigest()
             seed = int(text_hash[:8], 16)
             np.random.seed(seed)
-            
+
             # モデルに応じた次元数
             if "large" in model:
                 dim = 3072
@@ -254,22 +255,23 @@ class MockOpenAIClient:
                 dim = 1536
             else:
                 dim = 1536
-                
+
             embedding = np.random.normal(0, 1, dim).astype(np.float32)
             # 正規化
             norm = np.linalg.norm(embedding)
             if norm > 0:
                 embedding = embedding / norm
-            
+
             class MockResponse:
                 def __init__(self, embedding):
                     class MockData:
                         def __init__(self, embedding):
                             self.embedding = embedding.tolist()
+
                     self.data = [MockData(embedding)]
-            
+
             return MockResponse(embedding)
-    
+
     def __init__(self):
         self.embeddings = self.MockEmbeddings()
 
@@ -319,7 +321,7 @@ def create_embedding_service(config: Optional[Dict[str, Any]] = None) -> Embeddi
         embedding_config = config_obj.embedding.__dict__  # Convert dataclass to dict
     else:
         embedding_config = config.get("embedding", {})
-    
+
     # "service"優先、なければ"provider"も許容
     service_type = embedding_config.get("service") or embedding_config.get("provider", "mock")
 
@@ -358,4 +360,6 @@ def create_embedding_service(config: Optional[Dict[str, Any]] = None) -> Embeddi
         )
 
     else:
-        raise RuntimeError(f"Unknown embedding service type: {service_type}. Supported types: openai, sentence_transformer, mock")
+        raise RuntimeError(
+            f"Unknown embedding service type: {service_type}. Supported types: openai, sentence_transformer, mock"
+        )
