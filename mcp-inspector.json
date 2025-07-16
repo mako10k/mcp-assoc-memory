@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mcp-assoc-memory": {
+      "command": "python3",
+      "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json"],
+      "env": {
+        "PYTHONPATH": "./src"
+      }
+    }
+  }
+}

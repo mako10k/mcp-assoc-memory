@@ -6,6 +6,7 @@ Manages environment variables and default values
 import json
 import logging
 import os
+import re
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -217,11 +218,23 @@ class Config:
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
         self.debug_mode = os.getenv("DEBUG", "false").lower() == "true"
 
+        # Expand environment variables in all string settings
+        self.database = expand_dict_env_vars(self.database)
+        self.embedding = expand_dict_env_vars(self.embedding)
+        self.storage = expand_dict_env_vars(self.storage)
+        self.security = expand_dict_env_vars(self.security)
+        self.transport = expand_dict_env_vars(self.transport)
+        self.api = expand_dict_env_vars(self.api)
+
     def _load_from_file(self, config_path: str) -> None:
         """Load configuration from file"""
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
+
+            # 環境変数展開を実行
+            config_data = expand_dict_env_vars(config_data)
+            logger.info(f"Configuration loaded from {config_path} with environment variable expansion")
 
             # Merge configuration (file takes priority)
             self._merge_config(config_data)
@@ -265,6 +278,39 @@ class Config:
             "log_level": self.log_level,
             "debug_mode": self.debug_mode,
         }
+
+
+def expand_environment_variables(text: str) -> str:
+    """
+    環境変数展開機能
+    ${VAR_NAME} または $VAR_NAME 形式の環境変数を展開する
+    """
+    if not isinstance(text, str):
+        return text
+    
+    # ${VAR_NAME} 形式の環境変数を展開
+    def replace_env_var(match):
+        var_name = match.group(1)
+        return os.getenv(var_name, match.group(0))  # 見つからない場合は元のまま
+    
+    # ${VAR_NAME} パターンを置換
+    result = re.sub(r'\$\{([A-Za-z_][A-ZaZ0-9_]*)\}', replace_env_var, text)
+    
+    return result
+
+
+def expand_dict_env_vars(data: Any) -> Any:
+    """
+    辞書やリスト内の環境変数を再帰的に展開
+    """
+    if isinstance(data, dict):
+        return {key: expand_dict_env_vars(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [expand_dict_env_vars(item) for item in data]
+    elif isinstance(data, str):
+        return expand_environment_variables(data)
+    else:
+        return data
 
 
 # Global configuration instance - Singleton pattern

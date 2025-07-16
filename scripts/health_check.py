@@ -79,15 +79,9 @@ async def health_check():
     # 4. JSON persistence
     print("🔧 Checking JSON persistence...")
     try:
-        import tempfile
-
-        from mcp_assoc_memory.simple_persistence import SimplePersistence
-
-        with tempfile.NamedTemporaryFile(suffix=".json") as tmp:
-            persistence = SimplePersistence(tmp.name)
-            persistence.save_memories({})
-            persistence.load_memories()
-        print("✅ JSON persistence: OK")
+        # SimplePersistence has been removed from architecture
+        # SQLite/ChromaDB persistence is now the standard
+        print("✅ JSON persistence: DEPRECATED - Using SQLite/ChromaDB storage")
         checks.append(True)
     except Exception as e:
         print(f"❌ JSON persistence: FAILED - {e}")

@@ -4,28 +4,6 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "MCP: Test Connection",
-            "type": "shell",
-            "command": "python3",
-            "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json", "--test"],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PYTHONPATH": "${workspaceFolder}/src"
-                }
-            },
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },
-        {
             "label": "Logs: Rotate Log Files",
             "type": "shell",
             "command": "${workspaceFolder}/scripts/rotate_logs.sh",

@@ -114,7 +114,9 @@ try:
     from .core.embedding_service import (
         MockEmbeddingService,
         SentenceTransformerEmbeddingService,
+        create_embedding_service,
     )
+    from .core.embedding_validator import EmbeddingValidator, EmbeddingCompatibilityError
     logger.info("Embedding services import successful")
 
     logger.info("Importing core similarity and memory manager...")
@@ -126,7 +128,7 @@ try:
     logger.info("Memory manager import successful")
 
     logger.info("Importing storage components...")
-    from .simple_persistence import get_persistent_storage
+    # SimplePersistence removed - now using SingletonMemoryManager exclusively
     from .storage.graph_store import NetworkXGraphStore
     from .storage.metadata_store import SQLiteMetadataStore
     from .storage.vector_store import ChromaVectorStore
@@ -169,14 +171,10 @@ try:
     logger.info("Storage components initialized successfully")
 
     logger.info("Initializing embedding service...")
-    # Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
-    try:
-        embedding_service = SentenceTransformerEmbeddingService()
-        logger.info("Using SentenceTransformerEmbeddingService for production")
-    except Exception as e:
-        logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
-        embedding_service = MockEmbeddingService()  # type: ignore
-        logger.info("Using MockEmbeddingService as fallback")
+    
+    # Initialize embedding service using configuration factory
+    embedding_service = create_embedding_service()
+    logger.info(f"Embedding service initialized: {type(embedding_service).__name__}")
 
     logger.info("All components initialized successfully")
 
@@ -191,8 +189,8 @@ similarity_calculator = SimilarityCalculator()
 # Initialize memory manager using singleton pattern (will be done in ensure_initialized)
 memory_manager = None
 
-# Fallback simple storage for compatibility
-memory_storage, persistence = get_persistent_storage()
+# Legacy storage removed - now using SingletonMemoryManager exclusively
+# SimplePersistence compatibility layer no longer needed
 
 # Global initialization flag
 _initialized = False
@@ -203,6 +201,11 @@ async def ensure_initialized() -> None:
     global _initialized, memory_manager
     if not _initialized:
         try:
+            # Validate embedding provider compatibility before initialization
+            validator = EmbeddingValidator(metadata_store)
+            await validator.validate_embedding_compatibility()
+            logger.info("Embedding compatibility validation passed")
+            
             # Initialize memory manager using singleton pattern
             memory_manager = await initialize_memory_manager(
                 vector_store=vector_store,
@@ -213,13 +216,14 @@ async def ensure_initialized() -> None:
             )
 
             # Set up tool dependencies - use centralized dependency manager
-            set_global_dependencies(memory_manager, memory_storage, persistence)
+            # Legacy storage layer removed - only memory_manager needed
+            set_global_dependencies(memory_manager, {}, None)
 
             # Also set legacy dependencies for backward compatibility
-            set_dependencies(memory_manager, memory_storage, persistence)
+            set_dependencies(memory_manager, {}, None)
             set_scope_dependencies(memory_manager)
-            set_resource_dependencies(memory_manager, memory_storage, persistence)
-            set_prompt_dependencies(memory_manager, memory_storage, persistence)
+            set_resource_dependencies(memory_manager, {}, None)
+            set_prompt_dependencies(memory_manager, {}, None)
             set_other_dependencies(memory_manager)
 
             _initialized = True

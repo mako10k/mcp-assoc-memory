@@ -7,12 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
-from ...simple_persistence import get_persistent_storage
+from ...core.singleton_memory_manager import get_or_create_memory_manager
 from ..models.requests import MemoryExportRequest, MemoryImportRequest
 from ..models.responses import MemoryExportResponse, MemoryImportResponse
-
-# Get storage
-memory_storage, persistence = get_persistent_storage()
 
 
 async def _resolve_export_path(file_path: str) -> Path:
@@ -30,21 +27,43 @@ async def _resolve_export_path(file_path: str) -> Path:
 
 async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[str, Any]:
     """Handle memory_export tool requests."""
+    # Contract Programming: ctx MUST be provided for proper logging and error handling
+    assert ctx is not None, "Context object is required for export operations"
+    assert hasattr(ctx, 'info'), f"Context object missing required 'info' method: {type(ctx)}"
+    assert hasattr(ctx, 'error'), f"Context object missing required 'error' method: {type(ctx)}"
+    
     try:
         scope_info = f" from scope '{request.scope}'" if request.scope else " (all scopes)"
         export_mode = "file" if request.file_path else "direct data"
+        
         await ctx.info(f"Exporting memories{scope_info} via {export_mode}")
 
-        # Filter memories by scope
+        # Get memory manager instance
+        memory_manager = await get_or_create_memory_manager()
+        
+        if not memory_manager:
+            return {"error": "Memory manager not available", "export_count": 0}
+
+        # Get all memories using the same method as memory_list_all
+        # TODO: PERFORMANCE OPTIMIZATION - For large datasets, this should be implemented
+        # as a streaming approach to avoid loading all memories into memory at once.
+        # Consider implementing: async generator + streaming JSON writer pattern
+        # to process memories one-by-one and write directly to file/response stream.
+        all_memory_objects = await memory_manager.metadata_store.get_all_memories(limit=10000)
+
+        # Filter memories by scope if specified
         export_memories = []
-        for memory_data in memory_storage.values():
+        for memory in all_memory_objects:
+            if not memory:
+                continue
+                
             if request.scope:
-                memory_scope = memory_data["scope"]
                 # Include if memory scope matches or is a child of request scope
+                memory_scope = memory.scope if hasattr(memory, 'scope') else ""
                 if memory_scope == request.scope or memory_scope.startswith(request.scope + "/"):
-                    export_memories.append(memory_data)
+                    export_memories.append(memory)
             else:
-                export_memories.append(memory_data)
+                export_memories.append(memory)
 
         # Prepare export data structure
         export_data: Dict[str, Any] = {
@@ -57,33 +76,44 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
         }
 
         # Process each memory for export
-        for memory_data in export_memories:
+        # TODO: MEMORY EFFICIENCY - Current implementation loads all export data into memory.
+        # For production use with large datasets, implement streaming JSON serialization:
+        # 1. Write JSON header to file/stream first
+        # 2. Process memories one-by-one and append to JSON array
+        # 3. Close JSON structure and file handle
+        # This avoids potential memory exhaustion with large memory collections.
+        for memory in export_memories:
+            # Contract Programming: Memory objects MUST have required attributes
+            assert hasattr(memory, 'id'), f"Memory object missing required 'id' attribute: {type(memory)}"
+            assert hasattr(memory, 'content'), f"Memory object missing required 'content' attribute: {type(memory)}"
+            assert hasattr(memory, 'scope'), f"Memory object missing required 'scope' attribute: {type(memory)}"
+            
             memory_export = {
-                "memory_id": memory_data["memory_id"],
-                "content": memory_data["content"],
-                "scope": memory_data["scope"],
-                "metadata": memory_data.get("metadata", {}),
-                "tags": memory_data.get("tags", []),
-                "category": memory_data.get("category"),
-                "created_at": (
-                    memory_data["created_at"].isoformat()
-                    if isinstance(memory_data["created_at"], datetime)
-                    else memory_data["created_at"]
-                ),
+                "memory_id": memory.id,
+                "content": memory.content,
+                "scope": memory.scope,
+                "metadata": memory.metadata if hasattr(memory, 'metadata') else {},
+                "tags": memory.tags if hasattr(memory, 'tags') else [],
+                "category": memory.category if hasattr(memory, 'category') else None,
+                "created_at": memory.created_at.isoformat() if hasattr(memory, 'created_at') and memory.created_at else "",
+                "updated_at": memory.updated_at.isoformat() if hasattr(memory, 'updated_at') and memory.updated_at else "",
             }
 
             # Add associations if requested
             if request.include_associations:
-                # Get associations from advanced storage if available
+                # Contract Programming: Memory object MUST have valid id attribute
+                assert hasattr(memory, 'id'), f"Memory object missing required 'id' attribute: {type(memory)}"
+                assert memory.id, f"Memory object has empty/null id: {memory.id}"
+                
+                # Get associations from memory manager - if this fails, export should fail
                 try:
-                    # TODO: Access memory manager from context
-                    # memory = await memory_manager.get_memory(memory_data["memory_id"])
-                    # if memory:
-                    #     associations = await memory_manager.get_associations(memory.id, limit=10)
-                    #     memory_export["associations"] = [assoc.id for assoc in associations]
-                    memory_export["associations"] = []  # Placeholder
-                except Exception:
-                    memory_export["associations"] = []
+                    associations = await memory_manager.get_associations(memory.id, limit=10)
+                    memory_export["associations"] = [assoc.id for assoc in associations] if associations else []
+                except Exception as e:
+                    # Association retrieval failure is a critical error, not a fallback case
+                    raise RuntimeError(f"Failed to retrieve associations for memory {memory.id}: {e}")
+            else:
+                memory_export["associations"] = []
 
             memories_list = export_data["memories"]
             if isinstance(memories_list, list):
@@ -171,12 +201,24 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
             ).model_dump()
 
     except Exception as e:
-        await ctx.error(f"Failed to export memories: {e}")
-        return {"success": False, "error": f"Failed to export memories: {e}", "data": {}}
+        error_msg = f"Failed to export memories: {e}"
+        await ctx.error(error_msg)
+        # Return proper MCP error response instead of silent success
+        return {
+            "success": False,
+            "error": error_msg,
+            "exported_count": 0,
+            "data": {}
+        }
 
 
 async def handle_memory_import(request: MemoryImportRequest, ctx: Any) -> Dict[str, Any]:
     """Handle memory_import tool requests."""
+    # Contract Programming: ctx MUST be provided for proper logging and error handling
+    assert ctx is not None, "Context object is required for import operations"
+    assert hasattr(ctx, 'info'), f"Context object missing required 'info' method: {type(ctx)}"
+    assert hasattr(ctx, 'error'), f"Context object missing required 'error' method: {type(ctx)}"
+    
     try:
         # Import implementation would go here - this is a placeholder
         # for the full implementation that exists in the handlers
@@ -193,5 +235,12 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Any) -> Dict[s
         ).model_dump()
 
     except Exception as e:
-        await ctx.error(f"Failed to import memories: {e}")
-        return {"success": False, "error": f"Failed to import memories: {e}", "data": {}}
+        error_msg = f"Failed to import memories: {e}"
+        await ctx.error(error_msg)
+        # Return proper MCP error response instead of silent success
+        return {
+            "success": False,
+            "error": error_msg,
+            "imported_count": 0,
+            "data": {}
+        }

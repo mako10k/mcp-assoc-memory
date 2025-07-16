@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from ...core.singleton_memory_manager import get_or_create_memory_manager
-from ...simple_persistence import get_persistent_storage
+# SimplePersistence removed - using SingletonMemoryManager for all storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
 from ..models.responses import (
     MemoryMoveResponse,
@@ -24,8 +24,8 @@ def set_dependencies(mm: Any) -> None:
     memory_manager = mm
 
 
-# Get storage
-memory_storage, persistence = get_persistent_storage()
+# Storage now handled through SingletonMemoryManager - no separate persistence layer needed
+# Legacy memory_storage and persistence references removed
 
 
 async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, Any]:
@@ -38,15 +38,7 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
         if not memory_manager:
             error_msg = "Memory manager not available"
             await ctx.error(error_msg)
-
-            base_data = {
-                "success": False,
-                "error": error_msg,
-                "moved_count": 0,
-                "failed_count": len(request.memory_ids)
-            }
-
-            return ResponseBuilder.build_response(request.response_level, base_data)
+            raise RuntimeError(error_msg)
 
         # Handle empty memory_ids list early
         if not request.memory_ids:
@@ -73,9 +65,8 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
                 # Critical: Check if update_memory returned None
                 if updated_memory is None:
                     error_msg = f"Failed to update memory {memory_id} - update_memory returned None"
-                    await ctx.warning(error_msg)
-                    failed_memory_ids.append(memory_id)
-                    continue
+                    await ctx.error(error_msg)
+                    raise RuntimeError(error_msg)
 
                 moved_count += 1
                 moved_memories.append({
@@ -152,27 +143,16 @@ async def handle_memory_discover_associations(
         # Use comprehensive memory manager access
         manager = await get_or_create_memory_manager()
         if not manager:
-            return {
-                "success": False,
-                "message": "No memory manager available",
-                "data": {},
-                "source_memory": None,
-                "associations": [],
-                "total_found": 0,
-            }
+            error_msg = "No memory manager available"
+            await ctx.error(error_msg)
+            raise RuntimeError(error_msg)
 
         # Get the source memory
         source_memory = await manager.get_memory(memory_id)
         if not source_memory:
-            await ctx.warning(f"Memory not found: {memory_id}")
-            return {
-                "success": False,
-                "message": "Memory not found",
-                "data": {},
-                "source_memory": None,
-                "associations": [],
-                "total_found": 0,
-            }
+            error_msg = f"Memory not found: {memory_id}"
+            await ctx.error(error_msg)
+            raise RuntimeError(error_msg)
 
         # Use search_memories to find semantically related memories
         # First try with the exact content
@@ -198,10 +178,10 @@ async def handle_memory_discover_associations(
             important_words = [w for w in words if len(w) > 4 and w.isalpha()][:10]
             if important_words:
                 keyword_query = " ".join(important_words)
-                search_results = await memory_manager.search_memories(  # type: ignore
+                search_results = await manager.search_memories(
                     query=keyword_query,
                     limit=limit + 1,
-                    min_score=max(0.1, similarity_threshold),
+                    min_score=similarity_threshold,
                 )
 
         # Filter out the source memory and format results
@@ -251,27 +231,31 @@ async def handle_memory_discover_associations(
 
 
 async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> SessionManageResponse:
-    """Manage sessions and cleanup"""
+    """Manage sessions and cleanup using SingletonMemoryManager"""
     try:
         await ctx.info(f"Session management action: {request.action}")
+
+        # Get memory manager instance
+        manager = await get_or_create_memory_manager()
+        if not manager:
+            raise RuntimeError("Memory manager not available")
 
         if request.action == "create":
             # Create a new session scope
             session_id = request.session_id or f"session-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
             session_scope = f"session/{session_id}"
 
-            # Add a session marker memory
-            session_memory: Dict[str, Any] = {
-                "memory_id": str(uuid.uuid4()),
-                "content": f"Session created: {session_id}",
-                "scope": session_scope,
-                "metadata": {"session_marker": True, "created_by": "session_manage"},
-                "created_at": datetime.now(),
-            }
-            memory_storage[session_memory["memory_id"]] = session_memory
+            # Add a session marker memory using memory manager
+            session_memory = await manager.store_memory(
+                scope=session_scope,
+                content=f"Session created: {session_id}",
+                metadata={"session_marker": True, "created_by": "session_manage"},
+                category="session",
+                tags=["session", "marker"]
+            )
 
-            # Save to persistent storage
-            persistence.save_memories(memory_storage)
+            if not session_memory:
+                raise RuntimeError("Failed to create session marker memory")
 
             await ctx.info(f"Created session: {session_id}")
 
@@ -280,29 +264,45 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
                 message=f"Created session: {session_id}",
                 data={"action": "create", "session_id": session_id},
                 session=SessionInfo(
-                    session_id=session_id, created_at=datetime.now(), memory_count=1, last_activity=datetime.now()
+                    session_id=session_id,
+                    created_at=session_memory.created_at,
+                    memory_count=1,
+                    last_activity=session_memory.created_at
                 ),
                 sessions=[],
             )
 
         elif request.action == "list":
-            # List all active sessions
+            # List all active sessions by searching session scope
+            session_memories = await manager.search_memories(
+                query="",  # Empty query to get all
+                scope="session",
+                include_child_scopes=True,
+                limit=1000
+            )
+
+            # Group by session ID
             session_scopes = {}
-            for memory_data in memory_storage.values():
-                scope = memory_data["scope"]
+            for memory_result in session_memories:
+                memory = memory_result.get("memory") if isinstance(memory_result, dict) else memory_result
+                if not memory:
+                    continue
+                    
+                scope = memory.scope
                 if scope.startswith("session/"):
-                    session_id = scope.split("/", 1)[1]
+                    session_id = scope.split("/", 1)[1] if "/" in scope else scope
                     if session_id not in session_scopes:
                         session_scopes[session_id] = {
-                            "scope": scope,
                             "memories": [],
-                            "created_at": memory_data["created_at"],
-                            "last_updated": memory_data["created_at"],
+                            "created_at": memory.created_at,
+                            "last_updated": memory.created_at or memory.updated_at,
                         }
-                    session_scopes[session_id]["memories"].append(memory_data)
-                    session_scopes[session_id]["last_updated"] = max(
-                        session_scopes[session_id]["last_updated"], memory_data["created_at"]
-                    )
+                    session_scopes[session_id]["memories"].append(memory)
+                    if memory.updated_at:
+                        session_scopes[session_id]["last_updated"] = max(
+                            session_scopes[session_id]["last_updated"] or memory.created_at,
+                            memory.updated_at
+                        )
 
             active_sessions = [
                 SessionInfo(
@@ -327,30 +327,44 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
         elif request.action == "cleanup":
             # Clean up old sessions
             cutoff_date = datetime.now() - timedelta(days=request.max_age_days or 7)
+            
+            # Get all session memories
+            session_memories = await manager.search_memories(
+                query="",
+                scope="session",
+                include_child_scopes=True,
+                limit=1000
+            )
+
             cleaned_count = 0
-
-            memories_to_delete = []
-            for memory_id, memory_data in memory_storage.items():
-                if memory_data["scope"].startswith("session/") and memory_data["created_at"] < cutoff_date:
-                    memories_to_delete.append(memory_id)
-
-            for memory_id in memories_to_delete:
-                del memory_storage[memory_id]
-                cleaned_count += 1
-
-            # Save to persistent storage if any memories were cleaned
-            if cleaned_count > 0:
-                persistence.save_memories(memory_storage)
+            for memory_result in session_memories:
+                memory = memory_result.get("memory") if isinstance(memory_result, dict) else memory_result
+                if not memory:
+                    continue
+                    
+                # Check if memory is older than cutoff
+                memory_date = memory.created_at
+                if isinstance(memory_date, str):
+                    try:
+                        memory_date = datetime.fromisoformat(memory_date.replace('Z', '+00:00'))
+                    except (ValueError, AttributeError) as date_error:
+                        await ctx.error(f"Failed to parse date for memory {memory.id}: {date_error} - skipping memory")
+                        continue  # Skip this memory and continue with next one
+                        
+                if memory_date < cutoff_date:
+                    success = await manager.delete_memory(memory.id)
+                    if success:
+                        cleaned_count += 1
 
             await ctx.info(f"Cleaned up {cleaned_count} old session memories")
 
             return SessionManageResponse(
                 success=True,
                 message=f"Cleaned up {cleaned_count} old session memories",
-                data={"action": "cleanup"},
+                data={"action": "cleanup", "cleaned_count": cleaned_count},
                 session=None,
                 sessions=[],
-                cleaned_sessions=[f"session-{i}" for i in range(cleaned_count)],  # simplified representation
+                cleaned_sessions=[f"session-cleanup-{i}" for i in range(cleaned_count)],
             )
 
         else:
@@ -358,4 +372,10 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
 
     except Exception as e:
         await ctx.error(f"Failed to manage session: {e}")
-        raise
+        return SessionManageResponse(
+            success=False,
+            message=f"Failed to manage session: {e}",
+            data={"action": request.action, "error": str(e)},
+            session=None,
+            sessions=[],
+        )
