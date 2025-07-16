@@ -323,7 +323,9 @@ def create_embedding_service(config: Optional[Dict[str, Any]] = None) -> Embeddi
     # "service"優先、なければ"provider"も許容
     service_type = embedding_config.get("service") or embedding_config.get("provider", "mock")
 
-    logger.info(f"[create_embedding_service] embedding_config: {embedding_config}, service_type: {service_type}")
+    # SECURITY: Mask sensitive data in logs
+    safe_config = {k: ("***MASKED***" if "key" in k.lower() else v) for k, v in embedding_config.items()}
+    logger.info(f"[create_embedding_service] embedding_config: {safe_config}, service_type: {service_type}")
 
     if service_type == "openai":
         api_key = embedding_config.get("api_key")

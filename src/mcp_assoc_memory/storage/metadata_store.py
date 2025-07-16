@@ -914,7 +914,9 @@ class SQLiteMetadataStore(BaseMetadataStore):
                         (key, value, now, now)
                     )
                 await db.commit()
-                logger.info(f"System setting updated: {key} = {value}")
+                # Mask sensitive data for logging
+                safe_value = "***MASKED***" if any(sensitive in key.lower() for sensitive in ["key", "token", "secret", "password"]) else value
+                logger.info(f"System setting updated: {key} = {safe_value}")
                 return True
         except Exception as e:
             logger.error(f"Failed to set system setting '{key}': {e}")

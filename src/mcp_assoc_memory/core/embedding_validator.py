@@ -36,7 +36,10 @@ class EmbeddingValidator:
         current_config = self._get_current_embedding_config()
         stored_config = await self._get_stored_embedding_config()
         
-        logger.info(f"Validating embedding compatibility: current={current_config}, stored={stored_config}")
+        # Mask sensitive data for logging
+        current_safe = {k: ("***MASKED***" if "key" in k.lower() else v) for k, v in current_config.items()}
+        stored_safe = {k: ("***MASKED***" if "key" in k.lower() else v) for k, v in stored_config.items()} if stored_config else None
+        logger.info(f"Validating embedding compatibility: current={current_safe}, stored={stored_safe}")
         
         if stored_config is None:
             # First run - store current configuration
@@ -141,7 +144,7 @@ Embedding provider configuration change detected that would corrupt existing vec
 
 This would cause:
   • Incorrect similarity calculations
-  • Wrong search results  
+  • Wrong search results
   • Corrupted memory associations
 
 To safely change embedding providers:

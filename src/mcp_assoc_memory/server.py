@@ -128,7 +128,7 @@ try:
     logger.info("Memory manager import successful")
 
     logger.info("Importing storage components...")
-    from .simple_persistence import get_persistent_storage
+    # SimplePersistence removed - now using SingletonMemoryManager exclusively
     from .storage.graph_store import NetworkXGraphStore
     from .storage.metadata_store import SQLiteMetadataStore
     from .storage.vector_store import ChromaVectorStore
@@ -189,8 +189,8 @@ similarity_calculator = SimilarityCalculator()
 # Initialize memory manager using singleton pattern (will be done in ensure_initialized)
 memory_manager = None
 
-# Fallback simple storage for compatibility
-memory_storage, persistence = get_persistent_storage()
+# Legacy storage removed - now using SingletonMemoryManager exclusively
+# SimplePersistence compatibility layer no longer needed
 
 # Global initialization flag
 _initialized = False
@@ -216,13 +216,14 @@ async def ensure_initialized() -> None:
             )
 
             # Set up tool dependencies - use centralized dependency manager
-            set_global_dependencies(memory_manager, memory_storage, persistence)
+            # Legacy storage layer removed - only memory_manager needed
+            set_global_dependencies(memory_manager, {}, None)
 
             # Also set legacy dependencies for backward compatibility
-            set_dependencies(memory_manager, memory_storage, persistence)
+            set_dependencies(memory_manager, {}, None)
             set_scope_dependencies(memory_manager)
-            set_resource_dependencies(memory_manager, memory_storage, persistence)
-            set_prompt_dependencies(memory_manager, memory_storage, persistence)
+            set_resource_dependencies(memory_manager, {}, None)
+            set_prompt_dependencies(memory_manager, {}, None)
             set_other_dependencies(memory_manager)
 
             _initialized = True

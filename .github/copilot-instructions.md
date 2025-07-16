@@ -41,8 +41,13 @@
 - Prefer reuse of existing utilities
 - Run mypy before any modification
 - All source code in English (except user-facing Japanese)
+- **CRITICAL: Apply Contract Programming with assert statements for all preconditions**
 - **CRITICAL: NEVER implement silent fallbacks - always consult user first**
+- **CRITICAL: Fail-fast on contract violations - never continue with invalid state**
 - Never make independent decisions on branching issues; always consult user
+- All implementations must follow the official MCP SDK and its conventions
+- All Copilot/AI assistants must always refer to this file as the primary source of operational rules and project instructions
+- No action should be taken that contradicts this file
 - All implementations must follow the official MCP SDK and its conventions
 - All Copilot/AI assistants must always refer to this file as the primary source of operational rules and project instructions
 - No action should be taken that contradicts this file
@@ -55,6 +60,8 @@
 - Prefer reuse of existing utilities
 - Run mypy before any modification
 - All source code in English (except user-facing Japanese)
+- **CRITICAL: Apply Contract Programming - validate all preconditions with assert statements**
+- **CRITICAL: Fail-fast on contract violations - never continue with invalid state**
 - Never make independent decisions on branching issues; always consult user
 
 ## ✅ MCP Tool Development
@@ -76,9 +83,13 @@ Always use `#mcp_shellserver_shell_execute` or `#mcp_shellserver_terminal_create
 
 Recommended:
 ```bash
-# Server management
-./scripts/mcp_server_daemon.sh [start|stop|restart|status]
-# Or use VS Code "Tasks: Run Task"
+# Server testing and validation
+python3 -m mcp_assoc_memory.server --config config.json --test
+
+# VS Code Tasks (preferred method)
+# Use "Tasks: Run Task" → "Test: Run Unit Tests"
+# Use "Tasks: Run Task" → "Lint: Smart Lint (All)"
+
 # For terminal operations and command execution
 # Always use #mcp_shellserver_shell_execute or #mcp_shellserver_terminal_create
 ```
@@ -96,21 +107,66 @@ Recommended:
 - `#mcp_assocmemory_memory_search` - Comprehensive search (standard/diversified modes)
 - `#mcp_assocmemory_memory_manage` - CRUD operations (get/update/delete)
 
-### Error Handling and Fallback Rules (CRITICAL)
+### Contract Programming & Error Handling Rules (CRITICAL)
+**MANDATORY CONTRACT PROGRAMMING PRINCIPLES:**
+- **Design by Contract**: All functions must validate preconditions with assert statements
+- **Fail-Fast Execution**: Stop immediately when contracts are violated
+- **State Consistency**: Ensure object states match expected contracts
+- **Transparent Operations**: All operations must be visible and auditable
+
 **ABSOLUTE PROHIBITION OF SILENT FALLBACKS:**
 - NEVER implement fallbacks without explicit user consultation
-- NEVER hide errors behind automatic fallback mechanisms
+- NEVER hide errors behind automatic fallback mechanisms (e.g., `except Exception: pass`)
 - NEVER make arbitrary judgment calls that obscure root causes
+- NEVER use hasattr() checks with default values as silent fallbacks
+
+**Contract Programming Implementation Patterns:**
+```python
+# ✅ Correct: Contract Programming with Assertions
+def process_data(memory_manager, ctx):
+    # Precondition validation
+    assert memory_manager is not None, "Memory manager is required"
+    assert hasattr(memory_manager, 'metadata_store'), f"Missing metadata_store: {type(memory_manager)}"
+    assert ctx is not None, "Context object is required for operations"
+    
+    # State consistency checks
+    if is_initialized():
+        manager = get_manager()
+        assert manager is not None, "Initialized but manager is None - state inconsistency"
+        return manager
+
+# ❌ Forbidden: Silent Fallback Patterns
+def bad_process_data(memory_manager, ctx):
+    try:
+        if memory_manager and hasattr(memory_manager, 'metadata_store'):
+            return memory_manager.process()
+    except Exception:
+        pass  # FORBIDDEN: Silent error hiding
+    
+    # FORBIDDEN: Default fallback without transparency
+    return default_value if memory_manager else fallback_value
+```
 
 **Distinction Between Appropriate vs Forbidden Fallbacks:**
 - ✅ **Appropriate Fallbacks**: Explicit, transparent, user-approved with clear logging
+- ✅ **Contract-Compliant Fallbacks**: Assert-validated, logged, with full context
 - ❌ **Forbidden Fallbacks**: Silent error hiding implemented by AI without user knowledge
+- ❌ **Contract Violations**: hasattr() checks, try/except/pass, default value substitutions
 
-**Required Actions:**
+**Required Contract Programming Actions:**
+- Always validate preconditions with assert statements
 - Always fail fast and log errors with full context
+- Always ensure state consistency between related components
 - When fallback appears necessary, ALWAYS consult user first
 - If implementing fallback, ensure complete transparency and visibility
-- See details and examples: [docs/copilot-error-handling.md](../docs/copilot-error-handling.md)
+- All contract violations must be stored in associative memory for learning
+
+**Contract Programming Examples by Component:**
+- **Memory Management**: Assert memory_manager existence, validate store operations
+- **Context Objects**: Assert ctx availability, validate required methods (info, error)
+- **Data Structures**: Assert required fields, validate data integrity
+- **Initialization States**: Assert consistency between flags and actual objects
+- See detailed examples: [docs/copilot-error-handling.md](../docs/copilot-error-handling.md)
 
 work/
 

@@ -226,12 +226,11 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
     Returns:
         MemoryManager instance if available, None otherwise
     """
-    # Try to get from singleton first
-    try:
-        if is_memory_manager_initialized():
-            return await get_memory_manager()
-    except Exception:
-        pass  # Fall through to initialization
+    # Contract Programming: If manager is initialized, it MUST be retrievable
+    if is_memory_manager_initialized():
+        memory_manager = await get_memory_manager()
+        assert memory_manager is not None, "Memory manager initialized but returned None - critical state inconsistency"
+        return memory_manager
 
     # Initialize singleton if not already done
     try:
@@ -253,7 +252,17 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
         embedding_service: EmbeddingService
         try:
             embedding_service = SentenceTransformerEmbeddingService()
-        except Exception:
+        except Exception as e:
+            # Contract Programming: Log embedding service fallback with context
+            try:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"SentenceTransformer embedding service failed, falling back to Mock: {e}",
+                    extra={"fallback_reason": str(e), "service_type": "embedding"}
+                )
+            except ImportError:
+                print(f"Warning: SentenceTransformer failed, using Mock embedding service: {e}")
             embedding_service = MockEmbeddingService()
 
         similarity_calculator = SimilarityCalculator()
