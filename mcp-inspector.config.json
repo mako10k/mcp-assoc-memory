@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mcp-assoc-memory": {
+      "command": "python3",
+      "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json"],
+      "cwd": "/home/mako10k/mcp-assoc-memory",
+      "env": {
+        "PYTHONPATH": "/home/mako10k/mcp-assoc-memory/src",
+        "MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

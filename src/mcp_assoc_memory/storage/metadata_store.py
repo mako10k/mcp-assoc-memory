@@ -352,6 +352,18 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 """
                 )
 
+                # System settings table
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS system_settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """
+                )
+
                 # Create indexes
                 await db.execute(
                     """
@@ -869,3 +881,64 @@ class SQLiteMetadataStore(BaseMetadataStore):
         except Exception as e:
             logger.error(f"Failed to get memory count for scope '{scope}': {e}")
             return 0
+
+    # System Settings Management Methods
+    async def get_system_setting(self, key: str) -> Optional[str]:
+        """Get system setting value by key"""
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute(
+                    "SELECT value FROM system_settings WHERE key = ?", (key,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    return row[0] if row else None
+        except Exception as e:
+            logger.error(f"Failed to get system setting '{key}': {e}")
+            return None
+
+    async def set_system_setting(self, key: str, value: str) -> bool:
+        """Set system setting value"""
+        try:
+            now = datetime.utcnow().isoformat()
+            async with aiosqlite.connect(self.database_path) as db:
+                # Try to update existing setting first
+                await db.execute(
+                    "UPDATE system_settings SET value = ?, updated_at = ? WHERE key = ?",
+                    (value, now, key)
+                )
+                
+                # If no rows were affected, insert new setting
+                if db.total_changes == 0:
+                    await db.execute(
+                        "INSERT INTO system_settings (key, value, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                        (key, value, now, now)
+                    )
+                await db.commit()
+                logger.info(f"System setting updated: {key} = {value}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to set system setting '{key}': {e}")
+            return False
+
+    async def delete_system_setting(self, key: str) -> bool:
+        """Delete system setting"""
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                await db.execute("DELETE FROM system_settings WHERE key = ?", (key,))
+                await db.commit()
+                logger.info(f"System setting deleted: {key}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to delete system setting '{key}': {e}")
+            return False
+
+    async def get_all_system_settings(self) -> Dict[str, str]:
+        """Get all system settings"""
+        try:
+            async with aiosqlite.connect(self.database_path) as db:
+                async with db.execute("SELECT key, value FROM system_settings") as cursor:
+                    rows = await cursor.fetchall()
+                    return {row[0]: row[1] for row in rows}
+        except Exception as e:
+            logger.error(f"Failed to get all system settings: {e}")
+            return {}
