@@ -42,11 +42,11 @@ class MCPRequestBase(BaseModel, ABC):
             str: "minimal", "standard", or "full"
         """
         # Check if this request inherits from CommonToolParameters
-        if hasattr(self, 'response_level') and self.response_level:
+        if hasattr(self, "response_level") and self.response_level:
             return str(self.response_level.value)
 
         # Default implementation for requests without response_level
-        if hasattr(self, 'minimal_response') and self.minimal_response:
+        if hasattr(self, "minimal_response") and self.minimal_response:
             return "minimal"
         return "standard"
 
@@ -590,7 +590,11 @@ class MemoryImportRequest(MCPRequestBase):
         if self.file_path:
             return f"file_path:{self.file_path}"
         if self.import_data:
-            return f"import_data:{self.import_data[:50]}..." if len(self.import_data) > 50 else f"import_data:{self.import_data}"
+            return (
+                f"import_data:{self.import_data[:50]}..."
+                if len(self.import_data) > 50
+                else f"import_data:{self.import_data}"
+            )
         return "no_identifier"
 
 
@@ -853,7 +857,7 @@ class MemoryDiscoverAssociationsRequest(CommonToolParameters):
         ⚠️ Performance: Higher values increase processing time""",
         examples=[10, 15, 5],
         ge=1,
-        le=100
+        le=100,
     )
     similarity_threshold: float = Field(
         default=0.1,
@@ -869,7 +873,7 @@ class MemoryDiscoverAssociationsRequest(CommonToolParameters):
         Example: similarity_threshold=0.1 for most searches (trust Top-K ranking)""",
         examples=[0.1, 0.2, 0.4],
         ge=0.0,
-        le=1.0
+        le=1.0,
     )
 
     def get_primary_identifier(self) -> str:

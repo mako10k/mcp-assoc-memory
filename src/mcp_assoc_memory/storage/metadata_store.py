@@ -887,9 +887,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         """Get system setting value by key"""
         try:
             async with aiosqlite.connect(self.database_path) as db:
-                async with db.execute(
-                    "SELECT value FROM system_settings WHERE key = ?", (key,)
-                ) as cursor:
+                async with db.execute("SELECT value FROM system_settings WHERE key = ?", (key,)) as cursor:
                     row = await cursor.fetchone()
                     return row[0] if row else None
         except Exception as e:
@@ -903,19 +901,22 @@ class SQLiteMetadataStore(BaseMetadataStore):
             async with aiosqlite.connect(self.database_path) as db:
                 # Try to update existing setting first
                 await db.execute(
-                    "UPDATE system_settings SET value = ?, updated_at = ? WHERE key = ?",
-                    (value, now, key)
+                    "UPDATE system_settings SET value = ?, updated_at = ? WHERE key = ?", (value, now, key)
                 )
-                
+
                 # If no rows were affected, insert new setting
                 if db.total_changes == 0:
                     await db.execute(
                         "INSERT INTO system_settings (key, value, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                        (key, value, now, now)
+                        (key, value, now, now),
                     )
                 await db.commit()
                 # Mask sensitive data for logging
-                safe_value = "***MASKED***" if any(sensitive in key.lower() for sensitive in ["key", "token", "secret", "password"]) else value
+                safe_value = (
+                    "***MASKED***"
+                    if any(sensitive in key.lower() for sensitive in ["key", "token", "secret", "password"])
+                    else value
+                )
                 logger.info(f"System setting updated: {key} = {safe_value}")
                 return True
         except Exception as e:

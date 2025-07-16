@@ -46,7 +46,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
                 scope=session_scope,
                 metadata={"session_marker": True, "created_by": "session_manage"},
                 tags=["session", "marker"],
-                category="session_management"
+                category="session_management",
             )
 
             # Check for None result
@@ -54,13 +54,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
                 error_msg = "Failed to create session - store_memory returned None"
                 await ctx.error(error_msg)
                 return ResponseBuilder.build_response(
-                    request.response_level,
-                    {
-                        "success": False,
-                        "message": error_msg,
-                        "error": error_msg,
-                        "data": {}
-                    }
+                    request.response_level, {"success": False, "message": error_msg, "error": error_msg, "data": {}}
                 )
 
             await ctx.info(f"Created session: {session_id}")
@@ -71,8 +65,8 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
                 {
                     "success": True,
                     "message": f"Session {session_id} created successfully",
-                    "data": {"session_id": session_id, "scope": session_scope, "marker_memory_id": memory.id}
-                }
+                    "data": {"session_id": session_id, "scope": session_scope, "marker_memory_id": memory.id},
+                },
             )
 
         elif request.action == "list":
@@ -81,7 +75,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
                 query="session_marker:true",
                 scope="session",
                 include_child_scopes=True,
-                limit=1000  # High limit to get all sessions
+                limit=1000,  # High limit to get all sessions
             )
 
             # Group by session
@@ -118,12 +112,12 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
                                 "memory_count": len(data["memories"]),
                                 "created_at": data["created_at"].isoformat() if data["created_at"] else None,
                                 "last_activity": data["last_updated"].isoformat() if data["last_updated"] else None,
-                                "scope": data["scope"]
+                                "scope": data["scope"],
                             }
                             for session_id, data in session_scopes.items()
-                        ]
-                    }
-                }
+                        ],
+                    },
+                },
             )
 
         elif request.action == "cleanup":
@@ -135,7 +129,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
                 query="",
                 scope="session",
                 include_child_scopes=True,
-                limit=10000  # High limit to get all session memories
+                limit=10000,  # High limit to get all session memories
             )
 
             # Filter old memories and delete them
@@ -165,9 +159,9 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
                     "data": {
                         "cleaned_count": cleaned_count,
                         "cleaned_sessions": list(cleaned_sessions),
-                        "cutoff_date": cutoff_date.isoformat()
-                    }
-                }
+                        "cutoff_date": cutoff_date.isoformat(),
+                    },
+                },
             )
 
         else:
@@ -177,18 +171,13 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Context) -> 
                     "success": False,
                     "message": f"Unknown action: {request.action}",
                     "error": f"Unknown action: {request.action}",
-                    "data": {}
-                }
+                    "data": {},
+                },
             )
 
     except Exception as e:
         await ctx.error(f"Failed to manage session: {e}")
         return ResponseBuilder.build_response(
             request.response_level,
-            {
-                "success": False,
-                "message": f"Failed to manage session: {e}",
-                "error": str(e),
-                "data": {}
-            }
+            {"success": False, "message": f"Failed to manage session: {e}", "error": str(e), "data": {}},
         )

@@ -287,15 +287,15 @@ def expand_environment_variables(text: str) -> str:
     """
     if not isinstance(text, str):
         return text
-    
+
     # ${VAR_NAME} 形式の環境変数を展開
     def replace_env_var(match):
         var_name = match.group(1)
         return os.getenv(var_name, match.group(0))  # 見つからない場合は元のまま
-    
+
     # ${VAR_NAME} パターンを置換
-    result = re.sub(r'\$\{([A-Za-z_][A-ZaZ0-9_]*)\}', replace_env_var, text)
-    
+    result = re.sub(r"\$\{([A-Za-z_][A-ZaZ0-9_]*)\}", replace_env_var, text)
+
     return result
 
 
@@ -336,7 +336,9 @@ def get_config() -> Config:
         with _config_lock:
             if _global_config is None:
                 _global_config = Config.load()
-                logger.info(f"Initialized global Config singleton with api config: {hasattr(_global_config.api, 'default_response_level')}")
+                logger.info(
+                    f"Initialized global Config singleton with api config: {hasattr(_global_config.api, 'default_response_level')}"
+                )
 
     return _global_config
 
@@ -377,7 +379,7 @@ def initialize_config(config_path: Optional[str] = None) -> Config:
         _global_config = Config.load(config_path)
         logger.info(f"Initialized global Config from {config_path or 'default locations'}")
         logger.info(f"API config loaded: {hasattr(_global_config.api, 'default_response_level')}")
-        if hasattr(_global_config.api, 'default_response_level'):
+        if hasattr(_global_config.api, "default_response_level"):
             logger.info(f"Default response level: {_global_config.api.default_response_level}")
 
     return _global_config

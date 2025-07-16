@@ -29,18 +29,18 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
     """Handle memory_export tool requests."""
     # Contract Programming: ctx MUST be provided for proper logging and error handling
     assert ctx is not None, "Context object is required for export operations"
-    assert hasattr(ctx, 'info'), f"Context object missing required 'info' method: {type(ctx)}"
-    assert hasattr(ctx, 'error'), f"Context object missing required 'error' method: {type(ctx)}"
-    
+    assert hasattr(ctx, "info"), f"Context object missing required 'info' method: {type(ctx)}"
+    assert hasattr(ctx, "error"), f"Context object missing required 'error' method: {type(ctx)}"
+
     try:
         scope_info = f" from scope '{request.scope}'" if request.scope else " (all scopes)"
         export_mode = "file" if request.file_path else "direct data"
-        
+
         await ctx.info(f"Exporting memories{scope_info} via {export_mode}")
 
         # Get memory manager instance
         memory_manager = await get_or_create_memory_manager()
-        
+
         if not memory_manager:
             return {"error": "Memory manager not available", "export_count": 0}
 
@@ -56,10 +56,10 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
         for memory in all_memory_objects:
             if not memory:
                 continue
-                
+
             if request.scope:
                 # Include if memory scope matches or is a child of request scope
-                memory_scope = memory.scope if hasattr(memory, 'scope') else ""
+                memory_scope = memory.scope if hasattr(memory, "scope") else ""
                 if memory_scope == request.scope or memory_scope.startswith(request.scope + "/"):
                     export_memories.append(memory)
             else:
@@ -84,27 +84,31 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
         # This avoids potential memory exhaustion with large memory collections.
         for memory in export_memories:
             # Contract Programming: Memory objects MUST have required attributes
-            assert hasattr(memory, 'id'), f"Memory object missing required 'id' attribute: {type(memory)}"
-            assert hasattr(memory, 'content'), f"Memory object missing required 'content' attribute: {type(memory)}"
-            assert hasattr(memory, 'scope'), f"Memory object missing required 'scope' attribute: {type(memory)}"
-            
+            assert hasattr(memory, "id"), f"Memory object missing required 'id' attribute: {type(memory)}"
+            assert hasattr(memory, "content"), f"Memory object missing required 'content' attribute: {type(memory)}"
+            assert hasattr(memory, "scope"), f"Memory object missing required 'scope' attribute: {type(memory)}"
+
             memory_export = {
                 "memory_id": memory.id,
                 "content": memory.content,
                 "scope": memory.scope,
-                "metadata": memory.metadata if hasattr(memory, 'metadata') else {},
-                "tags": memory.tags if hasattr(memory, 'tags') else [],
-                "category": memory.category if hasattr(memory, 'category') else None,
-                "created_at": memory.created_at.isoformat() if hasattr(memory, 'created_at') and memory.created_at else "",
-                "updated_at": memory.updated_at.isoformat() if hasattr(memory, 'updated_at') and memory.updated_at else "",
+                "metadata": memory.metadata if hasattr(memory, "metadata") else {},
+                "tags": memory.tags if hasattr(memory, "tags") else [],
+                "category": memory.category if hasattr(memory, "category") else None,
+                "created_at": memory.created_at.isoformat()
+                if hasattr(memory, "created_at") and memory.created_at
+                else "",
+                "updated_at": memory.updated_at.isoformat()
+                if hasattr(memory, "updated_at") and memory.updated_at
+                else "",
             }
 
             # Add associations if requested
             if request.include_associations:
                 # Contract Programming: Memory object MUST have valid id attribute
-                assert hasattr(memory, 'id'), f"Memory object missing required 'id' attribute: {type(memory)}"
+                assert hasattr(memory, "id"), f"Memory object missing required 'id' attribute: {type(memory)}"
                 assert memory.id, f"Memory object has empty/null id: {memory.id}"
-                
+
                 # Get associations from memory manager - if this fails, export should fail
                 try:
                     associations = await memory_manager.get_associations(memory.id, limit=10)
@@ -204,21 +208,16 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
         error_msg = f"Failed to export memories: {e}"
         await ctx.error(error_msg)
         # Return proper MCP error response instead of silent success
-        return {
-            "success": False,
-            "error": error_msg,
-            "exported_count": 0,
-            "data": {}
-        }
+        return {"success": False, "error": error_msg, "exported_count": 0, "data": {}}
 
 
 async def handle_memory_import(request: MemoryImportRequest, ctx: Any) -> Dict[str, Any]:
     """Handle memory_import tool requests."""
     # Contract Programming: ctx MUST be provided for proper logging and error handling
     assert ctx is not None, "Context object is required for import operations"
-    assert hasattr(ctx, 'info'), f"Context object missing required 'info' method: {type(ctx)}"
-    assert hasattr(ctx, 'error'), f"Context object missing required 'error' method: {type(ctx)}"
-    
+    assert hasattr(ctx, "info"), f"Context object missing required 'info' method: {type(ctx)}"
+    assert hasattr(ctx, "error"), f"Context object missing required 'error' method: {type(ctx)}"
+
     try:
         # Import implementation would go here - this is a placeholder
         # for the full implementation that exists in the handlers
@@ -238,9 +237,4 @@ async def handle_memory_import(request: MemoryImportRequest, ctx: Any) -> Dict[s
         error_msg = f"Failed to import memories: {e}"
         await ctx.error(error_msg)
         # Return proper MCP error response instead of silent success
-        return {
-            "success": False,
-            "error": error_msg,
-            "imported_count": 0,
-            "data": {}
-        }
+        return {"success": False, "error": error_msg, "imported_count": 0, "data": {}}

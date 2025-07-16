@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from ...core.singleton_memory_manager import get_or_create_memory_manager
+
 # SimplePersistence removed - using SingletonMemoryManager for all storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
 from ..models.responses import (
@@ -42,11 +43,7 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
 
         # Handle empty memory_ids list early
         if not request.memory_ids:
-            base_data = {
-                "success": True,
-                "moved_count": 0,
-                "failed_count": 0
-            }
+            base_data = {"success": True, "moved_count": 0, "failed_count": 0}
             return ResponseBuilder.build_response(request.response_level, base_data)
 
         moved_count = 0
@@ -69,13 +66,17 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
                     raise RuntimeError(error_msg)
 
                 moved_count += 1
-                moved_memories.append({
-                    "memory_id": memory_id,
-                    "scope": request.target_scope,
-                    "content_preview": updated_memory.content[:50] + "..." if len(updated_memory.content) > 50 else updated_memory.content,
-                    "created_at": getattr(updated_memory, 'created_at', None),
-                    "updated_at": getattr(updated_memory, 'updated_at', None)
-                })
+                moved_memories.append(
+                    {
+                        "memory_id": memory_id,
+                        "scope": request.target_scope,
+                        "content_preview": updated_memory.content[:50] + "..."
+                        if len(updated_memory.content) > 50
+                        else updated_memory.content,
+                        "created_at": getattr(updated_memory, "created_at", None),
+                        "updated_at": getattr(updated_memory, "updated_at", None),
+                    }
+                )
                 await ctx.info(f"Successfully moved memory {memory_id} to {request.target_scope}")
 
             except Exception as move_error:
@@ -91,44 +92,27 @@ async def handle_memory_move(request: MemoryMoveRequest, ctx: Any) -> Dict[str, 
         await ctx.info(success_msg)
 
         # Use ResponseBuilder for level-appropriate response
-        base_data = {
-            "success": success,
-            "moved_count": moved_count,
-            "failed_count": len(failed_memory_ids)
-        }
+        base_data = {"success": success, "moved_count": moved_count, "failed_count": len(failed_memory_ids)}
 
-        standard_data = {
-            "target_scope": request.target_scope,
-            "moved_memories": moved_memories
-        }
+        standard_data = {"target_scope": request.target_scope, "moved_memories": moved_memories}
 
         full_data = {
             "move_summary": {
                 "total_requested": len(request.memory_ids),
                 "successfully_moved": moved_count,
                 "failed_moves": len(failed_memory_ids),
-                "success_rate": moved_count / len(request.memory_ids) if request.memory_ids else 0
+                "success_rate": moved_count / len(request.memory_ids) if request.memory_ids else 0,
             },
-            "failed_memory_ids": failed_memory_ids
+            "failed_memory_ids": failed_memory_ids,
         }
 
-        return ResponseBuilder.build_response(
-            request.response_level,
-            base_data,
-            standard_data,
-            full_data
-        )
+        return ResponseBuilder.build_response(request.response_level, base_data, standard_data, full_data)
 
     except Exception as e:
         error_msg = f"Failed to move memories: {e}"
         await ctx.error(error_msg)
 
-        base_data = {
-            "success": False,
-            "error": error_msg,
-            "moved_count": 0,
-            "failed_count": len(request.memory_ids)
-        }
+        base_data = {"success": False, "error": error_msg, "moved_count": 0, "failed_count": len(request.memory_ids)}
 
         return ResponseBuilder.build_response(request.response_level, base_data)
 
@@ -251,7 +235,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
                 content=f"Session created: {session_id}",
                 metadata={"session_marker": True, "created_by": "session_manage"},
                 category="session",
-                tags=["session", "marker"]
+                tags=["session", "marker"],
             )
 
             if not session_memory:
@@ -267,7 +251,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
                     session_id=session_id,
                     created_at=session_memory.created_at,
                     memory_count=1,
-                    last_activity=session_memory.created_at
+                    last_activity=session_memory.created_at,
                 ),
                 sessions=[],
             )
@@ -275,10 +259,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
         elif request.action == "list":
             # List all active sessions by searching session scope
             session_memories = await manager.search_memories(
-                query="",  # Empty query to get all
-                scope="session",
-                include_child_scopes=True,
-                limit=1000
+                query="", scope="session", include_child_scopes=True, limit=1000  # Empty query to get all
             )
 
             # Group by session ID
@@ -287,7 +268,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
                 memory = memory_result.get("memory") if isinstance(memory_result, dict) else memory_result
                 if not memory:
                     continue
-                    
+
                 scope = memory.scope
                 if scope.startswith("session/"):
                     session_id = scope.split("/", 1)[1] if "/" in scope else scope
@@ -300,8 +281,7 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
                     session_scopes[session_id]["memories"].append(memory)
                     if memory.updated_at:
                         session_scopes[session_id]["last_updated"] = max(
-                            session_scopes[session_id]["last_updated"] or memory.created_at,
-                            memory.updated_at
+                            session_scopes[session_id]["last_updated"] or memory.created_at, memory.updated_at
                         )
 
             active_sessions = [
@@ -327,13 +307,10 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
         elif request.action == "cleanup":
             # Clean up old sessions
             cutoff_date = datetime.now() - timedelta(days=request.max_age_days or 7)
-            
+
             # Get all session memories
             session_memories = await manager.search_memories(
-                query="",
-                scope="session",
-                include_child_scopes=True,
-                limit=1000
+                query="", scope="session", include_child_scopes=True, limit=1000
             )
 
             cleaned_count = 0
@@ -341,16 +318,16 @@ async def handle_session_manage(request: SessionManageRequest, ctx: Any) -> Sess
                 memory = memory_result.get("memory") if isinstance(memory_result, dict) else memory_result
                 if not memory:
                     continue
-                    
+
                 # Check if memory is older than cutoff
                 memory_date = memory.created_at
                 if isinstance(memory_date, str):
                     try:
-                        memory_date = datetime.fromisoformat(memory_date.replace('Z', '+00:00'))
+                        memory_date = datetime.fromisoformat(memory_date.replace("Z", "+00:00"))
                     except (ValueError, AttributeError) as date_error:
                         await ctx.error(f"Failed to parse date for memory {memory.id}: {date_error} - skipping memory")
                         continue  # Skip this memory and continue with next one
-                        
+
                 if memory_date < cutoff_date:
                     success = await manager.delete_memory(memory.id)
                     if success:

@@ -340,7 +340,6 @@ class MemoryManagerDiversified:
                                 and similar_memory.id not in exclude_set
                                 and similar_memory.id not in level_exclude
                             ):
-
                                 next_level.append(similar_memory.id)
 
                                 # Add similar memories to level exclude set

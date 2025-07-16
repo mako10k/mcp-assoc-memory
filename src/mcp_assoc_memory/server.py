@@ -21,10 +21,8 @@ def initialize_early_logging() -> logging.Logger:
         # Configure logging immediately - only file handler to avoid duplicates
         logging.basicConfig(
             level=logging.DEBUG,
-            format='%(asctime)s [%(levelname)s][%(name)s] %(message)s',
-            handlers=[
-                logging.FileHandler('logs/mcp_server.log', mode='a')
-            ]
+            format="%(asctime)s [%(levelname)s][%(name)s] %(message)s",
+            handlers=[logging.FileHandler("logs/mcp_server.log", mode="a")],
         )
 
         logger = logging.getLogger(__name__)
@@ -50,10 +48,12 @@ try:
     logger.info("Importing FastMCP and Pydantic...")
     from fastmcp import Context, FastMCP
     from pydantic import Field
+
     logger.info("Core imports successful")
 
     logger.info("Importing project dependencies...")
     from .api.dependencies import set_global_dependencies
+
     logger.info("Dependencies import successful")
 
     logger.info("Importing API models...")
@@ -70,6 +70,7 @@ try:
         UnifiedSearchRequest,
     )
     from .api.models.requests import MemoryListAllRequest
+
     logger.info("API models import successful")
 
     logger.info("Importing API tools...")
@@ -100,14 +101,17 @@ try:
         set_resource_dependencies,
         set_scope_dependencies,
     )
+
     logger.info("API tools import successful")
 
     logger.info("Importing additional tools...")
     from .api.tools.other_tools import set_dependencies as set_other_dependencies
+
     logger.info("Additional tools import successful")
 
     logger.info("Importing configuration...")
     from .config import get_config, initialize_config
+
     logger.info("Configuration import successful")
 
     logger.info("Importing embedding services...")
@@ -117,6 +121,7 @@ try:
         create_embedding_service,
     )
     from .core.embedding_validator import EmbeddingValidator, EmbeddingCompatibilityError
+
     logger.info("Embedding services import successful")
 
     logger.info("Importing core similarity and memory manager...")
@@ -125,6 +130,7 @@ try:
     from .core.singleton_memory_manager import (
         initialize_memory_manager,
     )
+
     logger.info("Memory manager import successful")
 
     logger.info("Importing storage components...")
@@ -132,6 +138,7 @@ try:
     from .storage.graph_store import NetworkXGraphStore
     from .storage.metadata_store import SQLiteMetadataStore
     from .storage.vector_store import ChromaVectorStore
+
     logger.info("Storage components import successful")
 
     logger.info("All imports completed successfully")
@@ -159,7 +166,7 @@ try:
     config = initialize_config(config_path)
     logger.info(f"Server initialized with config from: {config_path}")
     logger.info(f"API configuration loaded: {hasattr(config.api, 'default_response_level')}")
-    if hasattr(config.api, 'default_response_level'):
+    if hasattr(config.api, "default_response_level"):
         logger.info(f"Default response level: {config.api.default_response_level}")
     logger.info("Configuration initialized successfully")
 
@@ -171,7 +178,7 @@ try:
     logger.info("Storage components initialized successfully")
 
     logger.info("Initializing embedding service...")
-    
+
     # Initialize embedding service using configuration factory
     embedding_service = create_embedding_service()
     logger.info(f"Embedding service initialized: {type(embedding_service).__name__}")
@@ -205,7 +212,7 @@ async def ensure_initialized() -> None:
             validator = EmbeddingValidator(metadata_store)
             await validator.validate_embedding_compatibility()
             logger.info("Embedding compatibility validation passed")
-            
+
             # Initialize memory manager using singleton pattern
             memory_manager = await initialize_memory_manager(
                 vector_store=vector_store,
@@ -705,6 +712,7 @@ def main() -> None:
         try:
             # Initialize response processor
             from .api.processing import create_response_processor, set_global_processor
+
             processor = create_response_processor(config)
             set_global_processor(processor)
             logger.info("Response processor initialized successfully")
@@ -723,17 +731,17 @@ def main() -> None:
     transport_config = config.transport
 
     # Prefer STDIO as default, then HTTP, then SSE
-    if getattr(transport_config, 'stdio_enabled', True):
+    if getattr(transport_config, "stdio_enabled", True):
         logger.info("Starting server on STDIO transport")
         mcp.run(transport="stdio")
-    elif getattr(transport_config, 'http_enabled', False):
-        port = getattr(transport_config, 'http_port', 8000)
-        host = getattr(transport_config, 'http_host', "0.0.0.0")
+    elif getattr(transport_config, "http_enabled", False):
+        port = getattr(transport_config, "http_port", 8000)
+        host = getattr(transport_config, "http_host", "0.0.0.0")
         logger.info(f"Starting server on HTTP transport: {host}:{port}")
         mcp.run(transport="http", host=host, port=port)
-    elif getattr(transport_config, 'sse_enabled', False):
-        port = getattr(transport_config, 'sse_port', 8001)
-        host = getattr(transport_config, 'sse_host', "0.0.0.0")
+    elif getattr(transport_config, "sse_enabled", False):
+        port = getattr(transport_config, "sse_port", 8001)
+        host = getattr(transport_config, "sse_host", "0.0.0.0")
         logger.info(f"Starting server on SSE transport: {host}:{port}")
         mcp.run(transport="sse", host=host, port=port)
 
