@@ -68,13 +68,21 @@ class EmbeddingValidator:
     def _get_current_embedding_config(self) -> Dict[str, Any]:
         """Get current embedding configuration from config"""
         config = get_config()
-        embedding_config = config.get("embedding", {})
+        embedding_config = config.embedding  # Use dataclass directly
+        
+        # Convert provider to standardized format for validation
+        provider = embedding_config.provider
+        if provider == "local":
+            provider = "sentence_transformer"  # Normalize for compatibility checking
 
         return {
-            "provider": embedding_config.get("provider", "mock"),
-            "model": embedding_config.get("model", "unknown"),
-            "dimensions": embedding_config.get("dimensions", "auto"),
-            "config_hash": self._calculate_config_hash(embedding_config),
+            "provider": provider,
+            "model": embedding_config.model,
+            "dimensions": "auto",  # Will be determined by actual embedding service
+            "config_hash": self._calculate_config_hash({
+                "provider": provider,
+                "model": embedding_config.model
+            }),
         }
 
     async def _get_stored_embedding_config(self) -> Optional[Dict[str, Any]]:
@@ -131,7 +139,10 @@ class EmbeddingValidator:
         import hashlib
 
         # Only include settings that affect vector compatibility
-        relevant_config = {"provider": config.get("provider", "mock"), "model": config.get("model", "unknown")}
+        relevant_config = {
+            "provider": config.get("provider", "mock"),
+            "model": config.get("model", "unknown")
+        }
 
         config_str = json.dumps(relevant_config, sort_keys=True)
         return hashlib.sha256(config_str.encode()).hexdigest()[:16]

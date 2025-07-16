@@ -5,6 +5,24 @@ All notable changes to the MCP Associative Memory Server will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-07-16
+
+### Added
+- **Embedding Provider Auto-Detection**: Automatically selects OpenAI or local embeddings based on API key availability
+- **User-Friendly Provider Names**: "local" as alias for "sentence_transformer" provider
+- **Embedding Compatibility Validation**: Prevents data corruption when switching embedding providers
+- **Backward Compatibility**: Existing installations detect provider changes and show appropriate warnings
+
+### Enhanced
+- **Configuration Flexibility**: No longer requires OpenAI API key for local-only installations
+- **Error Handling**: Clear error messages when attempting incompatible provider changes
+- **Provider Switching**: Safe transitions between embedding providers with validation
+
+### Technical
+- Contract programming implementation with assert statements for robust error handling
+- Provider normalization in embedding service creation
+- Compatibility checking integrated into server initialization
+
 ## [1.1.0] - 2025-07-15
 
 ### Added

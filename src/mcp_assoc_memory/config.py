@@ -33,11 +33,55 @@ class DatabaseConfig:
 class EmbeddingConfig:
     """Embedding configuration"""
 
-    provider: str = "openai"  # openai, sentence_transformers, local
-    model: str = "text-embedding-3-small"
+    provider: str = ""  # "openai" or "local" - will be auto-determined if not set
+    model: str = ""  # Will be set based on provider: "text-embedding-3-small" for openai, "all-MiniLM-L6-v2" for local
     api_key: str = ""
     cache_size: int = 1000
     batch_size: int = 100
+    
+    def _determine_default_provider(self) -> str:
+        """Determine default provider based on API key availability"""
+        if self.provider:
+            return self.provider  # Explicit provider selection takes precedence
+        
+        # Auto-determine based on API key availability
+        api_key = self.api_key or os.getenv("OPENAI_API_KEY", "")
+        if api_key and api_key.strip():
+            return "openai"
+        else:
+            return "local"
+    
+    def _determine_default_model(self, provider: str) -> str:
+        """Determine default model based on provider"""
+        if self.model:
+            return self.model  # Explicit model selection takes precedence
+            
+        if provider == "openai":
+            return "text-embedding-3-small"
+        elif provider in ["local", "sentence_transformer"]:
+            return "all-MiniLM-L6-v2"
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+    
+    def __post_init__(self):
+        """Initialize provider and model with defaults if not explicitly set"""
+        # Determine provider if not set
+        if not self.provider:
+            self.provider = self._determine_default_provider()
+        
+        # Validate provider
+        if self.provider not in ["openai", "local", "sentence_transformer"]:
+            raise ValueError(f"Invalid provider '{self.provider}'. Must be 'openai', 'local', or 'sentence_transformer'")
+        
+        # Determine model if not set
+        if not self.model:
+            self.model = self._determine_default_model(self.provider)
+        
+        # Provider-specific validation
+        if self.provider == "openai":
+            api_key = self.api_key or os.getenv("OPENAI_API_KEY", "")
+            if not api_key or not api_key.strip():
+                raise ValueError("OpenAI provider requires OPENAI_API_KEY environment variable or api_key in config")
 
 
 @dataclass

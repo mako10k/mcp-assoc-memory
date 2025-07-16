@@ -99,15 +99,17 @@ class OpenAIEmbeddingService(EmbeddingService):
         self.model = model
         self._client: Optional[Any] = None
 
-        # 基本的な検証：APIキーの形式チェック
-        if not api_key or not isinstance(api_key, str):
-            raise ValueError("API key must be a non-empty string")
+        # 基本的な検証：APIキーの形式チェック（ただし空文字は許可）
+        if api_key and not isinstance(api_key, str):
+            raise ValueError("API key must be a string")
 
-        # OpenAI APIキーの基本形式チェック
-        if not api_key.startswith(("sk-", "sk-proj-")):
+        # OpenAI APIキーの基本形式チェック（空でない場合のみ）
+        if api_key and not api_key.startswith(("sk-", "sk-proj-")):
             raise ValueError(f"Invalid OpenAI API key format: {api_key[:10]}... (must start with 'sk-' or 'sk-proj-')")
 
         logger.info(f"OpenAIEmbeddingService initialized with model: {model}")
+        if not api_key:
+            logger.warning("OpenAI API key not provided - service will only work in test mode")
 
     async def _check_api_key(self) -> None:
         """APIキーの有効性を起動時に検証（embedding生成を1回試行）"""
@@ -138,6 +140,8 @@ class OpenAIEmbeddingService(EmbeddingService):
                     logger.info("Test mode detected, using mock OpenAI client")
                     self._client = MockOpenAIClient()
                 else:
+                    if not self.api_key:
+                        raise ValueError("OpenAI API key is required for production use. Please set your API key in the configuration.")
                     self._client = openai.AsyncOpenAI(api_key=self.api_key)
             except ImportError:
                 logger.error("OpenAI package not installed", error_code="OPENAI_IMPORT_ERROR")
@@ -324,6 +328,10 @@ def create_embedding_service(config: Optional[Dict[str, Any]] = None) -> Embeddi
 
     # "service"優先、なければ"provider"も許容
     service_type = embedding_config.get("service") or embedding_config.get("provider", "mock")
+    
+    # "local" を "sentence_transformer" として扱う
+    if service_type == "local":
+        service_type = "sentence_transformer"
 
     # SECURITY: Mask sensitive data in logs
     safe_config = {k: ("***MASKED***" if "key" in k.lower() else v) for k, v in embedding_config.items()}
@@ -345,7 +353,7 @@ def create_embedding_service(config: Optional[Dict[str, Any]] = None) -> Embeddi
     elif service_type == "sentence_transformer":
         logger.info("[create_embedding_service] SentenceTransformerEmbeddingService selected")
         return SentenceTransformerEmbeddingService(
-            model_name=embedding_config.get("model_name", "all-MiniLM-L6-v2"),
+            model_name=embedding_config.get("model", "all-MiniLM-L6-v2"),  # Use "model" instead of "model_name"
             device=embedding_config.get("device", "cpu"),
             cache_size=embedding_config.get("cache_size", 1000),
             cache_ttl_hours=embedding_config.get("cache_ttl_hours", 24),
@@ -361,5 +369,5 @@ def create_embedding_service(config: Optional[Dict[str, Any]] = None) -> Embeddi
 
     else:
         raise RuntimeError(
-            f"Unknown embedding service type: {service_type}. Supported types: openai, sentence_transformer, mock"
+            f"Unknown embedding service type: {service_type}. Supported types: openai, local, sentence_transformer, mock"
         )
