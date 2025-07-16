@@ -114,7 +114,9 @@ try:
     from .core.embedding_service import (
         MockEmbeddingService,
         SentenceTransformerEmbeddingService,
+        create_embedding_service,
     )
+    from .core.embedding_validator import EmbeddingValidator, EmbeddingCompatibilityError
     logger.info("Embedding services import successful")
 
     logger.info("Importing core similarity and memory manager...")
@@ -169,14 +171,10 @@ try:
     logger.info("Storage components initialized successfully")
 
     logger.info("Initializing embedding service...")
-    # Use SentenceTransformerEmbeddingService for production, fallback to Mock for testing
-    try:
-        embedding_service = SentenceTransformerEmbeddingService()
-        logger.info("Using SentenceTransformerEmbeddingService for production")
-    except Exception as e:
-        logger.warning(f"Failed to initialize SentenceTransformerEmbeddingService: {e}")
-        embedding_service = MockEmbeddingService()  # type: ignore
-        logger.info("Using MockEmbeddingService as fallback")
+    
+    # Initialize embedding service using configuration factory
+    embedding_service = create_embedding_service()
+    logger.info(f"Embedding service initialized: {type(embedding_service).__name__}")
 
     logger.info("All components initialized successfully")
 
@@ -203,6 +201,11 @@ async def ensure_initialized() -> None:
     global _initialized, memory_manager
     if not _initialized:
         try:
+            # Validate embedding provider compatibility before initialization
+            validator = EmbeddingValidator(metadata_store)
+            await validator.validate_embedding_compatibility()
+            logger.info("Embedding compatibility validation passed")
+            
             # Initialize memory manager using singleton pattern
             memory_manager = await initialize_memory_manager(
                 vector_store=vector_store,
