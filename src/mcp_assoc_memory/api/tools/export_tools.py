@@ -7,12 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
-from ...simple_persistence import get_persistent_storage
+from ...core.singleton_memory_manager import SingletonMemoryManager
 from ..models.requests import MemoryExportRequest, MemoryImportRequest
 from ..models.responses import MemoryExportResponse, MemoryImportResponse
-
-# Get storage
-memory_storage, persistence = get_persistent_storage()
 
 
 async def _resolve_export_path(file_path: str) -> Path:
@@ -35,16 +32,31 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
         export_mode = "file" if request.file_path else "direct data"
         await ctx.info(f"Exporting memories{scope_info} via {export_mode}")
 
-        # Filter memories by scope
+        # Get memory manager instance
+        singleton_manager = SingletonMemoryManager()
+        memory_manager = singleton_manager.get_instance()
+        
+        if not memory_manager:
+            return {"error": "Memory manager not available", "export_count": 0}
+
+        # Get all memories from the correct storage
+        all_memories = await memory_manager.search_memories(
+            query="",  # Empty query to get all
+            scope=request.scope,
+            include_child_scopes=True,
+            limit=10000  # Large limit for export
+        )
+
+        # Filter memories by scope if specified
         export_memories = []
-        for memory_data in memory_storage.values():
+        for memory in all_memories:
             if request.scope:
-                memory_scope = memory_data["scope"]
                 # Include if memory scope matches or is a child of request scope
+                memory_scope = memory.get("scope", "")
                 if memory_scope == request.scope or memory_scope.startswith(request.scope + "/"):
-                    export_memories.append(memory_data)
+                    export_memories.append(memory)
             else:
-                export_memories.append(memory_data)
+                export_memories.append(memory)
 
         # Prepare export data structure
         export_data: Dict[str, Any] = {
@@ -59,31 +71,29 @@ async def handle_memory_export(request: MemoryExportRequest, ctx: Any) -> Dict[s
         # Process each memory for export
         for memory_data in export_memories:
             memory_export = {
-                "memory_id": memory_data["memory_id"],
-                "content": memory_data["content"],
-                "scope": memory_data["scope"],
+                "memory_id": memory_data.get("memory_id", memory_data.get("id")),
+                "content": memory_data.get("content", ""),
+                "scope": memory_data.get("scope", ""),
                 "metadata": memory_data.get("metadata", {}),
                 "tags": memory_data.get("tags", []),
                 "category": memory_data.get("category"),
-                "created_at": (
-                    memory_data["created_at"].isoformat()
-                    if isinstance(memory_data["created_at"], datetime)
-                    else memory_data["created_at"]
-                ),
+                "created_at": memory_data.get("created_at", ""),
             }
 
             # Add associations if requested
             if request.include_associations:
-                # Get associations from advanced storage if available
+                # Get associations from memory manager if available
                 try:
-                    # TODO: Access memory manager from context
-                    # memory = await memory_manager.get_memory(memory_data["memory_id"])
-                    # if memory:
-                    #     associations = await memory_manager.get_associations(memory.id, limit=10)
-                    #     memory_export["associations"] = [assoc.id for assoc in associations]
-                    memory_export["associations"] = []  # Placeholder
+                    memory_id = memory_data.get("memory_id", memory_data.get("id"))
+                    if memory_id:
+                        associations = await memory_manager.get_associations(memory_id, limit=10)
+                        memory_export["associations"] = [assoc.id for assoc in associations] if associations else []
+                    else:
+                        memory_export["associations"] = []
                 except Exception:
                     memory_export["associations"] = []
+            else:
+                memory_export["associations"] = []
 
             memories_list = export_data["memories"]
             if isinstance(memories_list, list):
