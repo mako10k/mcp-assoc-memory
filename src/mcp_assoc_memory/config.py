@@ -10,7 +10,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -168,113 +168,34 @@ class Config:
     @classmethod
     def load(cls, config_path: Optional[str] = None, cli_args: Optional[dict] = None) -> "Config":
         """
-        Load configuration (CLI > environment variables > config.json > defaults)
-        Specification:
-          1. If CLI args specify --config, prioritize that path
-          2. If not specified, auto-discover ./config.json
-          3. If not found, use environment variables/defaults
+        Load configuration using centralized configuration manager
+        
+        Priority: CLI args > environment variables > config file > defaults
         """
-        config = cls()
+        manager = ConfigurationManager()
+        return manager.load_configuration(config_path, cli_args)
 
-        # Load from environment variables
-        config._load_from_env()
+    def _validate(self) -> None:
+        """Validate configuration values"""
+        # Create data directory
+        Path(self.storage.data_dir).mkdir(parents=True, exist_ok=True)
 
-        # Determine config file path
-        config_file = None
-        if config_path:
-            # Explicitly specified by CLI
-            if Path(config_path).exists():
-                config_file = config_path
-        else:
-            # Check environment variable first (for test/alternate configs)
-            env_config = os.getenv("MCP_CONFIG_FILE")
-            if env_config and Path(env_config).exists():
-                config_file = env_config
-            else:
-                # Auto-discover config.json in current and parent directories
-                default_path = Path.cwd() / "config.json"
-                parent_path = Path.cwd().parent / "config.json"
-                if default_path.exists():
-                    config_file = str(default_path)
-                elif parent_path.exists():
-                    config_file = str(parent_path)
+        # Check required settings
+        if self.embedding.provider == "openai" and not self.embedding.api_key:
+            logger.warning("OpenAI API key is not configured")
 
-        if config_file:
-            config._load_from_file(config_file)
-
-        # Override with CLI arguments
-        if cli_args:
-            # Reflect transport, port, host, log_level, etc.
-            if "log_level" in cli_args and cli_args["log_level"]:
-                config.log_level = cli_args["log_level"]
-            if "host" in cli_args and cli_args["host"]:
-                config.transport.http_host = cli_args["host"]
-            if "port" in cli_args and cli_args["port"]:
-                config.transport.http_port = cli_args["port"]
-            if "transport" in cli_args and cli_args["transport"]:
-                # Only enable valid transports to True
-                t = cli_args["transport"]
-                config.transport.stdio_enabled = t == "stdio"
-                config.transport.http_enabled = t == "http"
-                config.transport.sse_enabled = t == "sse"
-
-        # Validation
-        config._validate()
-
-        return config
-
-    def _load_from_env(self) -> None:
-        """Load configuration from environment variables"""
-        # Database configuration
-        self.database.type = os.getenv("DB_TYPE", self.database.type)
-        self.database.path = os.getenv("DB_PATH", self.database.path)
-        self.database.host = os.getenv("DB_HOST", self.database.host)
-        self.database.port = int(os.getenv("DB_PORT", str(self.database.port)))
-        self.database.database = os.getenv("DB_NAME", self.database.database)
-        self.database.username = os.getenv("DB_USER", self.database.username)
-        self.database.password = os.getenv("DB_PASSWORD", self.database.password)
-
-        # Embedding configuration
-        self.embedding.provider = os.getenv("EMBEDDING_PROVIDER", self.embedding.provider)
-        self.embedding.model = os.getenv("EMBEDDING_MODEL", self.embedding.model)
-        self.embedding.api_key = os.getenv("OPENAI_API_KEY", self.embedding.api_key)
-
-        # Storage configuration
-        self.storage.data_dir = os.getenv("DATA_DIR", self.storage.data_dir)
-        self.storage.export_dir = os.getenv("EXPORT_DIR", self.storage.export_dir)
-        self.storage.import_dir = os.getenv("IMPORT_DIR", self.storage.import_dir)
-        self.storage.allow_absolute_paths = os.getenv("ALLOW_ABSOLUTE_PATHS", "false").lower() == "true"
-        self.storage.max_export_size_mb = int(os.getenv("MAX_EXPORT_SIZE_MB", str(self.storage.max_export_size_mb)))
-        self.storage.max_import_size_mb = int(os.getenv("MAX_IMPORT_SIZE_MB", str(self.storage.max_import_size_mb)))
-
-        # Security configuration
-        self.security.auth_enabled = os.getenv("AUTH_ENABLED", "false").lower() == "true"
-        self.security.api_key_required = os.getenv("API_KEY_REQUIRED", "false").lower() == "true"
-        self.security.jwt_secret = os.getenv("JWT_SECRET", self.security.jwt_secret)
-
-        # Transport configuration
-        self.transport.http_host = os.getenv("HTTP_HOST", self.transport.http_host)
-        self.transport.http_port = int(os.getenv("HTTP_PORT", str(self.transport.http_port)))
-        self.transport.sse_host = os.getenv("SSE_HOST", self.transport.sse_host)
-        self.transport.sse_port = int(os.getenv("SSE_PORT", str(self.transport.sse_port)))
-
-        # Other settings
-        self.log_level = os.getenv("LOG_LEVEL", self.log_level)
-        self.debug_mode = os.getenv("DEBUG", "false").lower() == "true"
-
-        # Expand environment variables in all string settings
-        self.database = expand_dict_env_vars(self.database)
-        self.embedding = expand_dict_env_vars(self.embedding)
-        self.storage = expand_dict_env_vars(self.storage)
-        self.security = expand_dict_env_vars(self.security)
-        self.transport = expand_dict_env_vars(self.transport)
-        self.api = expand_dict_env_vars(self.api)
+        if self.security.auth_enabled and not self.security.jwt_secret:
+            raise ValueError("Authentication is enabled but JWT secret is not configured")
 
     def _load_from_file(self, config_path: str) -> None:
         """Load configuration from file"""
         try:
             with open(config_path, "r", encoding="utf-8") as f:
-                config_data = json.load(f)
+                if config_path.endswith(('.yaml', '.yml')):
+                    import yaml
+                    config_data = yaml.safe_load(f)
+                else:
+                    config_data = json.load(f)
 
             # 環境変数展開を実行
             config_data = expand_dict_env_vars(config_data)
@@ -355,6 +276,237 @@ def expand_dict_env_vars(data: Any) -> Any:
         return expand_environment_variables(data)
     else:
         return data
+
+
+class EnvironmentMapping:
+    """Environment variable mapping configuration"""
+    
+    # 環境変数の統一マッピング定義
+    ENV_MAPPINGS = {
+        # ログとデバッグ設定
+        "log_level": ["LOG_LEVEL", "MCP_LOG_LEVEL"],
+        "debug_mode": ["DEBUG", "DEBUG_MODE"],
+        
+        # データベース設定
+        "database.type": ["DB_TYPE"],
+        "database.path": ["DB_PATH"],
+        "database.host": ["DB_HOST"],
+        "database.port": ["DB_PORT"],
+        "database.database": ["DB_NAME"],
+        "database.username": ["DB_USER"],
+        "database.password": ["DB_PASSWORD"],
+        
+        # 埋め込み設定
+        "embedding.provider": ["EMBEDDING_PROVIDER"],
+        "embedding.model": ["EMBEDDING_MODEL"],
+        "embedding.api_key": ["OPENAI_API_KEY", "EMBEDDING_API_KEY"],
+        "embedding.cache_size": ["EMBEDDING_CACHE_SIZE"],
+        "embedding.batch_size": ["EMBEDDING_BATCH_SIZE"],
+        
+        # ストレージ設定
+        "storage.data_dir": ["DATA_DIR"],
+        "storage.export_dir": ["EXPORT_DIR"],
+        "storage.import_dir": ["IMPORT_DIR"],
+        "storage.allow_absolute_paths": ["ALLOW_ABSOLUTE_PATHS"],
+        "storage.max_export_size_mb": ["MAX_EXPORT_SIZE_MB"],
+        "storage.max_import_size_mb": ["MAX_IMPORT_SIZE_MB"],
+        
+        # セキュリティ設定
+        "security.auth_enabled": ["AUTH_ENABLED"],
+        "security.api_key_required": ["API_KEY_REQUIRED"],
+        "security.jwt_secret": ["JWT_SECRET"],
+        
+        # トランスポート設定
+        "transport.http_host": ["HTTP_HOST"],
+        "transport.http_port": ["HTTP_PORT"],
+        "transport.sse_host": ["SSE_HOST"],
+        "transport.sse_port": ["SSE_PORT"],
+        "transport.stdio_enabled": ["STDIO_ENABLED"],
+        "transport.http_enabled": ["HTTP_ENABLED"],
+        "transport.sse_enabled": ["SSE_ENABLED"],
+    }
+    
+    @classmethod
+    def get_env_value(cls, config_key: str) -> Optional[str]:
+        """環境変数から値を取得（優先順位考慮）"""
+        env_keys = cls.ENV_MAPPINGS.get(config_key, [])
+        for env_key in env_keys:
+            value = os.getenv(env_key)
+            if value is not None:
+                return value
+        return None
+    
+    @classmethod
+    def set_env_value(cls, config_key: str, value: str) -> None:
+        """設定値を対応する環境変数に設定"""
+        env_keys = cls.ENV_MAPPINGS.get(config_key, [])
+        for env_key in env_keys:
+            os.environ[env_key] = value
+
+
+class ConfigurationManager:
+    """一元化された設定管理クラス"""
+    
+    def __init__(self):
+        self.env_mapping = EnvironmentMapping()
+    
+    def load_configuration(self, config_path: Optional[str] = None, cli_args: Optional[dict] = None) -> "Config":
+        """
+        設定を一元的に読み込み・マージ
+        
+        優先順位: CLI引数 > 環境変数 > 設定ファイル > デフォルト値
+        """
+        # 1. デフォルト設定を作成
+        config = Config()
+        
+        # 2. 設定ファイルから読み込み
+        if config_path or self._find_config_file():
+            file_path = config_path or self._find_config_file()
+            if file_path:
+                self._load_from_file(config, file_path)
+        
+        # 3. 環境変数で上書き
+        self._apply_environment_overrides(config)
+        
+        # 4. CLI引数で最終上書き
+        if cli_args:
+            self._apply_cli_overrides(config, cli_args)
+        
+        # 5. 環境変数を設定に合わせて統一
+        self._sync_environment_variables(config)
+        
+        # 6. バリデーション実行
+        config._validate()
+        
+        return config
+    
+    def _find_config_file(self) -> Optional[str]:
+        """設定ファイルを自動発見"""
+        # 環境変数でのファイル指定
+        env_config = os.getenv("MCP_CONFIG_FILE")
+        if env_config and Path(env_config).exists():
+            return env_config
+        
+        # 標準的な場所を検索
+        candidates = [
+            Path.cwd() / "config.json",
+            Path.cwd().parent / "config.json",
+            Path.cwd() / "config.yaml",
+            Path.cwd() / "config.yml"
+        ]
+        
+        for candidate in candidates:
+            if candidate.exists():
+                return str(candidate)
+        
+        return None
+    
+    def _load_from_file(self, config: "Config", file_path: str) -> None:
+        """設定ファイルから読み込み"""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                if file_path.endswith(('.yaml', '.yml')):
+                    import yaml
+                    config_data = yaml.safe_load(f)
+                else:
+                    config_data = json.load(f)
+            
+            # 環境変数展開
+            config_data = expand_dict_env_vars(config_data)
+            logger.info(f"Configuration loaded from {file_path}")
+            
+            # 設定をマージ
+            self._merge_config_data(config, config_data)
+            
+        except Exception as e:
+            logger.warning(f"Failed to load configuration file {file_path}: {e}")
+    
+    def _apply_environment_overrides(self, config: "Config") -> None:
+        """環境変数による上書きを適用"""
+        for config_key in EnvironmentMapping.ENV_MAPPINGS:
+            env_value = EnvironmentMapping.get_env_value(config_key)
+            if env_value is not None:
+                self._set_config_value(config, config_key, env_value)
+    
+    def _apply_cli_overrides(self, config: "Config", cli_args: dict) -> None:
+        """CLI引数による上書きを適用"""
+        cli_mappings = {
+            "log_level": "log_level",
+            "debug": "debug_mode",
+            "host": "transport.http_host", 
+            "port": "transport.http_port",
+            "transport": None  # 特別処理
+        }
+        
+        for cli_key, config_key in cli_mappings.items():
+            if cli_key in cli_args and cli_args[cli_key] is not None:
+                if cli_key == "transport":
+                    # トランスポートタイプの特別処理
+                    self._set_transport_from_cli(config, cli_args[cli_key])
+                elif config_key:
+                    self._set_config_value(config, config_key, cli_args[cli_key])
+    
+    def _sync_environment_variables(self, config: "Config") -> None:
+        """設定値を対応する環境変数に同期"""
+        # 重要な設定を環境変数に反映
+        EnvironmentMapping.set_env_value("log_level", config.log_level)
+        
+        if hasattr(config, 'embedding') and hasattr(config.embedding, 'api_key'):
+            if config.embedding.api_key:
+                EnvironmentMapping.set_env_value("embedding.api_key", config.embedding.api_key)
+    
+    def _set_config_value(self, config: "Config", key_path: str, value: str) -> None:
+        """ドット記法で設定値をセット"""
+        parts = key_path.split('.')
+        obj = config
+        
+        # 最後の要素以外をたどる
+        for part in parts[:-1]:
+            if hasattr(obj, part):
+                obj = getattr(obj, part)
+            else:
+                return
+        
+        # 最終的な属性に値を設定
+        final_key = parts[-1]
+        if hasattr(obj, final_key):
+            # 型変換を実行
+            converted_value = self._convert_value(getattr(obj, final_key), value)
+            setattr(obj, final_key, converted_value)
+    
+    def _convert_value(self, current_value: Any, new_value: str) -> Any:
+        """現在の値の型に基づいて新しい値を変換"""
+        if isinstance(current_value, bool):
+            return new_value.lower() in ("true", "1", "yes", "on")
+        elif isinstance(current_value, int):
+            return int(new_value)
+        elif isinstance(current_value, float):
+            return float(new_value)
+        elif isinstance(current_value, list):
+            return new_value.split(",") if new_value else []
+        else:
+            return new_value
+    
+    def _set_transport_from_cli(self, config: "Config", transport_type: str) -> None:
+        """CLI引数のトランスポートタイプを設定"""
+        config.transport.stdio_enabled = transport_type == "stdio"
+        config.transport.http_enabled = transport_type == "http"
+        config.transport.sse_enabled = transport_type == "sse"
+    
+    def _merge_config_data(self, config: "Config", config_data: Dict[str, Any]) -> None:
+        """設定データをConfigオブジェクトにマージ"""
+        for section, values in config_data.items():
+            if section == "transport" and isinstance(values, dict):
+                # TransportConfigの特別処理
+                from .config import TransportConfig
+                config.transport = TransportConfig(**values)
+            elif hasattr(config, section) and isinstance(values, dict):
+                section_obj = getattr(config, section)
+                for key, value in values.items():
+                    if hasattr(section_obj, key):
+                        setattr(section_obj, key, value)
+            elif hasattr(config, section):
+                setattr(config, section, values)
 
 
 # Global configuration instance - Singleton pattern

@@ -164,7 +164,9 @@ try:
     # Initialize configuration singleton with explicit config file path
     config_path = "config.json"  # Explicitly specify the config file
     config = initialize_config(config_path)
+    
     logger.info(f"Server initialized with config from: {config_path}")
+    logger.info(f"Log level set to: {config.log_level}")
     logger.info(f"API configuration loaded: {hasattr(config.api, 'default_response_level')}")
     if hasattr(config.api, "default_response_level"):
         logger.info(f"Default response level: {config.api.default_response_level}")

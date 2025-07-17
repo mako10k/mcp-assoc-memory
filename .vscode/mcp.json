@@ -8,7 +8,9 @@
             "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json"],
             "cwd": "${workspaceFolder}",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "LOG_LEVEL": "INFO",
+                "MCP_LOG_LEVEL": "INFO"
             }
         },
         "ShellServer": {

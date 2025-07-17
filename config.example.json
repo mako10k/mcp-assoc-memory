@@ -1,0 +1,58 @@
+{
+  "log_level": "INFO",
+  "debug_mode": false,
+  "database": {
+    "type": "sqlite",
+    "path": "data/memory.db",
+    "host": "localhost",
+    "port": 5432,
+    "database": "mcp_memory",
+    "username": "",
+    "password": ""
+  },
+  "embedding": {
+    "provider": "local",
+    "api_key": "",
+    "model": "all-MiniLM-L6-v2",
+    "cache_size": 1000,
+    "batch_size": 100
+  },
+  "storage": {
+    "data_dir": "data",
+    "vector_store_type": "chromadb",
+    "graph_store_type": "networkx",
+    "backup_enabled": true,
+    "backup_interval_hours": 24,
+    "export_dir": "data/exports",
+    "import_dir": "data/imports",
+    "allow_absolute_paths": false,
+    "max_export_size_mb": 100,
+    "max_import_size_mb": 100
+  },
+  "security": {
+    "auth_enabled": false,
+    "api_key_required": false,
+    "jwt_secret": "",
+    "session_timeout_minutes": 60,
+    "rate_limit_requests_per_minute": 100
+  },
+  "transport": {
+    "stdio_enabled": true,
+    "http_enabled": false,
+    "sse_enabled": false,
+    "http_host": "localhost",
+    "http_port": 3006,
+    "sse_host": "localhost",
+    "sse_port": 8001,
+    "cors_origins": ["*"]
+  },
+  "api": {
+    "enable_response_metadata": false,
+    "enable_audit_trail": false,
+    "force_minimal_metadata": false,
+    "minimal_response_max_size": 1024,
+    "remove_null_values": true,
+    "enable_response_caching": false,
+    "cache_ttl_seconds": 300
+  }
+}
