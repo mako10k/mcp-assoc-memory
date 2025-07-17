@@ -5,6 +5,37 @@ All notable changes to the MCP Associative Memory Server will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2025-07-17
+
+### Added
+- **Centralized Configuration Management**: New `ConfigurationManager` class for unified config handling
+- **Comprehensive Environment Variable Support**: 30+ environment variables for complete deployment flexibility
+- **Environment Variable Expansion**: Support for `${VAR}` and `${VAR:-default}` syntax in config files
+- **Configuration Documentation**: Complete setup guide in `docs/CONFIGURATION.md`
+- **Enhanced VS Code Integration**: Improved `.vscode/mcp.json` with required environment variables
+
+### Fixed
+- **Pydantic Validation Errors**: Resolved `log_level` case sensitivity issues
+- **Scattered Configuration Logic**: Consolidated from multiple files into centralized system
+- **Missing Environment Variables**: Added comprehensive mapping for all configuration options
+- **Configuration Precedence**: Clear priority order (CLI > Env > File > Defaults)
+
+### Enhanced
+- **Troubleshooting Documentation**: Extended configuration troubleshooting in docs
+- **Error Messages**: Improved validation error reporting with actionable guidance
+- **Development Experience**: Simplified configuration for local development
+- **Deployment Support**: Production-ready configuration examples
+
+### Technical
+- Environment variable auto-synchronization (LOG_LEVEL ↔ MCP_LOG_LEVEL)
+- Type-safe configuration processing with validation
+- Removed duplicate environment variable handling
+- Configuration validation with detailed error reporting
+
+### Breaking Changes
+- Configuration file precedence may change behavior if relying on previous implicit defaults
+- Some environment variable names standardized (see migration guide in docs)
+
 ## [0.1.4] - 2025-07-16
 
 ### Added

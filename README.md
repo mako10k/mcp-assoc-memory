@@ -164,14 +164,58 @@ The server operates in **STDIO mode** for direct MCP client integration. This is
 
 ### Configuration
 
-- Copy `config.json.template` to `config.json`
-- Set your OpenAI API key for embeddings
-- Configure transport options (STDIO enabled by default)
+The server uses a centralized configuration management system that supports multiple configuration sources with clear precedence:
 
-### Environment Variables
+**Priority Order**: CLI arguments > Environment variables > Configuration file > Defaults
 
-- `OPENAI_API_KEY`: Required for OpenAI embeddings
-- `MCP_LOG_LEVEL`: Set logging level (DEBUG, INFO, WARNING, ERROR)
+#### Quick Setup
+1. Copy `config.example.json` to `config.json`
+2. Set your OpenAI API key: `export OPENAI_API_KEY="sk-your-key"`
+3. Start the server: `python -m mcp_assoc_memory.server --config config.json`
+
+#### Configuration Sources
+
+**Configuration File** (`config.json`):
+```json
+{
+  "log_level": "INFO",
+  "embedding": {
+    "provider": "openai",
+    "api_key": "${OPENAI_API_KEY}",
+    "model": "text-embedding-3-small"
+  },
+  "transport": {
+    "stdio_enabled": true,
+    "http_enabled": false
+  }
+}
+```
+
+**Environment Variables**:
+- `OPENAI_API_KEY`: OpenAI API key for embeddings
+- `LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `MCP_LOG_LEVEL`: MCP-specific logging (auto-synced with LOG_LEVEL)
+- `EMBEDDING_PROVIDER`: Override embedding provider (openai, local, sentence_transformer)
+- `DATA_DIR`: Override data directory location
+
+**VS Code Integration** (`.vscode/mcp.json`):
+```json
+{
+  "servers": {
+    "AssocMemory": {
+      "command": "python3",
+      "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "LOG_LEVEL": "INFO",
+        "MCP_LOG_LEVEL": "INFO"
+      },
+      "type": "stdio"
+    }
+  }
+}
+```
 
 ## 🛠️ Installation (PyPI, pipx, GitHub)
 

@@ -1,31 +1,51 @@
 {
-    "servers": {
-        "Google": {
-            "url": "http://localhost:3000/mcp"
-        },
-        "AssocMemory": {
-            "command": "python3",
-            "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json"],
-            "cwd": "${workspaceFolder}",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src",
-                "LOG_LEVEL": "INFO",
-                "MCP_LOG_LEVEL": "INFO"
-            }
-        },
-        "ShellServer": {
-            "command": "npm",
-            "args": ["start"],
-            "cwd": "${workspaceFolder}/../mcp-shell-server",
-            "env": {
-                "MCP_SHELL_DEFAULT_WORKDIR": "${workspaceFolder}",
-                "MCP_SHELL_ALLOWED_WORKDIRS": "${workspaceFolder},${userHome},/tmp",
-                "PATH": "${workspaceFolder}/venv/bin:${userHome}/.nvm/versions/node/v22.16.0/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-                "VIRTUAL_ENV": "${workspaceFolder}/venv",
-                "PYTHONPATH": "${workspaceFolder}/src",
-                "NODE_ENV": "development"
-            }
-        }
-
-    }
+	"servers": {
+		"AssocMemory": {
+			"command": "python3",
+			"args": [
+				"-m",
+				"mcp_assoc_memory.server",
+				"--config",
+				"config.json"
+			],
+			"cwd": "${workspaceFolder}",
+			"env": {
+				"PYTHONPATH": "${workspaceFolder}/src",
+				"LOG_LEVEL": "INFO",
+				"MCP_LOG_LEVEL": "INFO",
+                "PATH": "${workspaceFolder}/venv/bin:/usr/local/bin:/usr/bin:/bin"
+			},
+			"type": "stdio"
+		},
+		"mcp-search": {
+			"command": "npx",
+			"args": [
+				"@mako10k/mcp-search"
+			],
+			"env": {
+				"GOOGLE_API_KEY": "${input:google_api_key}",
+				"GOOGLE_CX": "${input:google_cx}"
+			},
+			"type": "stdio"
+		},
+		"mcp-shell-server": {
+			"command": "npx",
+			"args": [
+				"@mako10k/mcp-shell-server@2.1.4"
+			],
+			"type": "stdio"
+		}
+	},
+	"inputs": [
+		{
+			"id": "google_api_key",
+			"type": "promptString",
+			"description": "API key for Google Search API. Obtain from Google Cloud Console."
+		},
+		{
+			"id": "google_cx",
+			"type": "promptString",
+			"description": "Custom Search Engine ID for Google Search API."
+		}
+	]
 }

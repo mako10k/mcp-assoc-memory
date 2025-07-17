@@ -60,6 +60,20 @@ Practical usage patterns across different roles and workflows.
 
 ---
 
+### ⚙️ [Configuration Guide](CONFIGURATION.md)
+Complete setup and configuration documentation for deployment and development.
+
+**What you'll learn:**
+- Centralized configuration management system
+- Environment variables and precedence rules
+- VS Code integration setup
+- Production deployment examples
+- Configuration troubleshooting
+
+**Perfect for:** DevOps, system administrators, production deployments
+
+---
+
 ### 🆘 [Troubleshooting Guide](troubleshooting/README.md)
 Solutions for common issues and system maintenance procedures.
 

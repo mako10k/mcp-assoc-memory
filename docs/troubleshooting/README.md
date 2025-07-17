@@ -629,3 +629,184 @@ Import from emergency backup with skip_duplicates strategy
 ---
 
 **For issues not covered here, check the [API Reference](../api-reference/README.md) for detailed parameter options, or create an issue in the project repository with relevant log excerpts and system information.**
+
+---
+
+### Configuration Issues
+
+#### Problem: Pydantic Validation Errors
+```bash
+CRITICAL: 1 validation error for Settings
+log_level
+  Input should be 'DEBUG', 'INFO', 'WARNING', 'ERROR' or 'CRITICAL' [type=literal_error, input_value='info', input_type=str]
+```
+
+**Root Cause:** Log level values must be uppercase.
+
+**Solutions:**
+1. **Check environment variables:**
+   ```bash
+   echo $LOG_LEVEL
+   echo $MCP_LOG_LEVEL
+   # Should be uppercase: INFO, DEBUG, etc.
+   ```
+
+2. **Update VS Code MCP configuration:**
+   ```json
+   // .vscode/mcp.json
+   {
+     "servers": {
+       "AssocMemory": {
+         "env": {
+           "LOG_LEVEL": "INFO",        // ✅ Correct: uppercase
+           "MCP_LOG_LEVEL": "INFO"     // ✅ Correct: uppercase
+         }
+       }
+     }
+   }
+   ```
+
+3. **Check configuration file:**
+   ```json
+   // config.json
+   {
+     "log_level": "INFO"  // ✅ Correct: uppercase
+   }
+   ```
+
+#### Problem: OpenAI API Key Format Errors
+```bash
+CRITICAL: Invalid OpenAI API key format: Your API K... (must start with 'sk-' or 'sk-proj-')
+```
+
+**Solutions:**
+1. **Verify API key format:**
+   ```bash
+   # Correct formats
+   export OPENAI_API_KEY="sk-proj-..."  # New format
+   export OPENAI_API_KEY="sk-..."       # Legacy format
+   
+   # Check current value (masked)
+   echo $OPENAI_API_KEY | cut -c1-10
+   ```
+
+2. **Check configuration file expansion:**
+   ```json
+   // config.json
+   {
+     "embedding": {
+       "api_key": "${OPENAI_API_KEY}"  // Environment variable expansion
+     }
+   }
+   ```
+
+3. **Test environment variable:**
+   ```bash
+   python3 -c "import os; print('Key set:', bool(os.getenv('OPENAI_API_KEY')))"
+   ```
+
+#### Problem: Configuration File Not Found
+```bash
+WARNING: Failed to load configuration file: [Errno 2] No such file or directory: 'config.json'
+```
+
+**Solutions:**
+1. **Create configuration file:**
+   ```bash
+   cp config.example.json config.json
+   # Edit config.json with your settings
+   ```
+
+2. **Check file location:**
+   ```bash
+   ls -la config.json
+   # Must be in server working directory
+   ```
+
+3. **Use absolute path:**
+   ```bash
+   python -m mcp_assoc_memory.server --config /absolute/path/to/config.json
+   ```
+
+#### Problem: Environment Variables Not Applied
+```bash
+# Set LOG_LEVEL=DEBUG but server still uses INFO
+```
+
+**Diagnosis:**
+1. **Check variable precedence:**
+   ```bash
+   # Priority: CLI > Environment > File > Defaults
+   echo "ENV LOG_LEVEL: $LOG_LEVEL"
+   grep log_level config.json
+   ```
+
+2. **Test configuration loading:**
+   ```python
+   import os
+   os.environ['LOG_LEVEL'] = 'DEBUG'
+   from mcp_assoc_memory.config import ConfigurationManager
+   manager = ConfigurationManager()
+   config = manager.load_configuration('config.json')
+   print(f"Final log_level: {config.log_level}")
+   ```
+
+**Solutions:**
+1. **Verify environment variable names:**
+   ```bash
+   # Supported variables (see docs/CONFIGURATION.md)
+   export LOG_LEVEL=DEBUG
+   export MCP_LOG_LEVEL=DEBUG
+   export EMBEDDING_PROVIDER=local
+   ```
+
+2. **Check VS Code environment:**
+   ```json
+   // .vscode/mcp.json
+   {
+     "servers": {
+       "AssocMemory": {
+         "env": {
+           "PYTHONPATH": "${workspaceFolder}/src",
+           "LOG_LEVEL": "DEBUG"  // Ensure this is set
+         }
+       }
+     }
+   }
+   ```
+
+#### Problem: Invalid Configuration Values
+```bash
+ValueError: Invalid provider 'invalid_provider'. Must be 'openai', 'local', or 'sentence_transformer'
+```
+
+**Solutions:**
+1. **Check supported values:**
+   ```json
+   // Valid embedding providers
+   "provider": "openai"              // OpenAI embeddings
+   "provider": "local"               // Local SentenceTransformers
+   "provider": "sentence_transformer" // Alias for local
+   ```
+
+2. **Validate transport settings:**
+   ```json
+   // Valid transport configuration
+   "transport": {
+     "stdio_enabled": true,   // For VS Code/MCP clients
+     "http_enabled": false,   // For HTTP API
+     "sse_enabled": false     // For Server-Sent Events
+   }
+   ```
+
+3. **Test configuration:**
+   ```bash
+   python3 -c "
+   from mcp_assoc_memory.config import ConfigurationManager
+   manager = ConfigurationManager()
+   config = manager.load_configuration('config.json')
+   print('✅ Configuration valid')
+   "
+   ```
+
+---
