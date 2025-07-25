@@ -165,9 +165,9 @@ try:
     config_path = "config.json"  # Explicitly specify the config file
     config = initialize_config(config_path)
     logger.info(f"Server initialized with config from: {config_path}")
-    logger.info(f"API configuration loaded: {hasattr(config.api, 'default_response_level')}")
-    if hasattr(config.api, "default_response_level"):
-        logger.info(f"Default response level: {config.api.default_response_level}")
+    logger.info(f"API configuration loaded: {hasattr(config.api, 'enable_response_metadata')}")
+    if hasattr(config.api, "enable_response_metadata"):
+        logger.info(f"Response metadata enabled: {config.api.enable_response_metadata}")
     logger.info("Configuration initialized successfully")
 
     logger.info("Initializing storage components...")
@@ -702,6 +702,143 @@ async def memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[str, Any
     """Unified import/export operations for memory synchronization"""
     # Delegate to handler
     return await handle_memory_sync(request, ctx)
+
+
+# Search and web fetch tools
+@mcp.tool(
+    name="google_search_and_store",
+    description="""🔍 Google Search with Memory Storage: Search and store results in associative memory
+
+When to use:
+→ Research tasks that need to preserve search results
+→ Building knowledge base from web search
+→ Organizing search results in project scopes
+
+How it works:
+Executes Google Custom Search API and automatically stores results in associative memory with session scope by default.
+
+💡 Quick Start:
+- Basic search: query="AI research trends", scope="work/research"
+- Image search: query="architecture diagrams", image_search=True
+- Detailed storage: store_individual_results=True, store_summary=True
+- Language/region: language="ja", region="JP" for localized results
+
+⚠️ Important: Requires GOOGLE_API_KEY and GOOGLE_CX environment variables
+
+➡️ What's next: Use memory_search to find stored results, memory_discover_associations to explore connections""",
+    annotations={
+        "title": "Google Search with Memory Storage",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+    },
+)
+async def google_search_and_store(
+    ctx: Context,
+    query: str,
+    scope: Optional[str] = None,
+    language: Optional[str] = None,
+    region: Optional[str] = None,
+    num_results: Optional[int] = None,
+    start_index: Optional[int] = None,
+    image_search: Optional[bool] = None,
+    image_size: Optional[str] = None,
+    image_type: Optional[str] = None,
+    image_color: Optional[str] = None,
+    store_individual_results: bool = True,
+    store_summary: bool = True
+) -> Dict[str, Any]:
+    """Execute Google search and store results in associative memory"""
+    try:
+        from .tools.search_tools import google_search_and_store
+        
+        result = await google_search_and_store(
+            query=query,
+            scope=scope,
+            language=language,
+            region=region,
+            num_results=num_results,
+            start_index=start_index,
+            image_search=image_search,
+            image_size=image_size,
+            image_type=image_type,
+            image_color=image_color,
+            store_individual_results=store_individual_results,
+            store_summary=store_summary
+        )
+        
+        await ctx.info(f"Google search executed and stored: {result['query']} -> {len(result['stored_memories'])} memories")
+        return result
+        
+    except Exception as e:
+        error_msg = f"Google search and storage failed: {str(e)}"
+        await ctx.error(error_msg)
+        logger.error(error_msg, exc_info=True)
+        return {"error": True, "message": error_msg}
+
+
+@mcp.tool(
+    name="fetch_url_and_store",
+    description="""🌐 Web Fetch with Memory Storage: Fetch web content and store in associative memory
+
+When to use:
+→ Preserving web page content for reference
+→ Building document collections from URLs
+→ Analyzing web content with metadata
+
+How it works:
+Fetches web content via HTTP and stores both content and metadata in associative memory with session scope by default.
+
+💡 Quick Start:
+- Basic fetch: url="https://example.com", scope="work/research"
+- With headers: headers={"User-Agent": "MyBot"}, method="GET"
+- Large content: max_content_size=5242880 (5MB), store_metadata_separately=True
+- Custom timeout: timeout=60 for slow sites
+
+⚠️ Important: Content larger than max_content_size will be truncated
+
+➡️ What's next: Use memory_search to find stored content, analyze with other tools""",
+    annotations={
+        "title": "Web Fetch with Memory Storage",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+    },
+)
+async def fetch_url_and_store(
+    ctx: Context,
+    url: str,
+    scope: Optional[str] = None,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    timeout: int = 30,
+    include_response_headers: bool = True,
+    max_content_size: int = 1048576,  # 1MB default
+    store_metadata_separately: bool = True
+) -> Dict[str, Any]:
+    """Fetch URL content and store in associative memory"""
+    try:
+        from .tools.search_tools import fetch_url_and_store
+        
+        result = await fetch_url_and_store(
+            url=url,
+            scope=scope,
+            method=method,
+            headers=headers,
+            timeout=timeout,
+            include_response_headers=include_response_headers,
+            max_content_size=max_content_size,
+            store_metadata_separately=store_metadata_separately
+        )
+        
+        await ctx.info(f"URL fetched and stored: {result['url']} -> {len(result['stored_memories'])} memories")
+        return result
+        
+    except Exception as e:
+        error_msg = f"URL fetch and storage failed: {str(e)}"
+        await ctx.error(error_msg)
+        logger.error(error_msg, exc_info=True)
+        return {"error": True, "message": error_msg}
 
 
 def main() -> None:

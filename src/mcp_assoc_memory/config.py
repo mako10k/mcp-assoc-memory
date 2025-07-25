@@ -103,6 +103,17 @@ class StorageConfig:
 
 
 @dataclass
+class SearchConfig:
+    """Search and web fetch configuration"""
+    
+    google_api_key: str = ""
+    google_cx: str = ""
+    default_session_prefix: str = "search"
+    request_timeout_seconds: int = 30
+    max_content_size_mb: int = 10
+
+
+@dataclass
 class SecurityConfig:
     """Security configuration"""
 
@@ -152,6 +163,7 @@ class Config:
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
+    search: SearchConfig = field(default_factory=SearchConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     transport: TransportConfig = field(default_factory=TransportConfig)
     api: APIConfig = field(default_factory=APIConfig)
@@ -247,6 +259,11 @@ class Config:
         self.storage.max_export_size_mb = int(os.getenv("MAX_EXPORT_SIZE_MB", str(self.storage.max_export_size_mb)))
         self.storage.max_import_size_mb = int(os.getenv("MAX_IMPORT_SIZE_MB", str(self.storage.max_import_size_mb)))
 
+        # Search configuration
+        self.search.google_api_key = os.getenv("GOOGLE_API_KEY", self.search.google_api_key)
+        self.search.google_cx = os.getenv("GOOGLE_CX", self.search.google_cx)
+        self.search.default_session_prefix = os.getenv("SEARCH_SESSION_PREFIX", self.search.default_session_prefix)
+
         # Security configuration
         self.security.auth_enabled = os.getenv("AUTH_ENABLED", "false").lower() == "true"
         self.security.api_key_required = os.getenv("API_KEY_REQUIRED", "false").lower() == "true"
@@ -266,6 +283,7 @@ class Config:
         self.database = expand_dict_env_vars(self.database)
         self.embedding = expand_dict_env_vars(self.embedding)
         self.storage = expand_dict_env_vars(self.storage)
+        self.search = expand_dict_env_vars(self.search)
         self.security = expand_dict_env_vars(self.security)
         self.transport = expand_dict_env_vars(self.transport)
         self.api = expand_dict_env_vars(self.api)
@@ -381,7 +399,7 @@ def get_config() -> Config:
             if _global_config is None:
                 _global_config = Config.load()
                 logger.info(
-                    f"Initialized global Config singleton with api config: {hasattr(_global_config.api, 'default_response_level')}"
+                    f"Initialized global Config singleton with api config: {hasattr(_global_config.api, 'enable_response_metadata')}"
                 )
 
     return _global_config
@@ -401,7 +419,7 @@ def set_config(config: Config) -> None:
     global _global_config
     with _config_lock:
         _global_config = config
-        logger.info(f"Set global Config singleton with api config: {hasattr(config.api, 'default_response_level')}")
+        logger.info(f"Set global Config singleton with api config: {hasattr(config.api, 'enable_response_metadata')}")
 
 
 def initialize_config(config_path: Optional[str] = None) -> Config:
@@ -422,8 +440,8 @@ def initialize_config(config_path: Optional[str] = None) -> Config:
     with _config_lock:
         _global_config = Config.load(config_path)
         logger.info(f"Initialized global Config from {config_path or 'default locations'}")
-        logger.info(f"API config loaded: {hasattr(_global_config.api, 'default_response_level')}")
-        if hasattr(_global_config.api, "default_response_level"):
-            logger.info(f"Default response level: {_global_config.api.default_response_level}")
+        logger.info(f"API config loaded: {hasattr(_global_config.api, 'enable_response_metadata')}")
+        if hasattr(_global_config.api, "enable_response_metadata"):
+            logger.info(f"Response metadata enabled: {_global_config.api.enable_response_metadata}")
 
     return _global_config
