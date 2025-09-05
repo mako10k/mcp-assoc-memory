@@ -14,6 +14,7 @@ import networkx as nx
 from ..models.association import Association
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
+from ..utils.paths import get_default_graph_path
 from .base import BaseGraphStore
 
 logger = get_memory_logger(__name__)
@@ -135,8 +136,8 @@ class NetworkXGraphStore(BaseGraphStore):
 
     """NetworkX実装のグラフストア"""
 
-    def __init__(self, graph_path: str = "./data/memory_graph.pkl"):
-        self.graph_path = graph_path
+    def __init__(self, graph_path: Optional[str] = None):
+        self.graph_path = graph_path or get_default_graph_path()
         self.graph = nx.MultiDiGraph()
         self.graph_lock = asyncio.Lock()
 

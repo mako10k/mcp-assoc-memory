@@ -13,6 +13,7 @@ except ImportError:
     CHROMADB_AVAILABLE = False
 
 from ..utils.logging import get_memory_logger
+from ..utils.paths import get_default_chroma_path
 from .base import BaseVectorStore
 
 logger = get_memory_logger(__name__)
@@ -22,12 +23,12 @@ class ChromaVectorStore(BaseVectorStore):
     """ChromaDB implementation with single collection and scope-based organization"""
 
     def __init__(
-        self, persist_directory: str = "./data/chroma_db", host: Optional[str] = None, port: Optional[int] = None
+        self, persist_directory: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None
     ):
         if not CHROMADB_AVAILABLE:
             raise ImportError("ChromaDB is not installed. " "Install it with: pip install chromadb")
 
-        self.persist_directory = persist_directory
+        self.persist_directory = persist_directory or get_default_chroma_path()
         self.host = host
         self.port = port
         self.client: Optional[Any] = None

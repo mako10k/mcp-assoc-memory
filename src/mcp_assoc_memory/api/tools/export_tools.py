@@ -7,7 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
+from ...config import get_config
 from ...core.singleton_memory_manager import get_or_create_memory_manager
+from ...utils.paths import resolve_data_path
 from ..models.requests import MemoryExportRequest, MemoryImportRequest
 from ..models.responses import MemoryExportResponse, MemoryImportResponse
 
@@ -16,11 +18,12 @@ async def _resolve_export_path(file_path: str) -> Path:
     """Resolve export file path with proper validation."""
     path = Path(file_path)
 
-    # If it's a relative path, make it relative to the data directory
+    # If it's a relative path, make it relative to the configured exports directory
     if not path.is_absolute():
-        data_dir = Path("data/exports")
-        data_dir.mkdir(parents=True, exist_ok=True)
-        path = data_dir / path
+        config = get_config()
+        exports_dir = resolve_data_path(f"{config.storage.data_dir}/{config.storage.export_dir}", "exports")
+        exports_dir.mkdir(parents=True, exist_ok=True)
+        path = exports_dir / path
 
     return path
 

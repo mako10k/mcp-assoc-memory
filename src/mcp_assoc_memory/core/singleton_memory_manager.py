@@ -11,6 +11,7 @@ from ..core.embedding_service import EmbeddingService
 from ..core.memory_manager import MemoryManager
 from ..core.similarity import SimilarityCalculator
 from ..storage.base import BaseGraphStore, BaseMetadataStore, BaseVectorStore
+from ..utils.paths import resolve_data_path
 
 
 class SingletonMemoryManager:
@@ -243,10 +244,14 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
         from ..storage.metadata_store import SQLiteMetadataStore
         from ..storage.vector_store import ChromaVectorStore
 
-        # Create dependencies
-        vector_store = ChromaVectorStore(persist_directory="data/chroma_db")
-        metadata_store = SQLiteMetadataStore(database_path="data/memory.db")
-        graph_store = NetworkXGraphStore(graph_path="data/memory_graph.pkl")
+        # Create dependencies using configuration
+        from ..config import get_config
+        from ..utils.paths import get_default_chroma_path, get_default_graph_path
+        
+        config = get_config()
+        vector_store = ChromaVectorStore(persist_directory=get_default_chroma_path())
+        metadata_store = SQLiteMetadataStore(database_path=config.database.path)
+        graph_store = NetworkXGraphStore(graph_path=get_default_graph_path())
 
         # Use same embedding service logic as server.py
         embedding_service: EmbeddingService

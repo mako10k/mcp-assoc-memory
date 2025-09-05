@@ -12,6 +12,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .utils.paths import (
+    get_default_database_path,
+    get_default_chroma_path,
+    get_default_data_dir,
+    resolve_data_path,
+    ensure_directory,
+    ENV_DATABASE_PATH,
+    ENV_CHROMA_PATH,
+    ENV_DATA_DIR,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,7 +31,7 @@ class DatabaseConfig:
     """Database configuration"""
 
     type: str = "sqlite"  # sqlite, postgresql
-    path: str = "data/memory.db"  # For SQLite
+    path: str = field(default_factory=get_default_database_path)  # For SQLite
     host: str = "localhost"  # For PostgreSQL
     port: int = 5432
     database: str = "mcp_memory"
@@ -63,7 +74,7 @@ class EmbeddingConfig:
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize provider and model with defaults if not explicitly set"""
         # Determine provider if not set
         if not self.provider:
@@ -88,7 +99,7 @@ class EmbeddingConfig:
 class StorageConfig:
     """Storage configuration"""
 
-    data_dir: str = "data"
+    data_dir: str = field(default_factory=get_default_data_dir)
     vector_store_type: str = "chromadb"  # chromadb, faiss, local
     graph_store_type: str = "networkx"  # networkx, neo4j
     backup_enabled: bool = True
@@ -239,7 +250,10 @@ class Config:
         """Load configuration from environment variables"""
         # Database configuration
         self.database.type = os.getenv("DB_TYPE", self.database.type)
-        self.database.path = os.getenv("DB_PATH", self.database.path)
+        # Use environment variable override or resolve workspace path
+        db_path = os.getenv("DB_PATH") or os.getenv(ENV_DATABASE_PATH)
+        if db_path:
+            self.database.path = str(resolve_data_path(db_path, "memory.db"))
         self.database.host = os.getenv("DB_HOST", self.database.host)
         self.database.port = int(os.getenv("DB_PORT", str(self.database.port)))
         self.database.database = os.getenv("DB_NAME", self.database.database)
@@ -252,7 +266,10 @@ class Config:
         self.embedding.api_key = os.getenv("OPENAI_API_KEY", self.embedding.api_key)
 
         # Storage configuration
-        self.storage.data_dir = os.getenv("DATA_DIR", self.storage.data_dir)
+        # Use environment variable override or resolve workspace path
+        data_dir = os.getenv("DATA_DIR") or os.getenv(ENV_DATA_DIR)
+        if data_dir:
+            self.storage.data_dir = str(resolve_data_path(data_dir, ""))
         self.storage.export_dir = os.getenv("EXPORT_DIR", self.storage.export_dir)
         self.storage.import_dir = os.getenv("IMPORT_DIR", self.storage.import_dir)
         self.storage.allow_absolute_paths = os.getenv("ALLOW_ABSOLUTE_PATHS", "false").lower() == "true"
@@ -319,7 +336,8 @@ class Config:
     def _validate(self) -> None:
         """Validate configuration values"""
         # Create data directory
-        Path(self.storage.data_dir).mkdir(parents=True, exist_ok=True)
+        data_dir_path = Path(self.storage.data_dir)
+        ensure_directory(data_dir_path)
 
         # Check required settings
         if self.embedding.provider == "openai" and not self.embedding.api_key:
@@ -347,16 +365,13 @@ def expand_environment_variables(text: str) -> str:
     環境変数展開機能
     ${VAR_NAME} または $VAR_NAME 形式の環境変数を展開する
     """
-    if not isinstance(text, str):
-        return text
-
     # ${VAR_NAME} 形式の環境変数を展開
-    def replace_env_var(match):
+    def replace_env_var(match: Any) -> str:
         var_name = match.group(1)
         return os.getenv(var_name, match.group(0))  # 見つからない場合は元のまま
 
     # ${VAR_NAME} パターンを置換
-    result = re.sub(r"\$\{([A-Za-z_][A-ZaZ0-9_]*)\}", replace_env_var, text)
+    result = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", replace_env_var, text)
 
     return result
 

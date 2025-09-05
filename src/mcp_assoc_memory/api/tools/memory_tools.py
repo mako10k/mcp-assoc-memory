@@ -18,6 +18,7 @@ from ...core.memory_manager import MemoryManager
 from ...core.singleton_memory_manager import (
     get_or_create_memory_manager,
 )
+from ...utils.paths import resolve_data_path
 from ..processing import process_tool_response
 from ..models import (
     DiversifiedSearchRequest,
@@ -1388,11 +1389,12 @@ async def _resolve_import_path(file_path: str) -> Path:
     """Resolve import file path with proper validation."""
     path = Path(file_path)
 
-    # If it's a relative path, make it relative to the data directory
+    # If it's a relative path, make it relative to the configured imports directory
     if not path.is_absolute():
-        data_dir = Path("data/imports")
-        data_dir.mkdir(parents=True, exist_ok=True)
-        path = data_dir / path
+        config = get_config()
+        imports_dir = resolve_data_path(f"{config.storage.data_dir}/{config.storage.import_dir}", "imports")
+        imports_dir.mkdir(parents=True, exist_ok=True)
+        path = imports_dir / path
 
     return path
 
