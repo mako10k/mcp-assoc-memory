@@ -15,9 +15,7 @@ from typing import Optional, Tuple
 try:
     from platformdirs import PlatformDirs
 except Exception as e:  # pragma: no cover
-    raise RuntimeError(
-        "Missing dependency 'platformdirs'. Please add it to requirements and install."
-    ) from e
+    raise RuntimeError("Missing dependency 'platformdirs'. Please add it to requirements and install.") from e
 
 
 APP_NAME = "mcp-assoc-memory"

@@ -300,8 +300,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         else:
             db_path = Path(database_path).expanduser().resolve()
         assert db_path.suffix == ".db", f"Invalid database file: {db_path}"
-        database_path = str(db_path)
-        self.database_path = database_path
+        self.database_path = str(db_path)
         self.db_lock = asyncio.Lock()
         self._pool: Optional[DatabasePool] = None
 

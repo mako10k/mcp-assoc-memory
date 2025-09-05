@@ -3,6 +3,7 @@ ChromaDB Vector Store Implementation - Scope-based single collection
 """
 
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
@@ -22,18 +23,17 @@ logger = get_memory_logger(__name__)
 class ChromaVectorStore(BaseVectorStore):
     """ChromaDB implementation with single collection and scope-based organization"""
 
-    def __init__(
-        self, persist_directory: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None
-    ):
+    def __init__(self, persist_directory: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
         if not CHROMADB_AVAILABLE:
-            raise ImportError("ChromaDB is not installed. " "Install it with: pip install chromadb")
+            raise ImportError("ChromaDB is not installed. Install it with: pip install chromadb")
+
         if persist_directory is None:
             self.persist_directory = str(get_chroma_dir())
         else:
-            from pathlib import Path
             p = Path(persist_directory).expanduser().resolve()
             assert p.is_absolute(), f"persist_directory must be absolute: {p}"
             self.persist_directory = str(p)
+
         self.host = host
         self.port = port
         self.client: Optional[Any] = None

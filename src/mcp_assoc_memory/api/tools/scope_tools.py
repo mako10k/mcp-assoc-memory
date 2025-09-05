@@ -16,7 +16,7 @@ from ..models import (
     ScopeSuggestRequest,
     ScopeSuggestResponse,
 )
-from ..models.common import ResponseLevel, ResponseBuilder
+from ..models.common import ResponseBuilder, ResponseLevel
 from ..utils import get_child_scopes, validate_scope_path
 
 logger = logging.getLogger(__name__)

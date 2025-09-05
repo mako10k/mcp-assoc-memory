@@ -12,16 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .utils.paths import (
-    get_default_database_path,
-    get_default_chroma_path,
-    get_default_data_dir,
-    resolve_data_path,
-    ensure_directory,
-    ENV_DATABASE_PATH,
-    ENV_CHROMA_PATH,
-    ENV_DATA_DIR,
-)
+from .utils.paths import get_data_dir, get_database_path, _ensure_dir
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +22,7 @@ class DatabaseConfig:
     """Database configuration"""
 
     type: str = "sqlite"  # sqlite, postgresql
-    path: str = field(default_factory=get_default_database_path)  # For SQLite
+    path: str = field(default_factory=lambda: str(get_database_path()))  # For SQLite
     host: str = "localhost"  # For PostgreSQL
     port: int = 5432
     database: str = "mcp_memory"
@@ -49,45 +40,46 @@ class EmbeddingConfig:
     api_key: str = ""
     cache_size: int = 1000
     batch_size: int = 100
-    
+
     def _determine_default_provider(self) -> str:
         """Determine default provider based on API key availability"""
         if self.provider:
             return self.provider  # Explicit provider selection takes precedence
-        
+
         # Auto-determine based on API key availability
         api_key = self.api_key or os.getenv("OPENAI_API_KEY", "")
         if api_key and api_key.strip():
             return "openai"
         else:
             return "local"
-    
+
     def _determine_default_model(self, provider: str) -> str:
         """Determine default model based on provider"""
         if self.model:
             return self.model  # Explicit model selection takes precedence
-            
+
         if provider == "openai":
             return "text-embedding-3-small"
         elif provider in ["local", "sentence_transformer"]:
             return "all-MiniLM-L6-v2"
         else:
             raise ValueError(f"Unsupported provider: {provider}")
-    
     def __post_init__(self) -> None:
         """Initialize provider and model with defaults if not explicitly set"""
         # Determine provider if not set
         if not self.provider:
             self.provider = self._determine_default_provider()
-        
+
         # Validate provider
         if self.provider not in ["openai", "local", "sentence_transformer"]:
-            raise ValueError(f"Invalid provider '{self.provider}'. Must be 'openai', 'local', or 'sentence_transformer'")
-        
+            raise ValueError(
+                f"Invalid provider '{self.provider}'. Must be 'openai', 'local', or 'sentence_transformer'"
+            )
+
         # Determine model if not set
         if not self.model:
             self.model = self._determine_default_model(self.provider)
-        
+
         # Provider-specific validation
         if self.provider == "openai":
             api_key = self.api_key or os.getenv("OPENAI_API_KEY", "")
@@ -99,7 +91,7 @@ class EmbeddingConfig:
 class StorageConfig:
     """Storage configuration"""
 
-    data_dir: str = field(default_factory=get_default_data_dir)
+    data_dir: str = field(default_factory=lambda: str(get_data_dir()))
     vector_store_type: str = "chromadb"  # chromadb, faiss, local
     graph_store_type: str = "networkx"  # networkx, neo4j
     backup_enabled: bool = True
@@ -116,7 +108,7 @@ class StorageConfig:
 @dataclass
 class SearchConfig:
     """Search and web fetch configuration"""
-    
+
     google_api_key: str = ""
     google_cx: str = ""
     default_session_prefix: str = "search"
@@ -251,9 +243,9 @@ class Config:
         # Database configuration
         self.database.type = os.getenv("DB_TYPE", self.database.type)
         # Use environment variable override or resolve workspace path
-        db_path = os.getenv("DB_PATH") or os.getenv(ENV_DATABASE_PATH)
+        db_path = os.getenv("DB_PATH")
         if db_path:
-            self.database.path = str(resolve_data_path(db_path, "memory.db"))
+            self.database.path = str(Path(db_path).expanduser())
         self.database.host = os.getenv("DB_HOST", self.database.host)
         self.database.port = int(os.getenv("DB_PORT", str(self.database.port)))
         self.database.database = os.getenv("DB_NAME", self.database.database)
@@ -267,9 +259,9 @@ class Config:
 
         # Storage configuration
         # Use environment variable override or resolve workspace path
-        data_dir = os.getenv("DATA_DIR") or os.getenv(ENV_DATA_DIR)
+        data_dir = os.getenv("DATA_DIR")
         if data_dir:
-            self.storage.data_dir = str(resolve_data_path(data_dir, ""))
+            self.storage.data_dir = str(Path(data_dir).expanduser())
         self.storage.export_dir = os.getenv("EXPORT_DIR", self.storage.export_dir)
         self.storage.import_dir = os.getenv("IMPORT_DIR", self.storage.import_dir)
         self.storage.allow_absolute_paths = os.getenv("ALLOW_ABSOLUTE_PATHS", "false").lower() == "true"
@@ -336,8 +328,8 @@ class Config:
     def _validate(self) -> None:
         """Validate configuration values"""
         # Create data directory
-        data_dir_path = Path(self.storage.data_dir)
-        ensure_directory(data_dir_path)
+    data_dir_path = Path(self.storage.data_dir)
+    _ensure_dir(data_dir_path)
 
         # Check required settings
         if self.embedding.provider == "openai" and not self.embedding.api_key:

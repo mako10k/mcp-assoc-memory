@@ -76,26 +76,26 @@ try:
     logger.info("Importing API tools...")
     from .api.tools import (
         handle_analyze_memories_prompt,
-        handle_memory_discover_associations,
-        handle_memory_list_all,
-        handle_memory_get,
-        handle_memory_update,
+        handle_diversified_search,
         handle_memory_delete,
-        handle_memory_move,
-        handle_memory_stats,
-        handle_scope_memories,
-        handle_memory_store,
+        handle_memory_discover_associations,
         handle_memory_export,
+        handle_memory_get,
         handle_memory_import,
+        handle_memory_list_all,
+        handle_memory_manage,
+        handle_memory_move,
+        handle_memory_search,
+        handle_memory_stats,
+        handle_memory_store,
+        handle_memory_sync,
+        handle_memory_update,
         handle_scope_list,
+        handle_scope_memories,
         handle_scope_suggest,
         handle_session_manage,
         handle_summarize_memory_prompt,
-        handle_memory_search,
         handle_unified_search,
-        handle_memory_manage,
-        handle_memory_sync,
-        handle_diversified_search,
         set_dependencies,
         set_prompt_dependencies,
         set_resource_dependencies,
@@ -120,16 +120,14 @@ try:
         SentenceTransformerEmbeddingService,
         create_embedding_service,
     )
-    from .core.embedding_validator import EmbeddingValidator, EmbeddingCompatibilityError
+    from .core.embedding_validator import EmbeddingCompatibilityError, EmbeddingValidator
 
     logger.info("Embedding services import successful")
 
     logger.info("Importing core similarity and memory manager...")
     # Import the full associative memory architecture
     from .core.similarity import SimilarityCalculator
-    from .core.singleton_memory_manager import (
-        initialize_memory_manager,
-    )
+    from .core.singleton_memory_manager import initialize_memory_manager
 
     logger.info("Memory manager import successful")
 
@@ -746,12 +744,12 @@ async def google_search_and_store(
     image_type: Optional[str] = None,
     image_color: Optional[str] = None,
     store_individual_results: bool = True,
-    store_summary: bool = True
+    store_summary: bool = True,
 ) -> Dict[str, Any]:
     """Execute Google search and store results in associative memory"""
     try:
         from .tools.search_tools import google_search_and_store
-        
+
         result = await google_search_and_store(
             query=query,
             scope=scope,
@@ -764,12 +762,14 @@ async def google_search_and_store(
             image_type=image_type,
             image_color=image_color,
             store_individual_results=store_individual_results,
-            store_summary=store_summary
+            store_summary=store_summary,
         )
-        
-        await ctx.info(f"Google search executed and stored: {result['query']} -> {len(result['stored_memories'])} memories")
+
+        await ctx.info(
+            f"Google search executed and stored: {result['query']} -> {len(result['stored_memories'])} memories"
+        )
         return result
-        
+
     except Exception as e:
         error_msg = f"Google search and storage failed: {str(e)}"
         await ctx.error(error_msg)
@@ -814,12 +814,12 @@ async def fetch_url_and_store(
     timeout: int = 30,
     include_response_headers: bool = True,
     max_content_size: int = 1048576,  # 1MB default
-    store_metadata_separately: bool = True
+    store_metadata_separately: bool = True,
 ) -> Dict[str, Any]:
     """Fetch URL content and store in associative memory"""
     try:
         from .tools.search_tools import fetch_url_and_store
-        
+
         result = await fetch_url_and_store(
             url=url,
             scope=scope,
@@ -828,12 +828,12 @@ async def fetch_url_and_store(
             timeout=timeout,
             include_response_headers=include_response_headers,
             max_content_size=max_content_size,
-            store_metadata_separately=store_metadata_separately
+            store_metadata_separately=store_metadata_separately,
         )
-        
+
         await ctx.info(f"URL fetched and stored: {result['url']} -> {len(result['stored_memories'])} memories")
         return result
-        
+
     except Exception as e:
         error_msg = f"URL fetch and storage failed: {str(e)}"
         await ctx.error(error_msg)

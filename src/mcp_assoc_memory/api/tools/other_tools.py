@@ -5,15 +5,11 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from ...core.singleton_memory_manager import get_or_create_memory_manager
+from ..models.common import ResponseBuilder, ResponseLevel
 
 # SimplePersistence removed - using SingletonMemoryManager for all storage
 from ..models.requests import MemoryMoveRequest, SessionManageRequest
-from ..models.responses import (
-    MemoryMoveResponse,
-    SessionInfo,
-    SessionManageResponse,
-)
-from ..models.common import ResponseBuilder, ResponseLevel
+from ..models.responses import MemoryMoveResponse, SessionInfo, SessionManageResponse
 
 # Module-level dependencies (for backward compatibility)
 memory_manager = None

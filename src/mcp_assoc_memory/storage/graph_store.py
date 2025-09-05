@@ -138,6 +138,9 @@ class NetworkXGraphStore(BaseGraphStore):
 
     def __init__(self, graph_path: Optional[str] = None):
         from pathlib import Path
+
+        from ..utils.paths import get_graph_path
+
         if graph_path is None:
             p = get_graph_path()
         else:

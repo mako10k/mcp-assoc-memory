@@ -147,7 +147,6 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
 
     # Create default dependencies using platformdirs-based paths
     try:
-        # Storage backends with validated absolute paths
         vector_store = ChromaVectorStore(persist_directory=str(get_chroma_dir()))
         metadata_store = SQLiteMetadataStore(database_path=str(get_database_path()))
         graph_store = NetworkXGraphStore(graph_path=str(get_graph_path()))
