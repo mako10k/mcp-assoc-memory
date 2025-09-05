@@ -43,7 +43,7 @@ def main():
     print(f"   Data outside workspace: {not str(get_default_data_dir()).startswith(str(workspace))}")
     
     print("\n4. Configuration Instance:")
-    config = Config()
+    config = Config.load()  # Use load() to include environment variables
     print(f"   Config database path: {config.database.path}")
     print(f"   Config data directory: {config.storage.data_dir}")
     
