@@ -9,7 +9,7 @@ import aiosqlite
 from ..models.association import Association
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
-from ..utils.paths import get_default_database_path
+from ..utils.paths import get_database_path
 from .base import BaseMetadataStore
 from .database_pool import DatabasePool, get_database_pool
 
@@ -294,7 +294,14 @@ class SQLiteMetadataStore(BaseMetadataStore):
     """SQLite implementation of metadata store"""
 
     def __init__(self, database_path: Optional[str] = None):
-        self.database_path = database_path or get_default_database_path()
+        # Contract: resolve default path via paths util; no ./data fallback
+        if database_path is None:
+            db_path = get_database_path()
+        else:
+            db_path = Path(database_path).expanduser().resolve()
+        assert db_path.suffix == ".db", f"Invalid database file: {db_path}"
+        database_path = str(db_path)
+        self.database_path = database_path
         self.db_lock = asyncio.Lock()
         self._pool: Optional[DatabasePool] = None
 

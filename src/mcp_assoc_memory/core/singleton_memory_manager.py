@@ -1,53 +1,44 @@
-"""
-Singleton Memory Manager - Ensures single instance across the application
-Provides thread-safe, lazy initialization of MemoryManager
+"""Singleton Memory Manager with contract enforcement and async initialization.
+
+This module provides a single global manager to coordinate the unified
+`MemoryManager` instance used across the server and tools. It uses
+platformdirs-based path helpers for default storage locations and follows
+Design by Contract rules (assertions and fail-fast behavior).
 """
 
+from __future__ import annotations
+
 import asyncio
-import threading
+import logging
 from typing import Optional
 
 from ..core.embedding_service import EmbeddingService
 from ..core.memory_manager import MemoryManager
 from ..core.similarity import SimilarityCalculator
 from ..storage.base import BaseGraphStore, BaseMetadataStore, BaseVectorStore
-from ..utils.paths import resolve_data_path
+from ..storage.graph_store import NetworkXGraphStore
+from ..storage.metadata_store import SQLiteMetadataStore
+from ..storage.vector_store import ChromaVectorStore
+from ..utils.paths import get_chroma_dir, get_database_path, get_graph_path
+
+logger = logging.getLogger(__name__)
 
 
 class SingletonMemoryManager:
-    """
-    Singleton wrapper for MemoryManager to ensure single instance across application
-
-    Features:
-    - Thread-safe lazy initialization
-    - Async-safe singleton pattern
-    - Automatic cleanup on shutdown
-    - Dependency injection support
-    """
-
-    _instance: Optional["SingletonMemoryManager"] = None
-    _lock = threading.Lock()
-    _memory_manager: Optional[MemoryManager] = None
-    _initialized = False
-    _initialization_lock = asyncio.Lock()
-
-    def __new__(cls) -> "SingletonMemoryManager":
-        """Ensure only one instance exists"""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-        return cls._instance
+    """Async-safe singleton wrapper for the unified MemoryManager."""
 
     def __init__(self) -> None:
-        """Initialize singleton (called only once)"""
-        # Prevent re-initialization
-        if hasattr(self, "_singleton_initialized"):
-            return
-        self._singleton_initialized = True
+        self._memory_manager: Optional[MemoryManager] = None
+        self._initialized: bool = False
+        self._lock = asyncio.Lock()
+
+    def get_instance(self) -> Optional[MemoryManager]:
+        """Get current MemoryManager instance (may be None)."""
+        return self._memory_manager
 
     async def initialize(
         self,
+        *,
         vector_store: BaseVectorStore,
         metadata_store: BaseMetadataStore,
         graph_store: BaseGraphStore,
@@ -55,123 +46,47 @@ class SingletonMemoryManager:
         similarity_calculator: Optional[SimilarityCalculator] = None,
         force_reinit: bool = False,
     ) -> MemoryManager:
-        """
-        Initialize or get the MemoryManager instance
+        """Initialize the singleton MemoryManager instance.
 
-        Args:
-            vector_store: Vector storage backend
-            metadata_store: Metadata storage backend
-            graph_store: Graph storage backend
-            embedding_service: Embedding generation service
-            similarity_calculator: Similarity calculation service (optional)
-            force_reinit: Force re-initialization even if already initialized
-
-        Returns:
-            MemoryManager: The singleton instance
+        Preconditions are validated with assertions and the function is
+        guarded by an asyncio lock to ensure consistent initialization.
         """
-        async with self._initialization_lock:
-            if self._memory_manager is not None and not force_reinit:
+        # Preconditions
+        assert vector_store is not None, "vector_store is required"
+        assert metadata_store is not None, "metadata_store is required"
+        assert graph_store is not None, "graph_store is required"
+        assert embedding_service is not None, "embedding_service is required"
+
+        async with self._lock:
+            if self._initialized and self._memory_manager and not force_reinit:
                 return self._memory_manager
 
-            # Close existing instance if force reinit
-            if force_reinit and self._memory_manager is not None:
-                await self._memory_manager.close()
-                self._memory_manager = None
-                self._initialized = False
-
-            # Create new instance
-            self._memory_manager = MemoryManager(
+            # Create and initialize unified MemoryManager
+            manager = MemoryManager(
                 vector_store=vector_store,
                 metadata_store=metadata_store,
                 graph_store=graph_store,
                 embedding_service=embedding_service,
                 similarity_calculator=similarity_calculator,
             )
+            await manager.initialize()
 
-            # Initialize the memory manager
-            await self._memory_manager.initialize()
+            self._memory_manager = manager
             self._initialized = True
-
-            return self._memory_manager
-
-    def get_instance(self) -> Optional[MemoryManager]:
-        """
-        Get the MemoryManager instance (non-async)
-
-        Returns:
-            MemoryManager if initialized, None otherwise
-        """
-        return self._memory_manager
-
-    async def get_or_create_instance(
-        self,
-        vector_store: Optional[BaseVectorStore] = None,
-        metadata_store: Optional[BaseMetadataStore] = None,
-        graph_store: Optional[BaseGraphStore] = None,
-        embedding_service: Optional[EmbeddingService] = None,
-        similarity_calculator: Optional[SimilarityCalculator] = None,
-    ) -> Optional[MemoryManager]:
-        """
-        Get existing instance or create new one if dependencies are provided
-
-        Args:
-            vector_store: Vector storage backend (required for creation)
-            metadata_store: Metadata storage backend (required for creation)
-            graph_store: Graph storage backend (required for creation)
-            embedding_service: Embedding generation service (required for creation)
-            similarity_calculator: Similarity calculation service (optional)
-
-        Returns:
-            MemoryManager if available or successfully created, None otherwise
-        """
-        if self._memory_manager is not None:
-            return self._memory_manager
-
-        # Try to create if all required dependencies are provided
-        if all([vector_store, metadata_store, graph_store, embedding_service]):
-            # Type assertions after None check
-            assert vector_store is not None
-            assert metadata_store is not None
-            assert graph_store is not None
-            assert embedding_service is not None
-
-            return await self.initialize(
-                vector_store=vector_store,
-                metadata_store=metadata_store,
-                graph_store=graph_store,
-                embedding_service=embedding_service,
-                similarity_calculator=similarity_calculator,
-            )
-
-        return None
-
-    def is_initialized(self) -> bool:
-        """Check if the MemoryManager is initialized"""
-        return self._initialized and self._memory_manager is not None
+            return manager
 
     async def close(self) -> None:
-        """Close and cleanup the MemoryManager instance"""
-        async with self._initialization_lock:
+        """Close and reset the singleton manager."""
+        async with self._lock:
             if self._memory_manager is not None:
-                await self._memory_manager.close()
-                self._memory_manager = None
-                self._initialized = False
+                try:
+                    await self._memory_manager.close()
+                finally:
+                    self._memory_manager = None
+                    self._initialized = False
 
-    async def reset(self) -> None:
-        """Reset the singleton (for testing purposes)"""
-        await self.close()
-        with self._lock:
-            self.__class__._instance = None
-
-    def get_status(self) -> dict:
-        """Get status information about the singleton"""
-        return {
-            "singleton_initialized": hasattr(self, "_singleton_initialized"),
-            "memory_manager_exists": self._memory_manager is not None,
-            "memory_manager_initialized": self._initialized,
-            "memory_manager_type": str(type(self._memory_manager)) if self._memory_manager else None,
-            "instance_id": id(self),
-        }
+    def is_initialized(self) -> bool:
+        return self._initialized and self._memory_manager is not None
 
 
 # Global singleton instance
@@ -179,16 +94,17 @@ _singleton_manager = SingletonMemoryManager()
 
 
 def get_singleton_manager() -> SingletonMemoryManager:
-    """Get the global singleton manager instance"""
+    """Get the global singleton manager instance."""
     return _singleton_manager
 
 
 async def get_memory_manager() -> Optional[MemoryManager]:
-    """Get the MemoryManager instance from singleton"""
+    """Get the MemoryManager instance from singleton (may be None)."""
     return _singleton_manager.get_instance()
 
 
 async def initialize_memory_manager(
+    *,
     vector_store: BaseVectorStore,
     metadata_store: BaseMetadataStore,
     graph_store: BaseGraphStore,
@@ -196,7 +112,7 @@ async def initialize_memory_manager(
     similarity_calculator: Optional[SimilarityCalculator] = None,
     force_reinit: bool = False,
 ) -> MemoryManager:
-    """Initialize the global MemoryManager singleton"""
+    """Initialize the global MemoryManager singleton."""
     return await _singleton_manager.initialize(
         vector_store=vector_store,
         metadata_store=metadata_store,
@@ -208,72 +124,52 @@ async def initialize_memory_manager(
 
 
 async def close_memory_manager() -> None:
-    """Close the global MemoryManager singleton"""
+    """Close the global MemoryManager singleton."""
     await _singleton_manager.close()
 
 
 def is_memory_manager_initialized() -> bool:
-    """Check if the global MemoryManager is initialized"""
+    """Check if the global MemoryManager is initialized."""
     return _singleton_manager.is_initialized()
 
 
 async def get_or_create_memory_manager() -> Optional[MemoryManager]:
-    """
-    Unified function to get or create memory manager with robust fallback
+    """Get or create the MemoryManager with default dependencies.
 
-    This replaces the duplicated _get_or_create_memory_manager functions
-    in various tool modules to ensure consistent behavior.
-
-    Returns:
-        MemoryManager instance if available, None otherwise
+    Contract Programming:
+    - If manager reports initialized, the instance MUST be retrievable.
+    - Fallbacks are explicit and logged; no silent behavior.
     """
-    # Contract Programming: If manager is initialized, it MUST be retrievable
     if is_memory_manager_initialized():
-        memory_manager = await get_memory_manager()
-        assert memory_manager is not None, "Memory manager initialized but returned None - critical state inconsistency"
-        return memory_manager
+        manager = await get_memory_manager()
+        assert manager is not None, "Initialized but manager is None - critical state inconsistency"
+        return manager
 
-    # Initialize singleton if not already done
+    # Create default dependencies using platformdirs-based paths
     try:
+        # Storage backends with validated absolute paths
+        vector_store = ChromaVectorStore(persist_directory=str(get_chroma_dir()))
+        metadata_store = SQLiteMetadataStore(database_path=str(get_database_path()))
+        graph_store = NetworkXGraphStore(graph_path=str(get_graph_path()))
+
+        # Embedding service with explicit, logged fallback
         from ..core.embedding_service import (
             MockEmbeddingService,
             SentenceTransformerEmbeddingService,
         )
-        from ..core.similarity import SimilarityCalculator
-        from ..storage.graph_store import NetworkXGraphStore
-        from ..storage.metadata_store import SQLiteMetadataStore
-        from ..storage.vector_store import ChromaVectorStore
 
-        # Create dependencies using configuration
-        from ..config import get_config
-        from ..utils.paths import get_default_chroma_path, get_default_graph_path
-        
-        config = get_config()
-        vector_store = ChromaVectorStore(persist_directory=get_default_chroma_path())
-        metadata_store = SQLiteMetadataStore(database_path=config.database.path)
-        graph_store = NetworkXGraphStore(graph_path=get_default_graph_path())
-
-        # Use same embedding service logic as server.py
-        embedding_service: EmbeddingService
         try:
-            embedding_service = SentenceTransformerEmbeddingService()
-        except Exception as e:
-            # Contract Programming: Log embedding service fallback with context
-            try:
-                import logging
-
-                logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"SentenceTransformer embedding service failed, falling back to Mock: {e}",
-                    extra={"fallback_reason": str(e), "service_type": "embedding"},
-                )
-            except ImportError:
-                print(f"Warning: SentenceTransformer failed, using Mock embedding service: {e}")
+            embedding_service: EmbeddingService = SentenceTransformerEmbeddingService()
+        except Exception as e:  # User-approved, transparent fallback
+            logger.warning(
+                "SentenceTransformer initialization failed; falling back to MockEmbeddingService",
+                extra={"exception": str(e)},
+            )
             embedding_service = MockEmbeddingService()
 
         similarity_calculator = SimilarityCalculator()
 
-        # Initialize singleton memory manager
+        # Initialize singleton and return instance
         return await initialize_memory_manager(
             vector_store=vector_store,
             metadata_store=metadata_store,
@@ -281,18 +177,10 @@ async def get_or_create_memory_manager() -> Optional[MemoryManager]:
             embedding_service=embedding_service,
             similarity_calculator=similarity_calculator,
         )
-
     except Exception as e:
-        # Import logging for error reporting
-        try:
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error(
-                "Failed to create memory manager",
-                extra={"error_code": "MEMORY_MANAGER_CREATION_ERROR", "exception": str(e)},
-            )
-        except ImportError:
-            # Fallback if logger not available
-            print(f"Failed to create memory manager: {e}")
+        # Explicit error reporting; no silent fallbacks
+        logger.error(
+            "Failed to create default memory manager dependencies",
+            extra={"error_code": "MEMORY_MANAGER_CREATION_ERROR", "exception": str(e)},
+        )
         return None

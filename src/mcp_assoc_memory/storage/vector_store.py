@@ -13,7 +13,7 @@ except ImportError:
     CHROMADB_AVAILABLE = False
 
 from ..utils.logging import get_memory_logger
-from ..utils.paths import get_default_chroma_path
+from ..utils.paths import get_chroma_dir
 from .base import BaseVectorStore
 
 logger = get_memory_logger(__name__)
@@ -27,8 +27,13 @@ class ChromaVectorStore(BaseVectorStore):
     ):
         if not CHROMADB_AVAILABLE:
             raise ImportError("ChromaDB is not installed. " "Install it with: pip install chromadb")
-
-        self.persist_directory = persist_directory or get_default_chroma_path()
+        if persist_directory is None:
+            self.persist_directory = str(get_chroma_dir())
+        else:
+            from pathlib import Path
+            p = Path(persist_directory).expanduser().resolve()
+            assert p.is_absolute(), f"persist_directory must be absolute: {p}"
+            self.persist_directory = str(p)
         self.host = host
         self.port = port
         self.client: Optional[Any] = None

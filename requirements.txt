@@ -24,6 +24,7 @@ bcrypt>=4.0.0
 
 # Configuration and environment
 python-dotenv>=1.0.0
+platformdirs>=4.1.0
 
 # Visualization
 jinja2>=3.1.0

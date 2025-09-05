@@ -1388,13 +1388,12 @@ async def handle_memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[s
 async def _resolve_import_path(file_path: str) -> Path:
     """Resolve import file path with proper validation."""
     path = Path(file_path)
-
-    # If it's a relative path, make it relative to the configured imports directory
+    from ...utils.paths import get_imports_dir
+    # If it's a relative path, make it relative to the user data imports dir
     if not path.is_absolute():
-        config = get_config()
-        imports_dir = resolve_data_path(f"{config.storage.data_dir}/{config.storage.import_dir}", "imports")
-        imports_dir.mkdir(parents=True, exist_ok=True)
-        path = imports_dir / path
+        data_dir = get_imports_dir()
+        data_dir.mkdir(parents=True, exist_ok=True)
+        path = data_dir / path
 
     return path
 
