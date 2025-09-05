@@ -16,27 +16,14 @@
 			},
 			"type": "stdio"
 		},
-		"mcp-search": {
+		"search": {
 			"type": "stdio",
-			"command": "npx",
+			"command": "mcp-search",
 			"args": [
-				"@mako10k/mcp-search@2.0.0"
 			],
 			"env": {
 				"GOOGLE_API_KEY": "AIzaSyBBvo8t3hn4AOxG4PxiNoc-PlvI0vFNv4g",
 				"GOOGLE_CX": "7313b1ea006ad4112"
-			}
-		},
-		"mcp-shell-server": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"@mako10k/mcp-shell-server@2.2.0"
-			],
-			"env": {
-				"MCP_SHELL_SECURITY_MODE": "${input:security_mode}",
-				"MCP_SHELL_DEFAULT_WORKDIR": "${input:default_workdir}",
-				"MCP_SHELL_ALLOWED_WORKDIRS": "${input:allowed_workdirs}"
 			}
 		},
 		"mcp-llm-generator": {
@@ -49,6 +36,11 @@
 				"LOG_LEVEL": "warn",
 				"NODE_ENV": "production"
 			}
+		},
+		"shell": {
+			"type": "stdio",
+			"command": "mcp-shell-server",
+			"args": []
 		}
 	},
 	"inputs": [
