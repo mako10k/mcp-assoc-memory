@@ -2,6 +2,22 @@
 
 This note describes a simple technique for generating a short text continuation that begins with a fixed prefix and summarizes the content represented by an embedding vector.  It does **not** require any special training – we combine vector search with a language model to guess the next few words.
 
+## Prerequisites
+
+- Python 3.10+
+- Installed packages:
+    - mcp-assoc-memory (this repository)
+    - chromadb
+    - An embedding backend and credentials if needed (e.g., OpenAI)
+
+Install minimal dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Note: If you use OpenAI for embeddings, set the environment variable `OPENAI_API_KEY` or pass it explicitly in the config shown below.
+
 ## Concept
 
 1. **Create embeddings** for a set of reference snippets (e.g., short descriptions of known file types or documents).
@@ -18,32 +34,39 @@ Vector: (embedding of an XML file)
 → Result: "このファイルの種類は XMLです"
 ```
 
-## Minimal Example
+## Minimal Example (Async)
 
 ```python
+import asyncio
 from mcp_assoc_memory.core.embedding_service import create_embedding_service
 from mcp_assoc_memory.core.singleton_memory_manager import SingletonMemoryManager
 
-# Initialize services
-embedding_service = create_embedding_service({
-    "embedding": {"service": "openai", "api_key": "YOUR_OPENAI_KEY"}
-})
-manager = SingletonMemoryManager.create(embedding_service=embedding_service)
 
-# 1. Store reference embeddings with labels
-xml_text = "XMLです"
-xml_vec = await embedding_service.get_embedding("<sample xml></sample>")
-await manager.vector_store.upsert("xml_label", xml_vec, metadata={"label": xml_text})
+async def main() -> None:
+    # Initialize services
+    embedding_service = create_embedding_service({
+        "embedding": {"service": "openai", "api_key": "YOUR_OPENAI_KEY"}
+    })
+    manager = SingletonMemoryManager.create(embedding_service=embedding_service)
 
-# 2. Query with new content
-file_content = "<?xml version='1.0'?><root/>"
-file_vec = await embedding_service.get_embedding(file_content)
-results = await manager.vector_store.query(file_vec, top_k=1)
-label = results[0].metadata["label"]
+    # 1. Store reference embeddings with labels
+    xml_text = "XMLです"
+    xml_vec = await embedding_service.get_embedding("<sample xml></sample>")
+    await manager.vector_store.upsert("xml_label", xml_vec, metadata={"label": xml_text})
 
-prefix = "このファイルの種類は"
-result = f"{prefix} {label}"
-print(result)  # => "このファイルの種類は XMLです"
+    # 2. Query with new content
+    file_content = "<?xml version='1.0'?><root/>"
+    file_vec = await embedding_service.get_embedding(file_content)
+    results = await manager.vector_store.query(file_vec, top_k=1)
+    label = results[0].metadata["label"]
+
+    prefix = "このファイルの種類は"
+    result = f"{prefix} {label}"
+    print(result)  # => "このファイルの種類は XMLです"
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 You can optionally pass `result` to an LLM if you want a longer or more natural explanation.  This workflow keeps the prefix fixed and uses embeddings purely for retrieval of the appropriate continuation text.

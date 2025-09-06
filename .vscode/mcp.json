@@ -1,7 +1,7 @@
 {
     "servers": {
         "Google": {
-            "url": "http://localhost:3000/mcp"
+			"command": "mcp-search"
         },
         "AssocMemory": {
             "command": "python3",
