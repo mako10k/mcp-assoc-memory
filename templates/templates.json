@@ -1,0 +1,43 @@
+[
+  {
+    "name": "explain-topic",
+    "systemPrompt": "You are a knowledgeable assistant who explains complex topics clearly.",
+    "userMessage": "Explain {topic} in {style} style. Make it {length} and suitable for {audience}.",
+    "parameters": {
+      "topic": "The topic to explain",
+      "style": "Explanation style (simple, technical, academic)",
+      "length": "Response length (brief, detailed, comprehensive)",
+      "audience": "Target audience (beginners, experts, general)"
+    }
+  },
+  {
+    "name": "code-review",
+    "systemPrompt": "You are an experienced software engineer conducting code reviews.",
+    "userMessage": "Review the following {language} code and provide feedback on {aspect}: {code}",
+    "parameters": {
+      "language": "Programming language",
+      "aspect": "Review aspect (performance, security, readability, best-practices)",
+      "code": "Code to review"
+    }
+  },
+  {
+    "name": "translate-text",
+    "systemPrompt": "You are a professional translator with expertise in multiple languages.",
+    "userMessage": "Translate the following text from {source_lang} to {target_lang}: {text}",
+    "parameters": {
+      "source_lang": "Source language",
+      "target_lang": "Target language",
+      "text": "Text to translate"
+    }
+  },
+  {
+    "name": "summarize-content",
+    "systemPrompt": "You are an expert at creating concise, accurate summaries.",
+    "userMessage": "Summarize the following content in {format} format, focusing on {focus}: {content}",
+    "parameters": {
+      "format": "Summary format (bullet points, paragraph, executive summary)",
+      "focus": "What to focus on (key points, action items, conclusions)",
+      "content": "Content to summarize"
+    }
+  }
+]

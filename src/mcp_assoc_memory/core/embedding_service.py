@@ -122,11 +122,11 @@ class OpenAIEmbeddingService(EmbeddingService):
         """OpenAI クライアントを遅延初期化"""
         if self._client is None:
             try:
-                import openai
-
                 # テストモード検知：外部API呼び出しのみをモック化
                 import os
                 import sys
+
+                import openai
 
                 is_test_mode = (
                     "pytest" in sys.modules
@@ -141,7 +141,9 @@ class OpenAIEmbeddingService(EmbeddingService):
                     self._client = MockOpenAIClient()
                 else:
                     if not self.api_key:
-                        raise ValueError("OpenAI API key is required for production use. Please set your API key in the configuration.")
+                        raise ValueError(
+                            "OpenAI API key is required for production use. Please set your API key in the configuration."
+                        )
                     self._client = openai.AsyncOpenAI(api_key=self.api_key)
             except ImportError:
                 logger.error("OpenAI package not installed", error_code="OPENAI_IMPORT_ERROR")
@@ -328,7 +330,7 @@ def create_embedding_service(config: Optional[Dict[str, Any]] = None) -> Embeddi
 
     # "service"優先、なければ"provider"も許容
     service_type = embedding_config.get("service") or embedding_config.get("provider", "mock")
-    
+
     # "local" を "sentence_transformer" として扱う
     if service_type == "local":
         service_type = "sentence_transformer"

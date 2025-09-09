@@ -168,10 +168,29 @@ The server operates in **STDIO mode** for direct MCP client integration. This is
 - Set your OpenAI API key for embeddings
 - Configure transport options (STDIO enabled by default)
 
+### Database Path Configuration
+
+**🆕 Workspace Pollution Avoidance (NEW)**: The server now stores database files in OS-appropriate user directories by default, keeping your workspace clean.
+
+**Default Locations:**
+- **Linux**: `~/.local/share/mcp-assoc-memory/`
+- **macOS**: `~/Library/Application Support/mcp-assoc-memory/`
+- **Windows**: `%APPDATA%/mcp-assoc-memory/`
+
+**Override with Environment Variables:**
+```bash
+export MCP_DATABASE_PATH="/custom/path/memory.db"
+export MCP_DATA_DIR="/custom/data/directory"
+```
+
+See [Database Path Configuration](docs/database-path-configuration.md) for detailed options.
+
 ### Environment Variables
 
 - `OPENAI_API_KEY`: Required for OpenAI embeddings
 - `MCP_LOG_LEVEL`: Set logging level (DEBUG, INFO, WARNING, ERROR)
+- `MCP_DATABASE_PATH`: Override database file location
+- `MCP_DATA_DIR`: Override data directory location
 
 ## 🛠️ Installation (PyPI, pipx, GitHub)
 

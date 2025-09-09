@@ -1,29 +1,63 @@
 {
-    "servers": {
-        "Google": {
-            "url": "http://localhost:3000/mcp"
-        },
-        "AssocMemory": {
-            "command": "python3",
-            "args": ["-m", "mcp_assoc_memory.server", "--config", "config.json"],
-            "cwd": "${workspaceFolder}",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            }
-        },
-        "ShellServer": {
-            "command": "npm",
-            "args": ["start"],
-            "cwd": "${workspaceFolder}/../mcp-shell-server",
-            "env": {
-                "MCP_SHELL_DEFAULT_WORKDIR": "${workspaceFolder}",
-                "MCP_SHELL_ALLOWED_WORKDIRS": "${workspaceFolder},${userHome},/tmp",
-                "PATH": "${workspaceFolder}/venv/bin:${userHome}/.nvm/versions/node/v22.16.0/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-                "VIRTUAL_ENV": "${workspaceFolder}/venv",
-                "PYTHONPATH": "${workspaceFolder}/src",
-                "NODE_ENV": "development"
-            }
-        }
-
-    }
+	"servers": {
+		"AssocMemory": {
+			"command": "python3",
+			"args": [
+				"-m",
+				"mcp_assoc_memory.server",
+				"--config",
+				"config.json"
+			],
+			"cwd": "${workspaceFolder}",
+			"env": {
+				"PYTHONPATH": "${workspaceFolder}/src",
+				"GOOGLE_API_KEY": "AIzaSyBBvo8t3hn4AOxG4PxiNoc-PlvI0vFNv4g",
+				"GOOGLE_CX": "7313b1ea006ad4112"
+			},
+			"type": "stdio"
+		},
+		"search": {
+			"type": "stdio",
+			"command": "mcp-search",
+			"args": [
+			],
+			"env": {
+				"GOOGLE_API_KEY": "AIzaSyBBvo8t3hn4AOxG4PxiNoc-PlvI0vFNv4g",
+				"GOOGLE_CX": "7313b1ea006ad4112"
+			}
+		},
+		"mcp-llm-generator": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"@mako10k/mcp-llm-generator@1.4.1"
+			],
+			"env": {
+				"LOG_LEVEL": "warn",
+				"NODE_ENV": "production"
+			}
+		},
+		"shell": {
+			"type": "stdio",
+			"command": "mcp-shell-server",
+			"args": []
+		}
+	},
+	"inputs": [
+		{
+			"id": "security_mode",
+			"type": "promptString",
+			"description": "Security mode (permissive, restrictive, or custom)? Leave blank for default (restrictive)."
+		},
+		{
+			"id": "default_workdir",
+			"type": "promptString",
+			"description": "Default working directory for shell commands (optional)"
+		},
+		{
+			"id": "allowed_workdirs",
+			"type": "promptString",
+			"description": "Comma-separated list of allowed working directories (optional)"
+		}
+	]
 }

@@ -7,8 +7,8 @@ corrupt similarity calculations and search results.
 """
 
 import json
-from typing import Dict, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 from ..config import get_config
 from ..storage.metadata_store import SQLiteMetadataStore
@@ -69,7 +69,7 @@ class EmbeddingValidator:
         """Get current embedding configuration from config"""
         config = get_config()
         embedding_config = config.embedding  # Use dataclass directly
-        
+
         # Convert provider to standardized format for validation
         provider = embedding_config.provider
         if provider == "local":
@@ -79,10 +79,7 @@ class EmbeddingValidator:
             "provider": provider,
             "model": embedding_config.model,
             "dimensions": "auto",  # Will be determined by actual embedding service
-            "config_hash": self._calculate_config_hash({
-                "provider": provider,
-                "model": embedding_config.model
-            }),
+            "config_hash": self._calculate_config_hash({"provider": provider, "model": embedding_config.model}),
         }
 
     async def _get_stored_embedding_config(self) -> Optional[Dict[str, Any]]:
@@ -139,10 +136,7 @@ class EmbeddingValidator:
         import hashlib
 
         # Only include settings that affect vector compatibility
-        relevant_config = {
-            "provider": config.get("provider", "mock"),
-            "model": config.get("model", "unknown")
-        }
+        relevant_config = {"provider": config.get("provider", "mock"), "model": config.get("model", "unknown")}
 
         config_str = json.dumps(relevant_config, sort_keys=True)
         return hashlib.sha256(config_str.encode()).hexdigest()[:16]

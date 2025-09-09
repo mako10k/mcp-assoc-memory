@@ -243,3 +243,5 @@ config.json
 
 # Misc
 /.copilot-temp/
+*.db-shm
+*.db-wal

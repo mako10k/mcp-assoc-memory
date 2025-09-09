@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .utils.paths import get_data_dir, get_database_path, _ensure_dir
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,7 +22,7 @@ class DatabaseConfig:
     """Database configuration"""
 
     type: str = "sqlite"  # sqlite, postgresql
-    path: str = "data/memory.db"  # For SQLite
+    path: str = field(default_factory=lambda: str(get_database_path()))  # For SQLite
     host: str = "localhost"  # For PostgreSQL
     port: int = 5432
     database: str = "mcp_memory"
@@ -38,45 +40,46 @@ class EmbeddingConfig:
     api_key: str = ""
     cache_size: int = 1000
     batch_size: int = 100
-    
+
     def _determine_default_provider(self) -> str:
         """Determine default provider based on API key availability"""
         if self.provider:
             return self.provider  # Explicit provider selection takes precedence
-        
+
         # Auto-determine based on API key availability
         api_key = self.api_key or os.getenv("OPENAI_API_KEY", "")
         if api_key and api_key.strip():
             return "openai"
         else:
             return "local"
-    
+
     def _determine_default_model(self, provider: str) -> str:
         """Determine default model based on provider"""
         if self.model:
             return self.model  # Explicit model selection takes precedence
-            
+
         if provider == "openai":
             return "text-embedding-3-small"
         elif provider in ["local", "sentence_transformer"]:
             return "all-MiniLM-L6-v2"
         else:
             raise ValueError(f"Unsupported provider: {provider}")
-    
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize provider and model with defaults if not explicitly set"""
         # Determine provider if not set
         if not self.provider:
             self.provider = self._determine_default_provider()
-        
+
         # Validate provider
         if self.provider not in ["openai", "local", "sentence_transformer"]:
-            raise ValueError(f"Invalid provider '{self.provider}'. Must be 'openai', 'local', or 'sentence_transformer'")
-        
+            raise ValueError(
+                f"Invalid provider '{self.provider}'. Must be 'openai', 'local', or 'sentence_transformer'"
+            )
+
         # Determine model if not set
         if not self.model:
             self.model = self._determine_default_model(self.provider)
-        
+
         # Provider-specific validation
         if self.provider == "openai":
             api_key = self.api_key or os.getenv("OPENAI_API_KEY", "")
@@ -88,7 +91,7 @@ class EmbeddingConfig:
 class StorageConfig:
     """Storage configuration"""
 
-    data_dir: str = "data"
+    data_dir: str = field(default_factory=lambda: str(get_data_dir()))
     vector_store_type: str = "chromadb"  # chromadb, faiss, local
     graph_store_type: str = "networkx"  # networkx, neo4j
     backup_enabled: bool = True
@@ -100,6 +103,17 @@ class StorageConfig:
     allow_absolute_paths: bool = False  # Allow absolute file paths
     max_export_size_mb: int = 100  # Maximum export file size
     max_import_size_mb: int = 100  # Maximum import file size
+
+
+@dataclass
+class SearchConfig:
+    """Search and web fetch configuration"""
+
+    google_api_key: str = ""
+    google_cx: str = ""
+    default_session_prefix: str = "search"
+    request_timeout_seconds: int = 30
+    max_content_size_mb: int = 10
 
 
 @dataclass
@@ -152,6 +166,7 @@ class Config:
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
+    search: SearchConfig = field(default_factory=SearchConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     transport: TransportConfig = field(default_factory=TransportConfig)
     api: APIConfig = field(default_factory=APIConfig)
@@ -227,7 +242,10 @@ class Config:
         """Load configuration from environment variables"""
         # Database configuration
         self.database.type = os.getenv("DB_TYPE", self.database.type)
-        self.database.path = os.getenv("DB_PATH", self.database.path)
+        # Use environment variable override or resolve workspace path
+        db_path = os.getenv("DB_PATH")
+        if db_path:
+            self.database.path = str(Path(db_path).expanduser())
         self.database.host = os.getenv("DB_HOST", self.database.host)
         self.database.port = int(os.getenv("DB_PORT", str(self.database.port)))
         self.database.database = os.getenv("DB_NAME", self.database.database)
@@ -240,12 +258,20 @@ class Config:
         self.embedding.api_key = os.getenv("OPENAI_API_KEY", self.embedding.api_key)
 
         # Storage configuration
-        self.storage.data_dir = os.getenv("DATA_DIR", self.storage.data_dir)
+        # Use environment variable override or resolve workspace path
+        data_dir = os.getenv("DATA_DIR")
+        if data_dir:
+            self.storage.data_dir = str(Path(data_dir).expanduser())
         self.storage.export_dir = os.getenv("EXPORT_DIR", self.storage.export_dir)
         self.storage.import_dir = os.getenv("IMPORT_DIR", self.storage.import_dir)
         self.storage.allow_absolute_paths = os.getenv("ALLOW_ABSOLUTE_PATHS", "false").lower() == "true"
         self.storage.max_export_size_mb = int(os.getenv("MAX_EXPORT_SIZE_MB", str(self.storage.max_export_size_mb)))
         self.storage.max_import_size_mb = int(os.getenv("MAX_IMPORT_SIZE_MB", str(self.storage.max_import_size_mb)))
+
+        # Search configuration
+        self.search.google_api_key = os.getenv("GOOGLE_API_KEY", self.search.google_api_key)
+        self.search.google_cx = os.getenv("GOOGLE_CX", self.search.google_cx)
+        self.search.default_session_prefix = os.getenv("SEARCH_SESSION_PREFIX", self.search.default_session_prefix)
 
         # Security configuration
         self.security.auth_enabled = os.getenv("AUTH_ENABLED", "false").lower() == "true"
@@ -266,6 +292,7 @@ class Config:
         self.database = expand_dict_env_vars(self.database)
         self.embedding = expand_dict_env_vars(self.embedding)
         self.storage = expand_dict_env_vars(self.storage)
+        self.search = expand_dict_env_vars(self.search)
         self.security = expand_dict_env_vars(self.security)
         self.transport = expand_dict_env_vars(self.transport)
         self.api = expand_dict_env_vars(self.api)
@@ -301,7 +328,8 @@ class Config:
     def _validate(self) -> None:
         """Validate configuration values"""
         # Create data directory
-        Path(self.storage.data_dir).mkdir(parents=True, exist_ok=True)
+    data_dir_path = Path(self.storage.data_dir)
+    _ensure_dir(data_dir_path)
 
         # Check required settings
         if self.embedding.provider == "openai" and not self.embedding.api_key:
@@ -329,16 +357,13 @@ def expand_environment_variables(text: str) -> str:
     環境変数展開機能
     ${VAR_NAME} または $VAR_NAME 形式の環境変数を展開する
     """
-    if not isinstance(text, str):
-        return text
-
     # ${VAR_NAME} 形式の環境変数を展開
-    def replace_env_var(match):
+    def replace_env_var(match: Any) -> str:
         var_name = match.group(1)
         return os.getenv(var_name, match.group(0))  # 見つからない場合は元のまま
 
     # ${VAR_NAME} パターンを置換
-    result = re.sub(r"\$\{([A-Za-z_][A-ZaZ0-9_]*)\}", replace_env_var, text)
+    result = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", replace_env_var, text)
 
     return result
 
@@ -381,7 +406,7 @@ def get_config() -> Config:
             if _global_config is None:
                 _global_config = Config.load()
                 logger.info(
-                    f"Initialized global Config singleton with api config: {hasattr(_global_config.api, 'default_response_level')}"
+                    f"Initialized global Config singleton with api config: {hasattr(_global_config.api, 'enable_response_metadata')}"
                 )
 
     return _global_config
@@ -401,7 +426,7 @@ def set_config(config: Config) -> None:
     global _global_config
     with _config_lock:
         _global_config = config
-        logger.info(f"Set global Config singleton with api config: {hasattr(config.api, 'default_response_level')}")
+        logger.info(f"Set global Config singleton with api config: {hasattr(config.api, 'enable_response_metadata')}")
 
 
 def initialize_config(config_path: Optional[str] = None) -> Config:
@@ -422,8 +447,8 @@ def initialize_config(config_path: Optional[str] = None) -> Config:
     with _config_lock:
         _global_config = Config.load(config_path)
         logger.info(f"Initialized global Config from {config_path or 'default locations'}")
-        logger.info(f"API config loaded: {hasattr(_global_config.api, 'default_response_level')}")
-        if hasattr(_global_config.api, "default_response_level"):
-            logger.info(f"Default response level: {_global_config.api.default_response_level}")
+        logger.info(f"API config loaded: {hasattr(_global_config.api, 'enable_response_metadata')}")
+        if hasattr(_global_config.api, "enable_response_metadata"):
+            logger.info(f"Response metadata enabled: {_global_config.api.enable_response_metadata}")
 
     return _global_config

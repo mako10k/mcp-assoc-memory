@@ -14,6 +14,7 @@ import networkx as nx
 from ..models.association import Association
 from ..models.memory import Memory
 from ..utils.logging import get_memory_logger
+from ..utils.paths import get_graph_path
 from .base import BaseGraphStore
 
 logger = get_memory_logger(__name__)
@@ -135,8 +136,17 @@ class NetworkXGraphStore(BaseGraphStore):
 
     """NetworkX実装のグラフストア"""
 
-    def __init__(self, graph_path: str = "./data/memory_graph.pkl"):
-        self.graph_path = graph_path
+    def __init__(self, graph_path: Optional[str] = None):
+        from pathlib import Path
+
+        from ..utils.paths import get_graph_path
+
+        if graph_path is None:
+            p = get_graph_path()
+        else:
+            p = Path(graph_path).expanduser().resolve()
+        assert p.is_absolute(), f"graph_path must be absolute: {p}"
+        self.graph_path = str(p)
         self.graph = nx.MultiDiGraph()
         self.graph_lock = asyncio.Lock()
 

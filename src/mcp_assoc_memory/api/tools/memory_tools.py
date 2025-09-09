@@ -15,10 +15,7 @@ from fastmcp import Context
 
 from ...config import get_config
 from ...core.memory_manager import MemoryManager
-from ...core.singleton_memory_manager import (
-    get_or_create_memory_manager,
-)
-from ..processing import process_tool_response
+from ...core.singleton_memory_manager import get_or_create_memory_manager
 from ..models import (
     DiversifiedSearchRequest,
     Memory,
@@ -38,8 +35,9 @@ from ..models import (
     PaginationInfo,
     UnifiedSearchRequest,
 )
-from ..models.responses import SearchResultWithAssociations, Association
 from ..models.common import CommonToolParameters, ResponseBuilder, ResponseLevel
+from ..models.responses import Association, SearchResultWithAssociations
+from ..processing import process_tool_response
 from .export_tools import handle_memory_export
 
 # Global references (will be set by server.py)
@@ -1387,10 +1385,11 @@ async def handle_memory_sync(request: MemorySyncRequest, ctx: Context) -> Dict[s
 async def _resolve_import_path(file_path: str) -> Path:
     """Resolve import file path with proper validation."""
     path = Path(file_path)
+    from ...utils.paths import get_imports_dir
 
-    # If it's a relative path, make it relative to the data directory
+    # If it's a relative path, make it relative to the user data imports dir
     if not path.is_absolute():
-        data_dir = Path("data/imports")
+        data_dir = get_imports_dir()
         data_dir.mkdir(parents=True, exist_ok=True)
         path = data_dir / path
 
